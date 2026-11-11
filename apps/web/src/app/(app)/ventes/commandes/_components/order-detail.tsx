@@ -4,21 +4,14 @@
 // acomptes, factures liées, pièce du client. Préparer une facture crée un BROUILLON et
 // l'ouvre : « Émettre » reste dans l'écran des factures (`sales.invoice`).
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Field, Modal, SegmentedControl, TextInput, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { salesContractsApi, type SalesOrderView } from '@/lib/api-sales-contracts';
 
-import {
-  Alerte,
-  BOUTON,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Pastille,
-} from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -498,6 +491,7 @@ function FenetreFacturer({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
+        {/* ADR-0074 : type en segments, quantités à la largeur d'une quantité. */}
         {champs['lines'] ? <p className="text-sm text-[var(--danger)]">{champs['lines']}</p> : null}
         {avert.length > 0 ? (
           <ul className="list-disc pl-5 text-sm">
@@ -506,18 +500,16 @@ function FenetreFacturer({
             ))}
           </ul>
         ) : null}
-        <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${id}-type`}>
-          Type de facture
-          <select
-            id={`${id}-type`}
+        <Field id={`${id}-type`} label="Type de facture" group>
+          <SegmentedControl<'FV' | 'EV'>
             value={type}
-            onChange={(e) => setType(e.target.value as 'FV' | 'EV')}
-            className={CHAMP}
-          >
-            <option value="FV">Facture de vente (FV)</option>
-            <option value="EV">Facture de vente à l’export (EV)</option>
-          </select>
-        </label>
+            onChange={setType}
+            options={[
+              { value: 'FV', label: 'Facture de vente (FV)' },
+              { value: 'EV', label: 'À l’export (EV)' },
+            ]}
+          />
+        </Field>
         <table className="w-full text-sm">
           <caption className="sr-only">Quantités à facturer</caption>
           <thead>
@@ -543,12 +535,13 @@ function FenetreFacturer({
                     {reste ? formatQuantite(reste.remainingToPrepare) : '—'}
                   </td>
                   <td className="text-right">
-                    <input
+                    <TextInput
                       aria-label={`Quantité à facturer — ${l.name}`}
                       inputMode="decimal"
                       value={quantites[l.lineRef] ?? ''}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) => setQuantites((q) => ({ ...q, [l.lineRef]: e.target.value }))}
-                      className={`${CHAMP} max-w-[8rem] text-right`}
+                      className="ml-auto max-w-[7rem] text-right tabular-nums"
                       aria-invalid={champs[l.lineRef] ? true : undefined}
                     />
                     {champs[l.lineRef] ? (

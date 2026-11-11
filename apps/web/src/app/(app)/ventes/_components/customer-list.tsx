@@ -10,14 +10,15 @@
 // La suppression n'est proposée que pour un client JAMAIS facturé (§ O7) ;
 // sinon, seule la désactivation le retire des propositions.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Field, FormGrid, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 import { api, type CustomerType, type CustomerView, type SalesStatusFilter } from '@/lib/api';
 
 import { CustomerForm } from './customer-form';
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, CHAMP, Pastille } from './form-ui';
+import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from './form-ui';
 import { useAccesVentes } from './sales-access';
 import {
   actionsLigne,
@@ -157,65 +158,39 @@ export function CustomerList(): React.ReactElement {
         ) : null}
       </div>
 
-      <form
-        role="search"
-        aria-label="Rechercher un client"
-        onSubmit={(e) => e.preventDefault()}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
-      >
-        <div className="col-span-2 flex flex-col gap-1.5 sm:col-span-1">
-          <label htmlFor="cl-q" className="text-sm font-medium">
-            Rechercher
-          </label>
-          <input
-            id="cl-q"
-            type="search"
-            value={filtres.q}
-            onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
-            maxLength={100}
-            placeholder="Nom, NIF ou e-mail"
-            className={CHAMP}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="cl-filtre-type" className="text-sm font-medium">
-            Type
-          </label>
-          <select
-            id="cl-filtre-type"
-            value={filtres.type}
-            onChange={(e) =>
-              setFiltres((f) => ({ ...f, type: e.target.value as CustomerType | '' }))
-            }
-            className={CHAMP}
-          >
-            <option value="">Tous les types</option>
-            {CUSTOMER_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="cl-filtre-statut" className="text-sm font-medium">
-            État
-          </label>
-          <select
-            id="cl-filtre-statut"
-            value={filtres.status}
-            onChange={(e) =>
-              setFiltres((f) => ({ ...f, status: e.target.value as SalesStatusFilter }))
-            }
-            className={CHAMP}
-          >
-            {(Object.keys(STATUS_LABELS) as SalesStatusFilter[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </div>
+      <form role="search" aria-label="Rechercher un client" onSubmit={(e) => e.preventDefault()}>
+        <FormGrid>
+          <Field id="cl-q" label="Rechercher" size="lg">
+            <TextInput
+              type="search"
+              value={filtres.q}
+              onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
+              maxLength={100}
+              placeholder="Nom, NIF ou e-mail"
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
+            />
+          </Field>
+          <Field id="cl-filtre-type" label="Type" size="sm">
+            <Select<CustomerType | ''>
+              value={filtres.type}
+              onChange={(v) => setFiltres((f) => ({ ...f, type: v }))}
+              options={[
+                { value: '', label: 'Tous les types' },
+                ...CUSTOMER_TYPES.map((t) => ({ value: t.value, label: t.label })),
+              ]}
+            />
+          </Field>
+          <Field id="cl-filtre-statut" label="État" size="sm">
+            <Select<SalesStatusFilter>
+              value={filtres.status}
+              onChange={(v) => setFiltres((f) => ({ ...f, status: v }))}
+              options={(Object.keys(STATUS_LABELS) as SalesStatusFilter[]).map((s) => ({
+                value: s,
+                label: STATUS_LABELS[s],
+              }))}
+            />
+          </Field>
+        </FormGrid>
       </form>
 
       <p aria-live="polite" className="min-h-[1.25rem] text-sm text-[var(--foreground-muted)]">

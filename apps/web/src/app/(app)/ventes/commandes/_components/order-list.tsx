@@ -3,7 +3,8 @@
 // Liste des commandes clients — ADR-0050 § 9, lot V7. Lecture `sales.read` ; « + Commande »
 // (`sales.contract`) ouvre une fenêtre modale. Cartes entièrement cliquables.
 
-import { buttonClasses } from '@lalanda/ui';
+import { buttonClasses, Select, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -14,7 +15,7 @@ import {
   type SalesOrderSummary,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, CHAMP, Pastille } from '../../_components/form-ui';
+import { Alerte, BOUTON, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -97,28 +98,24 @@ export function OrderList(): React.ReactElement {
           </button>
         ) : null}
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <input
+      <div role="search" className="flex flex-wrap gap-2">
+        <TextInput
           type="search"
           aria-label="Rechercher une commande"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Numéro CC…, client ou référence"
           maxLength={100}
-          className={CHAMP}
+          leading={<Search aria-hidden="true" className="h-4 w-4" />}
+          className="min-w-0 flex-1 basis-60"
         />
-        <select
+        <Select<SalesOrderStatus | 'all'>
           aria-label="Statut"
           value={statut}
-          onChange={(e) => setStatut(e.target.value as SalesOrderStatus | 'all')}
-          className={CHAMP}
-        >
-          {FILTRES_COMMANDES.map((f) => (
-            <option key={f.valeur} value={f.valeur}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+          onChange={setStatut}
+          options={FILTRES_COMMANDES.map((f) => ({ value: f.valeur, label: f.label }))}
+          className="w-full sm:w-52"
+        />
       </div>
       {erreur ? (
         <Alerte>

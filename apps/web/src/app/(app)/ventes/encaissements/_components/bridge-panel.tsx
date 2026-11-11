@@ -3,7 +3,11 @@
 // Pont vers le réalisé du plan (ADR-0031 § 3). Désactivé par défaut ; l'activer
 // demande trois choix explicites (projet, ligne de chiffre d'affaires, mois qui
 // ouvre l'exercice 1). « Simuler » montre ce qui serait écrit sans rien écrire.
+//
+// ADR-0074 : initiative et ligne en `Select` ; le mois reste un champ mois natif
+// (pas de sélecteur de mois dans `@lalanda/ui`), au style commun.
 
+import { Field, FormGrid, Select, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -14,7 +18,7 @@ import {
   type ActualsSyncReport,
 } from '@/lib/api';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ, Pastille } from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { messageVentes } from '../../_components/sales-model';
 
@@ -124,61 +128,48 @@ export function BridgePanel(): React.ReactElement {
 
       {importerRealise ? (
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] p-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Champ id="pont-projet" label="Initiative qui reçoit le réalisé">
-              <select
-                id="pont-projet"
+          <FormGrid>
+            <Field id="pont-projet" label="Initiative qui reçoit le réalisé" size="lg">
+              <Select<string>
                 value={reglage.projectId ?? ''}
-                onChange={(e) =>
+                placeholder="Choisir…"
+                onChange={(v) =>
                   setReglage((r) => ({
                     ...r,
-                    projectId: e.target.value === '' ? null : e.target.value,
+                    projectId: v === '' ? null : v,
                     revenueLineId: null,
                   }))
                 }
-                className={CHAMP}
-              >
-                <option value="">Choisir…</option>
-                {candidats.map((c) => (
-                  <option
-                    key={c.projectId}
-                    value={c.projectId}
-                    disabled={c.approvedPlanVersion === null}
-                  >
-                    {c.name} ({c.currency})
-                    {c.approvedPlanVersion === null ? ' — aucun plan validé' : ''}
-                  </option>
-                ))}
-              </select>
-            </Champ>
-            <Champ id="pont-ligne" label="Ligne de chiffre d’affaires">
-              <select
-                id="pont-ligne"
+                options={candidats.map((c) => ({
+                  value: c.projectId,
+                  label: `${c.name} (${c.currency})`,
+                  disabled: c.approvedPlanVersion === null,
+                  ...(c.approvedPlanVersion === null ? { description: 'Aucun plan validé' } : {}),
+                }))}
+              />
+            </Field>
+            <Field id="pont-ligne" label="Ligne de chiffre d’affaires" size="md" disabled={!projet}>
+              <Select<string>
                 value={reglage.revenueLineId ?? ''}
-                onChange={(e) =>
+                placeholder={projet ? 'Choisir…' : 'Choisir d’abord l’initiative'}
+                onChange={(v) =>
                   setReglage((r) => ({
                     ...r,
-                    revenueLineId: e.target.value === '' ? null : e.target.value,
+                    revenueLineId: v === '' ? null : v,
                   }))
                 }
-                className={CHAMP}
-                disabled={!projet}
-              >
-                <option value="">Choisir…</option>
-                {(projet?.lines ?? []).map((l) => (
-                  <option key={l.lineId} value={l.lineId}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </Champ>
-            <Champ
+                options={(projet?.lines ?? []).map((l) => ({ value: l.lineId, label: l.label }))}
+              />
+            </Field>
+            <Field
               id="pont-debut"
               label="Mois qui ouvre l’exercice 1"
-              aide="Le mois civil où commence le premier exercice du plan. Initiative et début d’exercice sont communs au report des dépenses (Trésorerie)."
+              size="sm"
+              newRow
+              hint="Le mois civil où commence le premier exercice du plan. Initiative et début d’exercice sont communs au report des dépenses (Trésorerie)."
             >
-              <input
-                id="pont-debut"
+              {/* Aucun sélecteur de mois dans @lalanda/ui : champ mois natif, style commun. */}
+              <TextInput
                 type="month"
                 value={reglage.exerciseStart ?? ''}
                 onChange={(e) =>
@@ -187,11 +178,9 @@ export function BridgePanel(): React.ReactElement {
                     exerciseStart: e.target.value === '' ? null : e.target.value,
                   }))
                 }
-                className={CHAMP}
-                aria-describedby="pont-debut-aide"
               />
-            </Champ>
-          </div>
+            </Field>
+          </FormGrid>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"

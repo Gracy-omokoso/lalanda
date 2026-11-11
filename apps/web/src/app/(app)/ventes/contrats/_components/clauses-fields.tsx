@@ -3,12 +3,27 @@
 // Clauses SAISIES d'un contrat (début, durée, reconduction, préavis, échéancier, texte) —
 // ADR-0050 § 2.3, § 2.4, lot V7. Lalanda calcule des dates à partir de ces clauses ; il
 // n'en juge pas la validité juridique (bandeau constant de la fiche).
+//
+// ADR-0074 : dates en `DatePicker`, durées et nombres à la largeur d'un nombre, listes
+// en `Select`, mode de facturation en cartes de choix, préparation automatique en
+// interrupteur. Mêmes valeurs saisies, mêmes erreurs. Les identifiants des échéances
+// viennent de leur position (la clé interne diffère entre serveur et navigateur).
 
 import { SALES_CONTRACT_CLAUSES_BANNER } from '@lalanda/shared/sales-contracts';
+import {
+  ChoiceCards,
+  DatePicker,
+  Field,
+  FormGrid,
+  Select,
+  Switch,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 
 import type { InvoiceLineBody } from '@/lib/api';
 
-import { BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { BOUTON_PETIT } from '../../_components/form-ui';
 
 import {
   FREQUENCE_LABELS,
@@ -23,6 +38,9 @@ function nomLigne(l: InvoiceLineBody, i: number): string {
   if (l.source === 'free') return l.name;
   return `Ligne ${i + 1} (article du catalogue)`;
 }
+
+const options = <K extends string>(libelles: Record<K, string>): { value: K; label: string }[] =>
+  (Object.keys(libelles) as K[]).map((k) => ({ value: k, label: libelles[k] }));
 
 export function ChampsClauses({
   prefixe,
@@ -50,111 +68,118 @@ export function ChampsClauses({
     <K extends keyof FormulaireClauses>(k: K) =>
     (v: FormulaireClauses[K]) =>
       setF((x) => ({ ...x, [k]: v }));
+  const majEcheance = (
+    cleEcheance: string,
+    patch: Partial<FormulaireClauses['echeances'][number]>,
+  ): void =>
+    setF((x) => ({
+      ...x,
+      echeances: x.echeances.map((y) => (y.cle === cleEcheance ? { ...y, ...patch } : y)),
+    }));
 
   return (
-    <div className="flex flex-col gap-5">
-      <p className="rounded-md border border-[var(--border)] p-3 text-sm">
+    <div className="flex min-w-0 flex-col gap-5">
+      <p className="rounded-[var(--radius-md)] border border-[var(--border)] p-3 text-sm">
         {SALES_CONTRACT_CLAUSES_BANNER}
       </p>
-      <fieldset className="grid gap-4 sm:grid-cols-3" disabled={desactive}>
-        <legend className="mb-1 text-sm font-semibold sm:col-span-3">Durée et préavis</legend>
-        <Champ id={`${p}-debut`} label="Début du contrat" requis erreur={erreurs['startDate']}>
-          <input
+      <fieldset className="flex min-w-0 flex-col gap-3" disabled={desactive}>
+        <legend className="mb-1 text-sm font-semibold">Durée et préavis</legend>
+        <FormGrid>
+          <Field
             id={`${p}-debut`}
-            type="date"
-            value={f.startDate}
-            onChange={(e) => set('startDate')(e.target.value)}
-            className={CHAMP}
-            {...aria(`${p}-debut`, erreurs['startDate'])}
-          />
-        </Champ>
-        <Champ
-          id={`${p}-duree`}
-          label="Durée du premier terme (mois)"
-          aide="Vide : durée indéterminée."
-          erreur={erreurs['initialTermMonths']}
-        >
-          <input
+            label="Début du contrat"
+            required
+            size="sm"
+            error={erreurs['startDate']}
+          >
+            <DatePicker
+              value={f.startDate}
+              onChange={set('startDate')}
+              shortcuts={['today', 'endOfMonth']}
+            />
+          </Field>
+          <Field
             id={`${p}-duree`}
-            inputMode="numeric"
-            value={f.dureeMois}
-            onChange={(e) => set('dureeMois')(e.target.value)}
-            className={CHAMP}
-            {...aria(`${p}-duree`, erreurs['initialTermMonths'], true)}
-          />
-        </Champ>
-        <Champ
-          id={`${p}-preavis`}
-          label="Préavis (jours)"
-          requis
-          aide="Clause de votre contrat, de 0 à 365 jours."
-          erreur={erreurs['noticeDays']}
-        >
-          <input
+            label="Durée du premier terme"
+            optional
+            size="sm"
+            hint="Vide : durée indéterminée."
+            error={erreurs['initialTermMonths']}
+          >
+            <TextInput
+              inputMode="numeric"
+              value={f.dureeMois}
+              onChange={(e) => set('dureeMois')(e.target.value)}
+              trailing="mois"
+              className="text-right tabular-nums"
+            />
+          </Field>
+          <Field
             id={`${p}-preavis`}
-            inputMode="numeric"
-            value={f.preavisJours}
-            onChange={(e) => set('preavisJours')(e.target.value)}
-            className={CHAMP}
-            {...aria(`${p}-preavis`, erreurs['noticeDays'], true)}
-          />
-        </Champ>
+            label="Préavis"
+            required
+            size="sm"
+            hint="Clause de votre contrat, de 0 à 365 jours."
+            error={erreurs['noticeDays']}
+          >
+            <TextInput
+              inputMode="numeric"
+              value={f.preavisJours}
+              onChange={(e) => set('preavisJours')(e.target.value)}
+              trailing="jours"
+              className="text-right tabular-nums"
+            />
+          </Field>
+        </FormGrid>
       </fieldset>
 
-      <fieldset className="grid gap-4 sm:grid-cols-3" disabled={desactive}>
-        <legend className="mb-1 text-sm font-semibold sm:col-span-3">Reconduction</legend>
-        <Champ id={`${p}-reconduction`} label="Mode" erreur={erreurs['renewal.mode']}>
-          <select
-            id={`${p}-reconduction`}
-            value={f.reconduction}
-            onChange={(e) =>
-              set('reconduction')(e.target.value as FormulaireClauses['reconduction'])
-            }
-            className={CHAMP}
-          >
-            {(Object.keys(RECONDUCTION_LABELS) as FormulaireClauses['reconduction'][]).map((m) => (
-              <option key={m} value={m}>
-                {RECONDUCTION_LABELS[m]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        {f.reconduction !== 'none' ? (
-          <>
-            <Champ
-              id={`${p}-periode`}
-              label="Période de reconduction (mois)"
-              requis
-              erreur={erreurs['renewal.periodMonths']}
-            >
-              <input
+      <fieldset className="flex min-w-0 flex-col gap-3" disabled={desactive}>
+        <legend className="mb-1 text-sm font-semibold">Reconduction</legend>
+        <FormGrid>
+          <Field id={`${p}-reconduction`} label="Mode" size="md" error={erreurs['renewal.mode']}>
+            <Select<FormulaireClauses['reconduction']>
+              value={f.reconduction}
+              onChange={set('reconduction')}
+              options={options(RECONDUCTION_LABELS)}
+            />
+          </Field>
+          {f.reconduction !== 'none' ? (
+            <>
+              <Field
                 id={`${p}-periode`}
-                inputMode="numeric"
-                value={f.periodeMois}
-                onChange={(e) => set('periodeMois')(e.target.value)}
-                className={CHAMP}
-                {...aria(`${p}-periode`, erreurs['renewal.periodMonths'])}
-              />
-            </Champ>
-            <Champ
-              id={`${p}-max`}
-              label="Nombre maximal de reconductions"
-              aide="Vide : sans limite saisie."
-              erreur={erreurs['renewal.maxRenewals']}
-            >
-              <input
+                label="Période de reconduction"
+                required
+                size="sm"
+                error={erreurs['renewal.periodMonths']}
+              >
+                <TextInput
+                  inputMode="numeric"
+                  value={f.periodeMois}
+                  onChange={(e) => set('periodeMois')(e.target.value)}
+                  trailing="mois"
+                  className="text-right tabular-nums"
+                />
+              </Field>
+              <Field
                 id={`${p}-max`}
-                inputMode="numeric"
-                value={f.maxReconductions}
-                onChange={(e) => set('maxReconductions')(e.target.value)}
-                className={CHAMP}
-                {...aria(`${p}-max`, erreurs['renewal.maxRenewals'], true)}
-              />
-            </Champ>
-          </>
-        ) : null}
+                label="Reconductions au plus"
+                optional
+                size="sm"
+                hint="Vide : sans limite saisie."
+                error={erreurs['renewal.maxRenewals']}
+              >
+                <TextInput
+                  inputMode="numeric"
+                  value={f.maxReconductions}
+                  onChange={(e) => set('maxReconductions')(e.target.value)}
+                  className="text-right tabular-nums"
+                />
+              </Field>
+            </>
+          ) : null}
+        </FormGrid>
         {f.reconduction === 'tacit' ? (
-          <p className="text-xs text-[var(--foreground-muted)] sm:col-span-3">
+          <p className="text-xs text-[var(--foreground-muted)]">
             À la fin de chaque terme, Lalanda propose le terme suivant ; une personne habilitée le
             constate d’un geste. Sans ce geste, aucun brouillon n’est préparé au-delà du terme.
           </p>
@@ -162,100 +187,71 @@ export function ChampsClauses({
       </fieldset>
 
       {avecEcheancier ? (
-        <fieldset className="flex flex-col gap-4" disabled={desactive}>
+        <fieldset className="flex min-w-0 flex-col gap-4" disabled={desactive}>
           <legend className="mb-1 text-sm font-semibold">Facturation</legend>
-          <div className="flex flex-wrap gap-4 text-sm">
-            {(
-              [
-                ['none', 'Sans échéancier (factures préparées à la main)'],
-                ['recurring', 'Abonnement (récurrent)'],
-                ['schedule', 'Échéancier à dates fixes'],
-              ] as const
-            ).map(([k, label]) => (
-              <label key={k} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name={`${p}-facturation`}
-                  checked={f.facturation === k}
-                  onChange={() =>
-                    setF((x) => ({
-                      ...x,
-                      facturation: k,
-                      echeances:
-                        k === 'schedule' && x.echeances.length === 0
-                          ? [echeanceVide(0)]
-                          : x.echeances,
-                    }))
-                  }
-                />
-                {label}
-              </label>
-            ))}
-          </div>
+          <ChoiceCards<FormulaireClauses['facturation']>
+            aria-label="Mode de facturation"
+            value={f.facturation}
+            onChange={(k) =>
+              setF((x) => ({
+                ...x,
+                facturation: k,
+                echeances:
+                  k === 'schedule' && x.echeances.length === 0 ? [echeanceVide(0)] : x.echeances,
+              }))
+            }
+            options={[
+              { value: 'none', label: 'Sans échéancier (factures préparées à la main)' },
+              { value: 'recurring', label: 'Abonnement (récurrent)' },
+              { value: 'schedule', label: 'Échéancier à dates fixes' },
+            ]}
+          />
           {f.facturation === 'recurring' ? (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Champ id={`${p}-frequence`} label="Fréquence">
-                <select
-                  id={`${p}-frequence`}
-                  value={f.frequence}
-                  onChange={(e) =>
-                    set('frequence')(e.target.value as FormulaireClauses['frequence'])
-                  }
-                  className={CHAMP}
-                >
-                  {(Object.keys(FREQUENCE_LABELS) as FormulaireClauses['frequence'][]).map((k) => (
-                    <option key={k} value={k}>
-                      {FREQUENCE_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </Champ>
-              <Champ
-                id={`${p}-ancre`}
-                label="Première échéance"
-                requis
-                aide="Les suivantes tombent le même quantième, ramené au dernier jour du mois."
-                erreur={erreurs['billing.anchorDate']}
-              >
-                <input
+            <div className="flex min-w-0 flex-col gap-3">
+              <FormGrid>
+                <Field id={`${p}-frequence`} label="Fréquence" size="md">
+                  <Select<FormulaireClauses['frequence']>
+                    value={f.frequence}
+                    onChange={set('frequence')}
+                    options={options(FREQUENCE_LABELS)}
+                  />
+                </Field>
+                <Field
                   id={`${p}-ancre`}
-                  type="date"
-                  value={f.ancre}
-                  onChange={(e) => set('ancre')(e.target.value)}
-                  className={CHAMP}
-                  {...aria(`${p}-ancre`, erreurs['billing.anchorDate'], true)}
-                />
-              </Champ>
-              <Champ id={`${p}-moment`} label="Libellé de période">
-                <select
-                  id={`${p}-moment`}
-                  value={f.moment}
-                  onChange={(e) => set('moment')(e.target.value as FormulaireClauses['moment'])}
-                  className={CHAMP}
+                  label="Première échéance"
+                  required
+                  size="sm"
+                  hint="Les suivantes tombent le même quantième, ramené au dernier jour du mois."
+                  error={erreurs['billing.anchorDate']}
                 >
-                  {(Object.keys(MOMENT_LABELS) as FormulaireClauses['moment'][]).map((k) => (
-                    <option key={k} value={k}>
-                      {MOMENT_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </Champ>
-              <label className="flex items-center gap-2 text-sm sm:col-span-3">
-                <input
-                  type="checkbox"
-                  checked={f.autoPrepare}
-                  onChange={(e) => set('autoPrepare')(e.target.checked)}
-                />
-                Préparer les brouillons automatiquement à chaque échéance (jamais émis seuls)
-              </label>
-              <p className="text-xs text-[var(--foreground-muted)] sm:col-span-3">
+                  <DatePicker
+                    value={f.ancre}
+                    onChange={set('ancre')}
+                    shortcuts={['today', 'endOfMonth']}
+                  />
+                </Field>
+                <Field id={`${p}-moment`} label="Libellé de période" size="md">
+                  <Select<FormulaireClauses['moment']>
+                    value={f.moment}
+                    onChange={set('moment')}
+                    options={options(MOMENT_LABELS)}
+                  />
+                </Field>
+              </FormGrid>
+              <Switch
+                checked={f.autoPrepare}
+                onChange={set('autoPrepare')}
+                disabled={desactive}
+                label="Préparer les brouillons automatiquement à chaque échéance (jamais émis seuls)"
+              />
+              <p className="text-xs text-[var(--foreground-muted)]">
                 Chaque brouillon reprend les lignes du contrat en vigueur à la date de l’échéance.
                 Aucun prorata : une période incomplète s’ajuste à la main sur le brouillon.
               </p>
             </div>
           ) : null}
           {f.facturation === 'schedule' ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex min-w-0 flex-col gap-3">
               {erreurs['billing.items'] ? (
                 <p className="text-xs font-medium text-[var(--danger)]">
                   {erreurs['billing.items']}
@@ -271,66 +267,51 @@ export function ChampsClauses({
               {f.echeances.map((e, i) => (
                 <div
                   key={e.cle}
-                  className="flex flex-col gap-3 rounded-md border border-[var(--border)] p-3"
+                  className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
                 >
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <Champ
-                      id={`${p}-ech-${e.cle}-date`}
-                      label={`Échéance ${i + 1} — date`}
-                      requis
-                      erreur={erreurs[`billing.items.${i}.dueDate`]}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">Échéance {i + 1}</span>
+                    <button
+                      type="button"
+                      className={`${BOUTON_PETIT} max-sm:h-11`}
+                      onClick={() =>
+                        setF((x) => ({
+                          ...x,
+                          echeances: x.echeances.filter((y) => y.cle !== e.cle),
+                        }))
+                      }
                     >
-                      <input
-                        id={`${p}-ech-${e.cle}-date`}
-                        type="date"
+                      Retirer l’échéance
+                    </button>
+                  </div>
+                  <FormGrid>
+                    <Field
+                      id={`${p}-ech-${i}-date`}
+                      label="Date"
+                      required
+                      size="sm"
+                      error={erreurs[`billing.items.${i}.dueDate`]}
+                    >
+                      <DatePicker
                         value={e.dueDate}
-                        onChange={(ev) =>
-                          setF((x) => ({
-                            ...x,
-                            echeances: x.echeances.map((y) =>
-                              y.cle === e.cle ? { ...y, dueDate: ev.target.value } : y,
-                            ),
-                          }))
-                        }
-                        className={CHAMP}
+                        onChange={(v) => majEcheance(e.cle, { dueDate: v })}
+                        shortcuts={['endOfMonth', 'plus30']}
                       />
-                    </Champ>
-                    <Champ
-                      id={`${p}-ech-${e.cle}-label`}
+                    </Field>
+                    <Field
+                      id={`${p}-ech-${i}-label`}
                       label="Libellé"
-                      requis
-                      erreur={erreurs[`billing.items.${i}.label`]}
+                      required
+                      size="lg"
+                      error={erreurs[`billing.items.${i}.label`]}
                     >
-                      <input
-                        id={`${p}-ech-${e.cle}-label`}
+                      <TextInput
                         value={e.label}
                         maxLength={200}
-                        onChange={(ev) =>
-                          setF((x) => ({
-                            ...x,
-                            echeances: x.echeances.map((y) =>
-                              y.cle === e.cle ? { ...y, label: ev.target.value } : y,
-                            ),
-                          }))
-                        }
-                        className={CHAMP}
+                        onChange={(ev) => majEcheance(e.cle, { label: ev.target.value })}
                       />
-                    </Champ>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        className={BOUTON_PETIT}
-                        onClick={() =>
-                          setF((x) => ({
-                            ...x,
-                            echeances: x.echeances.filter((y) => y.cle !== e.cle),
-                          }))
-                        }
-                      >
-                        Retirer l’échéance
-                      </button>
-                    </div>
-                  </div>
+                    </Field>
+                  </FormGrid>
                   {erreurs[`billing.items.${i}.lines`] ? (
                     <p className="text-xs font-medium text-[var(--danger)]">
                       {erreurs[`billing.items.${i}.lines`]}
@@ -339,27 +320,24 @@ export function ChampsClauses({
                   <ul className="grid gap-2 sm:grid-cols-2">
                     {lignesContrat.map((l, n) =>
                       l.source === 'origin' ? null : (
-                        <li key={n} className="flex items-center gap-2 text-sm">
-                          <input
+                        <li key={n} className="flex min-w-0 items-center gap-2 text-sm">
+                          <TextInput
                             aria-label={`Quantité à l’échéance ${i + 1} — ${nomsLignes?.[n] ?? nomLigne(l, n)}`}
                             inputMode="decimal"
                             value={e.quantites[n] ?? ''}
                             onChange={(ev) =>
-                              setF((x) => ({
-                                ...x,
-                                echeances: x.echeances.map((y) =>
-                                  y.cle === e.cle
-                                    ? { ...y, quantites: { ...y.quantites, [n]: ev.target.value } }
-                                    : y,
-                                ),
-                              }))
+                              majEcheance(e.cle, {
+                                quantites: { ...e.quantites, [n]: ev.target.value },
+                              })
                             }
-                            className={`${CHAMP} max-w-[6rem] text-right`}
+                            className="w-24 shrink-0 text-right tabular-nums"
                             aria-invalid={
                               erreurs[`billing.items.${i}.lines.${n}`] ? true : undefined
                             }
                           />
-                          <span>{nomsLignes?.[n] ?? nomLigne(l, n)}</span>
+                          <span className="min-w-0 break-words">
+                            {nomsLignes?.[n] ?? nomLigne(l, n)}
+                          </span>
                           {erreurs[`billing.items.${i}.lines.${n}`] ? (
                             <span className="text-xs text-[var(--danger)]">
                               {erreurs[`billing.items.${i}.lines.${n}`]}
@@ -373,7 +351,7 @@ export function ChampsClauses({
               ))}
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-start`}
+                className={`${BOUTON_PETIT} self-start max-sm:h-11`}
                 onClick={() =>
                   setF((x) => ({
                     ...x,
@@ -388,22 +366,24 @@ export function ChampsClauses({
         </fieldset>
       ) : null}
 
-      <Champ
-        id={`${p}-clauses`}
-        label="Clauses (texte libre, saisi par vous)"
-        aide="Lalanda ne propose aucun modèle de clause."
-        erreur={erreurs['clauses']}
-      >
-        <textarea
+      <FormGrid>
+        <Field
           id={`${p}-clauses`}
-          value={f.clauses}
-          rows={4}
-          maxLength={4000}
-          onChange={(e) => set('clauses')(e.target.value)}
-          className={CHAMP}
+          label="Clauses"
+          optional
+          size="full"
+          hint="Texte libre, saisi par vous. Lalanda ne propose aucun modèle de clause."
+          error={erreurs['clauses']}
           disabled={desactive}
-        />
-      </Champ>
+        >
+          <TextArea
+            value={f.clauses}
+            rows={4}
+            maxLength={4000}
+            onChange={(e) => set('clauses')(e.target.value)}
+          />
+        </Field>
+      </FormGrid>
     </div>
   );
 }

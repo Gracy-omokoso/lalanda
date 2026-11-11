@@ -10,7 +10,17 @@
 //   sans imputation automatique (§ 5.2).
 // - Factures liées : lien vers la facture ; aucune émission ici.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  Select,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 
@@ -23,15 +33,9 @@ import {
 } from '@/lib/api-sales-contracts';
 
 import { lecteurPdfIntegre } from '../../_components/apercu-document-model';
-import {
-  Alerte,
-  BOUTON,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  Pastille,
-  aria,
-} from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
+import { CustomerForm } from '../../_components/customer-form';
+import { useAccesVentes } from '../../_components/sales-access';
 import { formatMontant } from '../../_components/sales-model';
 import { formatJour } from '../../devis/_components/quote-model';
 import type { ClientChoix } from '../../factures/_components/invoice-model';
@@ -326,7 +330,7 @@ function FenetreTeleversement({
           type="file"
           accept="application/pdf,.pdf"
           onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
-          className="text-sm"
+          className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
         />
       </div>
     </Modal>
@@ -407,17 +411,21 @@ export function FenetreMotif({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ id={`${id}-m`} label={libelle} requis={!facultatif} erreur={erreurChamp}>
-          <textarea
-            id={`${id}-m`}
+        <Field
+          id={`${id}-m`}
+          label={libelle}
+          required={!facultatif}
+          optional={facultatif}
+          error={erreurChamp}
+          size="full"
+        >
+          <TextArea
             value={motif}
             rows={3}
             maxLength={1000}
             onChange={(e) => setMotif(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-m`, erreurChamp)}
           />
-        </Champ>
+        </Field>
       </div>
     </Modal>
   );
@@ -481,6 +489,17 @@ export function FenetreConfirmation({
 }
 
 // ─── Client (fiche seulement : un prospect est d'abord converti) ────────────
+//
+// ADR-0074 § 4 : on tape pour trouver le client (même recherche qu'avant : clients
+// actifs, 50 au plus) ; « + » ouvre la fiche client complète en fenêtre (sous
+// `sales.manage`), et le client créé est choisi d'office.
+
+/** Client tel que le sélecteur le connaît : la fiche lue, ou ce que le formulaire en garde. */
+type ClientListe = Pick<CustomerView, 'id' | 'name'> &
+  Partial<Pick<CustomerView, 'typeLabel' | 'nif'>>;
+
+const chercherClients = async (q: string): Promise<CustomerView[]> =>
+  (await api.listCustomers({ status: 'active', limit: 50, ...(q ? { q } : {}) })).items;
 
 export function ChoixClientFiche({
   client,
@@ -493,72 +512,62 @@ export function ChoixClientFiche({
   erreur: string | undefined;
   desactive: boolean;
 }): React.ReactElement {
-  const id = useId();
-  const [q, setQ] = useState('');
-  const [clients, setClients] = useState<CustomerView[]>([]);
+  const { gerer } = useAccesVentes();
   const choisi = client?.mode === 'fiche' ? client : null;
+  const valeur: ClientListe | null = choisi ? { id: choisi.customerId, name: choisi.nom } : null;
 
-  useEffect(() => {
-    let annule = false;
-    const t = setTimeout(() => {
-      api
-        .listCustomers({ status: 'active', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => {
-          if (!annule) setClients(p.items);
-        })
-        .catch(() => undefined);
-    }, 250);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q]);
+  function choisir(c: ClientListe | null): void {
+    onChange(
+      c ? { mode: 'fiche', customerId: c.id, nom: c.name, printContactDetails: false } : null,
+    );
+  }
 
   return (
-    <fieldset className="flex flex-col gap-2" disabled={desactive}>
-      <legend className="mb-1 text-sm font-semibold">Client</legend>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <input
-          aria-label="Rechercher un client"
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Nom, NIF ou e-mail"
-          className={CHAMP}
-        />
-        <select
-          aria-label="Client"
-          value={choisi?.customerId ?? ''}
-          onChange={(e) => {
-            const c = clients.find((x) => x.id === e.target.value);
-            onChange(
-              c
-                ? { mode: 'fiche', customerId: c.id, nom: c.name, printContactDetails: false }
-                : null,
-            );
-          }}
-          className={CHAMP}
-          {...aria(`${id}-client`, erreur)}
+    <fieldset className="flex min-w-0 flex-col gap-2" disabled={desactive}>
+      <legend className="sr-only">Client</legend>
+      <FormGrid>
+        <Field
+          label="Client"
+          size="lg"
+          hint={
+            gerer
+              ? 'Tapez un nom, un NIF ou un e-mail. Client absent : « + » le crée. Un prospect est d’abord converti en client depuis le CRM.'
+              : 'Tapez un nom, un NIF ou un e-mail. Un prospect est d’abord converti en client depuis le CRM.'
+          }
+          error={erreur}
         >
-          <option value="">{choisi ? choisi.nom : 'Choisir un client…'}</option>
-          {clients
-            .filter((c) => c.id !== choisi?.customerId)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} — {c.typeLabel}
-              </option>
-            ))}
-          {choisi ? <option value={choisi.customerId}>{choisi.nom}</option> : null}
-        </select>
-      </div>
-      <p className="text-xs text-[var(--foreground-muted)]">
-        Un prospect est d’abord converti en client depuis le CRM.
-      </p>
-      {erreur ? (
-        <p id={`${id}-client-erreur`} className="text-xs font-medium text-[var(--danger)]">
-          {erreur}
-        </p>
-      ) : null}
+          <EntityPicker<ClientListe>
+            value={valeur}
+            onChange={choisir}
+            search={chercherClients}
+            getKey={(c) => c.id}
+            getLabel={(c) => c.name}
+            getDescription={(c) =>
+              [c.typeLabel ?? null, c.nif ? `NIF ${c.nif}` : null].filter(Boolean).join(' · ') ||
+              null
+            }
+            placeholder="Nom, NIF ou e-mail"
+            recentKey="ventes.clients"
+            createTitle="Nouveau client"
+            createButtonLabel="Créer un client"
+            createSize="lg"
+            {...(gerer
+              ? {
+                  createForm: ({ initialText, onCreated, onCancel }) => (
+                    <CustomerForm
+                      fiche={{ mode: 'creation' }}
+                      gerer
+                      base="/ventes/clients"
+                      enModal
+                      nomInitial={initialText}
+                      onFermer={(c) => (c ? onCreated(c) : onCancel())}
+                    />
+                  ),
+                }
+              : {})}
+          />
+        </Field>
+      </FormGrid>
     </fieldset>
   );
 }
@@ -867,60 +876,61 @@ function FenetreAcompte({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ id={`${id}-type`} label="Type de facture">
-          <select
-            id={`${id}-type`}
-            value={f.type}
-            onChange={(e) => setF((x) => ({ ...x, type: e.target.value as 'FT' | 'ET' }))}
-            className={CHAMP}
-          >
-            <option value="FT">Facture d’acompte (FT)</option>
-            <option value="ET">Facture d’acompte à l’export (ET)</option>
-          </select>
-        </Champ>
-        <Champ
-          id={`${id}-montant`}
-          label={`Montant demandé (${devise})`}
-          requis
-          aide="Dans le mode de prix de l’engagement (TTC ou HT)."
-          erreur={champs['requestedAmount']}
-        >
-          <input
+        <FormGrid>
+          <Field id={`${id}-type`} label="Type de facture" size="lg">
+            <Select<'FT' | 'ET'>
+              value={f.type}
+              onChange={(v) => setF((x) => ({ ...x, type: v }))}
+              options={[
+                { value: 'FT', label: 'Facture d’acompte (FT)' },
+                { value: 'ET', label: 'Facture d’acompte à l’export (ET)' },
+              ]}
+            />
+          </Field>
+          <Field
             id={`${id}-montant`}
-            inputMode="decimal"
-            value={f.montant}
-            onChange={(e) => setF((x) => ({ ...x, montant: e.target.value }))}
-            className={CHAMP}
-            {...aria(`${id}-montant`, champs['requestedAmount'], true)}
-          />
-        </Champ>
-        <Champ id={`${id}-groupe`} label="Groupe de taxation" requis erreur={champs['taxGroup']}>
-          <select
-            id={`${id}-groupe`}
-            value={f.groupe}
-            onChange={(e) => setF((x) => ({ ...x, groupe: e.target.value }))}
-            className={CHAMP}
-            {...aria(`${id}-groupe`, champs['taxGroup'])}
+            label="Montant demandé"
+            required
+            size="sm"
+            newRow
+            hint="Dans le mode de prix de l’engagement (TTC ou HT)."
+            error={champs['requestedAmount']}
           >
-            <option value="">Choisir…</option>
-            {(groupes?.groups ?? []).map((g) => (
-              <option key={g.letter} value={g.letter}>
-                [{g.letter}] {g.label}
-                {g.ratePercent ? ` — ${g.ratePercent.replace('.', ',')} %` : ''}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id={`${id}-libelle`} label="Libellé (facultatif)" erreur={champs['label']}>
-          <input
-            id={`${id}-libelle`}
-            value={f.libelle}
-            maxLength={200}
-            onChange={(e) => setF((x) => ({ ...x, libelle: e.target.value }))}
-            placeholder="Acompte — prérempli par Lalanda si vide"
-            className={CHAMP}
-          />
-        </Champ>
+            <MoneyInput
+              value={f.montant}
+              currency={devise}
+              onChange={(v) => setF((x) => ({ ...x, montant: v }))}
+            />
+          </Field>
+          <Field
+            id={`${id}-groupe`}
+            label="Groupe de taxation"
+            required
+            size="lg"
+            newRow
+            error={champs['taxGroup']}
+          >
+            <Select<string>
+              value={f.groupe}
+              placeholder="Choisir…"
+              loading={groupes === null}
+              onChange={(v) => setF((x) => ({ ...x, groupe: v }))}
+              options={(groupes?.groups ?? []).map((g) => ({
+                value: g.letter,
+                label: `[${g.letter}] ${g.label}${g.ratePercent ? ` — ${g.ratePercent.replace('.', ',')} %` : ''}`,
+                keywords: g.letter,
+              }))}
+            />
+          </Field>
+          <Field id={`${id}-libelle`} label="Libellé" optional size="full" error={champs['label']}>
+            <TextInput
+              value={f.libelle}
+              maxLength={200}
+              onChange={(e) => setF((x) => ({ ...x, libelle: e.target.value }))}
+              placeholder="Acompte — prérempli par Lalanda si vide"
+            />
+          </Field>
+        </FormGrid>
       </div>
     </Modal>
   );

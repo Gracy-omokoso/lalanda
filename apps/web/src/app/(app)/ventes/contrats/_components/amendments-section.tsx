@@ -4,7 +4,15 @@
 // contrat (préparé, soumis, approuvé, signé) ; un avenant non signé n'a aucun effet. Les
 // conditions en vigueur sont calculées par le moteur (`termsAt`), jamais par l'écran.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  Switch,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { OrgAction } from '@/lib/api';
@@ -15,16 +23,7 @@ import {
   type SalesContractView,
 } from '@/lib/api-sales-contracts';
 
-import {
-  Alerte,
-  BOUTON,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  Pastille,
-  aria,
-} from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { formatJour } from '../../devis/_components/quote-model';
 import {
@@ -552,40 +551,35 @@ function FenetreSaisieAvenant({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Champ id={`${id}-date`} label="Date d’effet" requis erreur={erreurs['effectiveDate']}>
-            <input
-              id={`${id}-date`}
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={CHAMP}
-              {...aria(`${id}-date`, erreurs['effectiveDate'])}
-            />
-          </Champ>
-          <Champ id={`${id}-objet`} label="Objet">
-            <select
-              id={`${id}-objet`}
+        <FormGrid>
+          <Field
+            id={`${id}-date`}
+            label="Date d’effet"
+            required
+            size="sm"
+            error={erreurs['effectiveDate']}
+          >
+            <DatePicker value={date} onChange={setDate} shortcuts={['today', 'endOfMonth']} />
+          </Field>
+          <Field id={`${id}-objet`} label="Objet" group size="md">
+            <SegmentedControl<AmendmentBody['purpose']>
               value={objet}
-              onChange={(e) => setObjet(e.target.value as AmendmentBody['purpose'])}
-              className={CHAMP}
-            >
-              <option value="change">Modification</option>
-              <option value="renewal">Renouvellement exprès</option>
-            </select>
-          </Champ>
-        </div>
+              onChange={setObjet}
+              options={[
+                { value: 'change', label: 'Modification' },
+                { value: 'renewal', label: 'Renouvellement exprès' },
+              ]}
+            />
+          </Field>
+        </FormGrid>
         {erreurs['changes'] ? (
           <p className="text-xs font-medium text-[var(--danger)]">{erreurs['changes']}</p>
         ) : null}
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={avecLignes}
-            onChange={(e) => setAvecLignes(e.target.checked)}
-          />
-          Modifier les lignes (prix, quantités, articles)
-        </label>
+        <Switch
+          checked={avecLignes}
+          onChange={setAvecLignes}
+          label="Modifier les lignes (prix, quantités, articles)"
+        />
         {avecLignes ? (
           <ChampsDocument
             prefixe={`${id}-doc`}
@@ -598,14 +592,11 @@ function FenetreSaisieAvenant({
             avecClient={false}
           />
         ) : null}
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={avecClauses}
-            onChange={(e) => setAvecClauses(e.target.checked)}
-          />
-          Modifier la durée, la reconduction, le préavis ou les clauses
-        </label>
+        <Switch
+          checked={avecClauses}
+          onChange={setAvecClauses}
+          label="Modifier la durée, la reconduction, le préavis ou les clauses"
+        />
         {avecClauses ? (
           <ChampsClauses
             prefixe={`${id}-cl`}

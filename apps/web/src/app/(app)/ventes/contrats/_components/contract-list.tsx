@@ -4,7 +4,8 @@
 // d'onglet de plus. « + Contrat » (`sales.contract`) et « Réglages »
 // (`sales.contract.approve`) ouvrent une fenêtre modale. Cartes entièrement cliquables.
 
-import { buttonClasses } from '@lalanda/ui';
+import { buttonClasses, Select, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -16,7 +17,7 @@ import {
   type SalesContractSummary,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Pastille } from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -125,40 +126,31 @@ export function ContractList(): React.ReactElement {
           ) : null}
         </div>
       </div>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <input
+      <div role="search" className="flex flex-wrap gap-2">
+        <TextInput
           type="search"
           aria-label="Rechercher un contrat"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Numéro CT…, client ou titre"
           maxLength={100}
-          className={CHAMP}
+          leading={<Search aria-hidden="true" className="h-4 w-4" />}
+          className="min-w-0 flex-1 basis-60"
         />
-        <select
+        <Select<SalesContractStatus | 'all'>
           aria-label="Statut"
           value={statut}
-          onChange={(e) => setStatut(e.target.value as SalesContractStatus | 'all')}
-          className={CHAMP}
-        >
-          {FILTRES_CONTRATS.map((f) => (
-            <option key={f.valeur} value={f.valeur}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <select
+          onChange={setStatut}
+          options={FILTRES_CONTRATS.map((f) => ({ value: f.valeur, label: f.label }))}
+          className="w-full sm:w-48"
+        />
+        <Select<SalesContractBillingKind | 'all'>
           aria-label="Facturation"
           value={facturation}
-          onChange={(e) => setFacturation(e.target.value as SalesContractBillingKind | 'all')}
-          className={CHAMP}
-        >
-          {FILTRES_FACTURATION.map((f) => (
-            <option key={f.valeur} value={f.valeur}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+          onChange={setFacturation}
+          options={FILTRES_FACTURATION.map((f) => ({ value: f.valeur, label: f.label }))}
+          className="w-full sm:w-48"
+        />
       </div>
       {erreur ? (
         <Alerte>

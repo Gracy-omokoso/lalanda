@@ -4,7 +4,16 @@
 // La signature électronique est hors périmètre (décision ouverte n° 6) : on téléverse la
 // copie signée (PDF), puis on déclare la date et les signataires.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SegmentedControl,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import {
@@ -13,7 +22,7 @@ import {
   type SignatureBody,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_PETIT } from '../../_components/form-ui';
 import { formatJour } from '../../devis/_components/quote-model';
 
 import {
@@ -117,35 +126,39 @@ export function FenetreSignature({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ id={`${id}-date`} label="Date de signature" requis erreur={champs['signedOn']}>
-          <input
+        <FormGrid>
+          <Field
             id={`${id}-date`}
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-date`, champs['signedOn'])}
-          />
-        </Champ>
-        <fieldset className="flex flex-col gap-2">
+            label="Date de signature"
+            required
+            size="sm"
+            error={champs['signedOn']}
+          >
+            <DatePicker value={date} onChange={setDate} shortcuts={['today']} />
+          </Field>
+        </FormGrid>
+        <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-1 text-sm font-semibold">Copie signée (PDF, 10 Mo au plus)</legend>
           {copiesExistantes.length > 0 ? (
-            <select
-              aria-label="Copie signée déjà déposée"
-              value={fichier ? '' : copie}
-              onChange={(e) => {
-                setCopie(e.target.value);
-                setFichier(null);
-              }}
-              className={CHAMP}
-            >
-              <option value="">Déposer une nouvelle copie…</option>
-              {copiesExistantes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.fileName} — déposée le {formatJour(c.uploadedAt.slice(0, 10))}
-                </option>
-              ))}
-            </select>
+            <FormGrid>
+              <Field id={`${id}-copie`} label="Copie signée déjà déposée" size="lg">
+                <Select<string>
+                  value={fichier ? '' : copie}
+                  onChange={(v) => {
+                    setCopie(v);
+                    setFichier(null);
+                  }}
+                  options={[
+                    { value: '', label: 'Déposer une nouvelle copie…' },
+                    ...copiesExistantes.map((c) => ({
+                      value: c.id,
+                      label: c.fileName,
+                      description: `Déposée le ${formatJour(c.uploadedAt.slice(0, 10))}`,
+                    })),
+                  ]}
+                />
+              </Field>
+            </FormGrid>
           ) : null}
           {copie === '' || copiesExistantes.length === 0 ? (
             <input
@@ -153,50 +166,53 @@ export function FenetreSignature({
               accept="application/pdf,.pdf"
               aria-label="Fichier PDF de la copie signée"
               onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
-              className="text-sm"
+              className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
             />
           ) : null}
           {champs['file'] ? (
             <p className="text-xs font-medium text-[var(--danger)]">{champs['file']}</p>
           ) : null}
         </fieldset>
-        <fieldset className="flex flex-col gap-3">
+        <fieldset className="flex min-w-0 flex-col gap-3">
           <legend className="mb-1 text-sm font-semibold">Signataires</legend>
           {champs['signatories'] ? (
             <p className="text-xs font-medium text-[var(--danger)]">{champs['signatories']}</p>
           ) : null}
-          {signataires.map((s) => (
-            <div key={s.cle} className="grid gap-2 sm:grid-cols-[1fr_1fr_12rem_auto]">
-              <input
-                aria-label="Nom du signataire"
-                placeholder="Nom"
-                value={s.nom}
-                maxLength={120}
-                onChange={(e) => maj(s.cle, { nom: e.target.value })}
-                className={CHAMP}
-              />
-              <input
-                aria-label="Fonction du signataire"
-                placeholder="Fonction (facultatif)"
-                value={s.fonction}
-                maxLength={120}
-                onChange={(e) => maj(s.cle, { fonction: e.target.value })}
-                className={CHAMP}
-              />
-              <select
-                aria-label="Côté du signataire"
-                value={s.cote}
-                onChange={(e) =>
-                  maj(s.cle, { cote: e.target.value as SignataireFormulaire['cote'] })
-                }
-                className={CHAMP}
-              >
-                <option value="customer">{COTE_LABELS.customer}</option>
-                <option value="organization">{COTE_LABELS.organization}</option>
-              </select>
+          {signataires.map((s, i) => (
+            <div
+              key={s.cle}
+              className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
+            >
+              <FormGrid>
+                <Field id={`${id}-sig-${i}-nom`} label="Nom du signataire" size="md">
+                  <TextInput
+                    value={s.nom}
+                    maxLength={120}
+                    onChange={(e) => maj(s.cle, { nom: e.target.value })}
+                  />
+                </Field>
+                <Field id={`${id}-sig-${i}-fonction`} label="Fonction" optional size="md">
+                  <TextInput
+                    value={s.fonction}
+                    maxLength={120}
+                    onChange={(e) => maj(s.cle, { fonction: e.target.value })}
+                  />
+                </Field>
+                <Field id={`${id}-sig-${i}-cote`} label="Côté" group size="md">
+                  <SegmentedControl<SignataireFormulaire['cote']>
+                    value={s.cote}
+                    onChange={(v) => maj(s.cle, { cote: v })}
+                    options={[
+                      { value: 'customer', label: COTE_LABELS.customer },
+                      { value: 'organization', label: COTE_LABELS.organization },
+                    ]}
+                  />
+                </Field>
+              </FormGrid>
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={`${BOUTON_PETIT} self-end max-sm:h-11`}
+                aria-label={`Retirer le signataire ${i + 1}`}
                 onClick={() => setSignataires((x) => x.filter((y) => y.cle !== s.cle))}
               >
                 Retirer
@@ -205,7 +221,7 @@ export function FenetreSignature({
           ))}
           <button
             type="button"
-            className={`${BOUTON_PETIT} self-start`}
+            className={`${BOUTON_PETIT} self-start max-sm:h-11`}
             onClick={() => setSignataires((x) => [...x, signataireVide('customer')])}
           >
             + Signataire

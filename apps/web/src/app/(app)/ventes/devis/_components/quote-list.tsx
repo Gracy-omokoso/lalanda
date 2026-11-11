@@ -11,7 +11,8 @@
 // par curseur (« Afficher plus »). Les compteurs des onglets et les graphiques
 // viennent du même calcul serveur : ils concordent avec la liste.
 
-import { buttonClasses, StatusPill } from '@lalanda/ui';
+import { buttonClasses, Select, StatusPill, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -21,7 +22,6 @@ import { crmApi, type QuoteStatus, type QuoteSummary } from '@/lib/api-crm';
 import { BoutonApercu } from '../../_components/apercu-document';
 import {
   BOUTON_LIGNE,
-  CHAMP_COMPACT,
   IconePlus,
   OngletsStatut,
   type EtatTableau,
@@ -185,33 +185,25 @@ export function QuoteList(): React.ReactElement {
             onSubmit={(e) => e.preventDefault()}
             className="flex min-w-0 flex-1 gap-2"
           >
-            <label htmlFor="dv-q" className="sr-only">
-              Rechercher un devis
-            </label>
-            <input
+            <TextInput
               id="dv-q"
               type="search"
+              aria-label="Rechercher un devis"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               maxLength={100}
               placeholder="Numéro DV…, client ou objet"
-              className={`${CHAMP_COMPACT} min-w-0 flex-1`}
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
+              className="min-w-0 flex-1"
             />
-            <label htmlFor="dv-tri" className="sr-only">
-              Trier
-            </label>
-            <select
+            <Select<Tri>
               id="dv-tri"
+              aria-label="Trier"
               value={tri}
-              onChange={(e) => setTri(e.target.value as Tri)}
-              className={`${CHAMP_COMPACT} w-36 shrink-0 sm:w-48`}
-            >
-              {TRIS.map((t) => (
-                <option key={t.valeur} value={t.valeur}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              onChange={setTri}
+              options={TRIS.map((t) => ({ value: t.valeur, label: t.label }))}
+              className="w-40 shrink-0 sm:w-52"
+            />
           </form>
         </div>
 

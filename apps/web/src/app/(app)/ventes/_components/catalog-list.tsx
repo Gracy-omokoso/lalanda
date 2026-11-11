@@ -11,7 +11,8 @@
 // à la française (`1 234,50 CDF TTC`, `40,00 USD HT`) ; aucun n'est converti ni
 // recalculé (ADR-0023 E4).
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Field, FormGrid, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -25,7 +26,7 @@ import {
 } from '@/lib/api';
 
 import { BandeauGroupes, CatalogItemForm } from './catalog-item-form';
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, CHAMP, Pastille } from './form-ui';
+import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from './form-ui';
 import { useAccesVentes } from './sales-access';
 import {
   actionsLigne,
@@ -201,85 +202,56 @@ export function CatalogList(): React.ReactElement {
 
       {groupes ? <BandeauGroupes liste={groupes} /> : null}
 
-      <form
-        role="search"
-        aria-label="Rechercher un article"
-        onSubmit={(e) => e.preventDefault()}
-        className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]"
-      >
-        <div className="col-span-2 flex flex-col gap-1.5 lg:col-span-1">
-          <label htmlFor="ar-q" className="text-sm font-medium">
-            Rechercher
-          </label>
-          <input
-            id="ar-q"
-            type="search"
-            value={filtres.q}
-            onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
-            maxLength={100}
-            placeholder="Désignation ou référence"
-            className={CHAMP}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="ar-filtre-groupe" className="text-sm font-medium">
-            Groupe
-          </label>
-          <select
-            id="ar-filtre-groupe"
-            value={filtres.taxGroup}
-            onChange={(e) =>
-              setFiltres((f) => ({ ...f, taxGroup: e.target.value as TaxGroupLetter | '' }))
-            }
-            className={CHAMP}
-          >
-            <option value="">Tous les groupes</option>
-            {groupes?.groups.map((g) => (
-              <option key={g.letter} value={g.letter}>
-                {g.letter} — {g.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="ar-filtre-type" className="text-sm font-medium">
-            Type
-          </label>
-          <select
-            id="ar-filtre-type"
-            value={filtres.itemType}
-            onChange={(e) =>
-              setFiltres((f) => ({ ...f, itemType: e.target.value as CatalogItemType | '' }))
-            }
-            className={CHAMP}
-          >
-            <option value="">Tous les types</option>
-            {(Object.keys(ITEM_TYPE_LABELS) as CatalogItemType[]).map((t) => (
-              <option key={t} value={t}>
-                {ITEM_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="ar-filtre-statut" className="text-sm font-medium">
-            État
-          </label>
-          <select
-            id="ar-filtre-statut"
-            value={filtres.status}
-            onChange={(e) =>
-              setFiltres((f) => ({ ...f, status: e.target.value as SalesStatusFilter }))
-            }
-            className={CHAMP}
-          >
-            {(Object.keys(STATUS_LABELS) as SalesStatusFilter[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </div>
+      <form role="search" aria-label="Rechercher un article" onSubmit={(e) => e.preventDefault()}>
+        <FormGrid>
+          <Field id="ar-q" label="Rechercher" size="md">
+            <TextInput
+              type="search"
+              value={filtres.q}
+              onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
+              maxLength={100}
+              placeholder="Désignation ou référence"
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
+            />
+          </Field>
+          <Field id="ar-filtre-groupe" label="Groupe" size="sm">
+            <Select<TaxGroupLetter | ''>
+              value={filtres.taxGroup}
+              onChange={(v) => setFiltres((f) => ({ ...f, taxGroup: v }))}
+              loading={groupes === null}
+              options={[
+                { value: '', label: 'Tous les groupes' },
+                ...(groupes?.groups ?? []).map((g) => ({
+                  value: g.letter,
+                  label: `${g.letter} — ${g.label}`,
+                })),
+              ]}
+            />
+          </Field>
+          <Field id="ar-filtre-type" label="Type" size="sm">
+            <Select<CatalogItemType | ''>
+              value={filtres.itemType}
+              onChange={(v) => setFiltres((f) => ({ ...f, itemType: v }))}
+              options={[
+                { value: '', label: 'Tous les types' },
+                ...(Object.keys(ITEM_TYPE_LABELS) as CatalogItemType[]).map((t) => ({
+                  value: t,
+                  label: ITEM_TYPE_LABELS[t],
+                })),
+              ]}
+            />
+          </Field>
+          <Field id="ar-filtre-statut" label="État" size="xs">
+            <Select<SalesStatusFilter>
+              value={filtres.status}
+              onChange={(v) => setFiltres((f) => ({ ...f, status: v }))}
+              options={(Object.keys(STATUS_LABELS) as SalesStatusFilter[]).map((s) => ({
+                value: s,
+                label: STATUS_LABELS[s],
+              }))}
+            />
+          </Field>
+        </FormGrid>
       </form>
 
       <p aria-live="polite" className="min-h-[1.25rem] text-sm text-[var(--foreground-muted)]">

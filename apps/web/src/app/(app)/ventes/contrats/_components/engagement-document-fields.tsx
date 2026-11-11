@@ -3,12 +3,14 @@
 // Document de vente d'une commande ou d'un contrat : client (fiche), devise, mode de prix
 // et lignes — les MÊMES lignes qu'un devis ou un brouillon de facture (`InvoiceLines`).
 // Les montants viennent de l'API (moteur) après chaque enregistrement. ADR-0050 — V7.
+//
+// ADR-0074 : devise et mode de prix en segments, comme le brouillon de facture.
 
+import { Field, FormGrid, SegmentedControl } from '@lalanda/ui';
 import { useEffect, useState } from 'react';
 
 import { api, type InvoiceView, type TaxGroupList } from '@/lib/api';
 
-import { CHAMP, Champ, aria } from '../../_components/form-ui';
 import { InvoiceLines } from '../../factures/_components/invoice-lines';
 import {
   PRICE_MODE_DOC_LABELS,
@@ -48,41 +50,48 @@ export function ChampsDocument({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Champ id={`${prefixe}-devise`} label="Devise">
-          <select
-            id={`${prefixe}-devise`}
+      <FormGrid>
+        <Field
+          id={`${prefixe}-devise`}
+          label="Devise"
+          group
+          size="sm"
+          hint={form.currency === 'CDF' ? 'Franc congolais (CDF).' : 'Dollar américain (USD).'}
+        >
+          <SegmentedControl<FormulaireDocument['currency']>
             value={form.currency}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, currency: e.target.value as FormulaireDocument['currency'] }))
-            }
-            className={CHAMP}
+            onChange={(c) => setForm((f) => ({ ...f, currency: c }))}
             disabled={desactive}
-          >
-            <option value="CDF">Franc congolais (CDF)</option>
-            <option value="USD">Dollar américain (USD)</option>
-          </select>
-        </Champ>
-        <Champ id={`${prefixe}-mode`} label="Prix" requis erreur={erreurs['priceMode']}>
-          <select
-            id={`${prefixe}-mode`}
+            options={[
+              { value: 'CDF', label: 'CDF' },
+              { value: 'USD', label: 'USD' },
+            ]}
+          />
+        </Field>
+        <Field
+          id={`${prefixe}-mode`}
+          label="Prix"
+          group
+          required
+          size="sm"
+          hint={
+            form.priceMode
+              ? PRICE_MODE_DOC_LABELS[form.priceMode]
+              : 'TTC : prix taxes comprises ; HT : prix hors taxes.'
+          }
+          error={erreurs['priceMode']}
+        >
+          <SegmentedControl<'ht' | 'ttc'>
             value={form.priceMode}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                priceMode: e.target.value as FormulaireDocument['priceMode'],
-              }))
-            }
-            className={CHAMP}
+            onChange={(m) => setForm((f) => ({ ...f, priceMode: m }))}
             disabled={desactive}
-            {...aria(`${prefixe}-mode`, erreurs['priceMode'])}
-          >
-            <option value="">Choisir…</option>
-            <option value="ht">{PRICE_MODE_DOC_LABELS.ht}</option>
-            <option value="ttc">{PRICE_MODE_DOC_LABELS.ttc}</option>
-          </select>
-        </Champ>
-      </div>
+            options={[
+              { value: 'ht', label: 'HT' },
+              { value: 'ttc', label: 'TTC' },
+            ]}
+          />
+        </Field>
+      </FormGrid>
       {avecClient ? (
         <ChoixClientFiche
           client={form.client}

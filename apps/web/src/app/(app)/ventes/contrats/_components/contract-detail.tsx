@@ -8,7 +8,15 @@
 // Les brouillons préparés renvoient vers la facture brouillon : aucune émission ici.
 
 import { SALES_CONTRACT_SETTINGS_DEFAULTS } from '@lalanda/shared/sales-contracts';
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  TextArea,
+  buttonClasses,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useState } from 'react';
@@ -16,16 +24,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { salesContractsApi, type SalesContractView } from '@/lib/api-sales-contracts';
 
 import { useProfil } from '../../../_components/profile-context';
-import {
-  Alerte,
-  BOUTON,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  Pastille,
-  aria,
-} from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -720,48 +719,49 @@ function FenetreResiliation({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ id={`${id}-par`} label="Qui résilie ?">
-          <select
-            id={`${id}-par`}
-            value={par}
-            onChange={(e) => setPar(e.target.value as 'customer' | 'organization')}
-            className={CHAMP}
-          >
-            <option value="customer">{PARTIE_LABELS.customer}</option>
-            <option value="organization">{PARTIE_LABELS.organization}</option>
-          </select>
-        </Champ>
-        <Champ id={`${id}-notif`} label="Notifiée le" requis erreur={champs['noticeGivenOn']}>
-          <input
+        <FormGrid>
+          <Field id={`${id}-par`} label="Qui résilie ?" group size="full">
+            <SegmentedControl<'customer' | 'organization'>
+              value={par}
+              onChange={setPar}
+              options={[
+                { value: 'customer', label: PARTIE_LABELS.customer },
+                { value: 'organization', label: PARTIE_LABELS.organization },
+              ]}
+            />
+          </Field>
+          <Field
             id={`${id}-notif`}
-            type="date"
-            value={notifieeLe}
-            onChange={(e) => setNotifieeLe(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-notif`, champs['noticeGivenOn'])}
-          />
-        </Champ>
-        <Champ id={`${id}-effet`} label="Prend effet le" requis erreur={champs['effectiveOn']}>
-          <input
+            label="Notifiée le"
+            required
+            size="sm"
+            newRow
+            error={champs['noticeGivenOn']}
+          >
+            <DatePicker value={notifieeLe} onChange={setNotifieeLe} shortcuts={['today']} />
+          </Field>
+          <Field
             id={`${id}-effet`}
-            type="date"
-            value={effetLe}
-            onChange={(e) => setEffetLe(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-effet`, champs['effectiveOn'])}
-          />
-        </Champ>
-        <Champ id={`${id}-motif`} label="Motif" requis erreur={champs['reason']}>
-          <textarea
-            id={`${id}-motif`}
-            value={motif}
-            rows={3}
-            maxLength={500}
-            onChange={(e) => setMotif(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-motif`, champs['reason'])}
-          />
-        </Champ>
+            label="Prend effet le"
+            required
+            size="sm"
+            error={champs['effectiveOn']}
+          >
+            <DatePicker
+              value={effetLe}
+              onChange={setEffetLe}
+              shortcuts={['endOfMonth', 'plus30']}
+            />
+          </Field>
+          <Field id={`${id}-motif`} label="Motif" required size="full" error={champs['reason']}>
+            <TextArea
+              value={motif}
+              rows={3}
+              maxLength={500}
+              onChange={(e) => setMotif(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
       </div>
     </Modal>
   );

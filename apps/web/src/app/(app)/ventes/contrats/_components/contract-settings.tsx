@@ -3,14 +3,16 @@
 // Réglages des contrats (§ 2.1) en fenêtre modale : délais d'alerte, préparation
 // automatique des brouillons d'échéance, approbateur unique. Lecture `sales.read`,
 // écriture `sales.contract.approve`. ADR-0050 — V7.
+//
+// ADR-0074 : délais à la largeur d'un nombre de jours, réglages en interrupteurs.
 
 import { SALES_CONTRACT_LIMITS as L } from '@lalanda/shared/sales-contracts';
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Field, FormGrid, Modal, Switch, TextInput, buttonClasses } from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { salesContractsApi, type SalesContractSettingsView } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, CHAMP, Champ } from '../../_components/form-ui';
+import { Alerte, BOUTON } from '../../_components/form-ui';
 
 import { messageEngagement } from './contract-model';
 
@@ -103,53 +105,48 @@ export function FenetreReglages({ onFermer }: { onFermer: () => void }): React.R
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ
-          id={`${id}-preavis`}
-          label="Alerte de préavis (jours avant la date limite)"
-          erreur={champs['preavis']}
-        >
-          <input
-            id={`${id}-preavis`}
-            inputMode="numeric"
-            value={preavis}
-            onChange={(e) => setPreavis(e.target.value)}
-            className={CHAMP}
-          />
-        </Champ>
-        <Champ
-          id={`${id}-fin`}
-          label="Alerte de fin de terme (jours avant la fin)"
-          erreur={champs['fin']}
-        >
-          <input
-            id={`${id}-fin`}
-            inputMode="numeric"
-            value={fin}
-            onChange={(e) => setFin(e.target.value)}
-            className={CHAMP}
-          />
-        </Champ>
-        <Champ
-          id={`${id}-avance`}
-          label="Préparer les brouillons d’échéance N jours à l’avance"
-          erreur={champs['avance']}
-        >
-          <input
-            id={`${id}-avance`}
-            inputMode="numeric"
-            value={avance}
-            onChange={(e) => setAvance(e.target.value)}
-            className={CHAMP}
-          />
-        </Champ>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-          Préparer automatiquement les brouillons d’échéance (jamais émis seuls)
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={unique} onChange={(e) => setUnique(e.target.checked)} />
-          Si une seule personne peut approuver, elle approuve aussi ce qu’elle a préparé
-        </label>
+        <FormGrid>
+          {(
+            [
+              ['preavis', 'Alerte de préavis', 'Jours avant la date limite.', preavis, setPreavis],
+              ['fin', 'Alerte de fin de terme', 'Jours avant la fin.', fin, setFin],
+              [
+                'avance',
+                'Préparer les brouillons d’échéance',
+                'Nombre de jours à l’avance.',
+                avance,
+                setAvance,
+              ],
+            ] as const
+          ).map(([cle, label, aide, valeur, poser]) => (
+            <Field
+              key={cle}
+              id={`${id}-${cle}`}
+              label={label}
+              hint={aide}
+              size="sm"
+              error={champs[cle]}
+            >
+              <TextInput
+                inputMode="numeric"
+                value={valeur}
+                onChange={(e) => poser(e.target.value)}
+                trailing="jours"
+                className="text-right tabular-nums"
+              />
+            </Field>
+          ))}
+        </FormGrid>
+        <Switch
+          checked={auto}
+          onChange={setAuto}
+          label="Préparer automatiquement les brouillons d’échéance (jamais émis seuls)"
+        />
+        <Switch
+          checked={unique}
+          onChange={setUnique}
+          label="Si une seule personne peut approuver, elle approuve aussi ce qu’elle a préparé"
+        />
       </div>
     </Modal>
   );

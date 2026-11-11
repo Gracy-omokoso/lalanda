@@ -13,7 +13,28 @@
 //   mode à l'autre appartient au moteur, au moment de la facture.
 // - La devise du prix est au choix, CDF (d'office) ou USD (ADR-0023 E4). Aucune
 //   conversion ici : le passage en CDF n'a lieu qu'à la normalisation.
+//
+// ADR-0074 : composants de `@lalanda/ui` (groupe et type en `Select`, devise et
+// mode TTC/HT en segments — le mode reste sans valeur par défaut —, prix en
+// `MoneyInput` qui ne fait que mettre en forme), validation à la sortie du champ
+// avec les règles de l'envoi (`preparerArticle`), résumé d'erreurs. Sert aussi
+// de fenêtre de création rapide depuis une ligne de facture (`nomInitial`).
 
+import {
+  Button,
+  Checkbox,
+  ErrorSummary,
+  Field,
+  Form,
+  FormSection,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextInput,
+  resumerErreurs,
+  useBlurValidation,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -26,7 +47,7 @@ import {
   type TaxGroupList,
 } from '@/lib/api';
 
-import { AideEtErreur, Alerte, aria, BOUTON, Champ, CHAMP, Pastille } from './form-ui';
+import { Alerte, BOUTON, Pastille } from './form-ui';
 import {
   appliquerGroupe,
   bandeauGroupes,
@@ -55,6 +76,21 @@ import {
   type TaxeSpecifiqueChoix,
   typesAdmis,
 } from './sales-model';
+
+/** Ordre, contrôle et libellé de chaque champ dans le résumé d'erreurs. */
+const RESUME: { cle: ChampArticle; id: string; libelle: string }[] = [
+  { cle: 'name', id: 'ar-name', libelle: 'Désignation' },
+  { cle: 'code', id: 'ar-code', libelle: 'Référence interne' },
+  { cle: 'unit', id: 'ar-unit', libelle: 'Unité' },
+  { cle: 'taxGroup', id: 'ar-group', libelle: 'Groupe de taxation' },
+  { cle: 'itemType', id: 'ar-type', libelle: 'Type d’article' },
+  { cle: 'outOfScope', id: 'ar-hc', libelle: 'Opération hors champ' },
+  { cle: 'currency', id: 'ar-devise', libelle: 'Devise' },
+  { cle: 'unitPrice', id: 'ar-price', libelle: 'Prix unitaire' },
+  { cle: 'priceMode', id: 'ar-mode', libelle: 'Le prix est' },
+  { cle: 'specificKind', id: 'ar-ts', libelle: 'Taxe spécifique' },
+  { cle: 'specificValue', id: 'ar-ts-valeur', libelle: 'Valeur de la taxe spécifique' },
+];
 
 const CHAMPS: readonly ChampArticle[] = [
   'code',
@@ -110,6 +146,16 @@ export function CatalogItemForm({
   const [occupe, setOccupe] = useState(false);
 
   const lectureSeule = !gerer;
+  // Validation à la sortie du champ (ADR-0074 § 9) : les règles de l'envoi.
+  const {
+    errors: erreursSaisie,
+    touch,
+    validateAll,
+    submitCount: soumissions,
+  } = useBlurValidation<ChampArticle>(() => {
+    const p = preparerArticle(form, groupes);
+    return p.ok ? {} : p.champs;
+  });
 
   const charger = useCallback(async (): Promise<void> => {
     if (id === null) return;
@@ -151,10 +197,11 @@ export function CatalogItemForm({
     setAutres([]);
     setPerimee(false);
     setExistant(null);
+    validateAll();
     const prep = preparerArticle(form, groupes);
     if (!prep.ok) {
+      // Le résumé cliquable (ErrorSummary) liste les champs à compléter.
       setChamps(prep.champs);
-      setErreur('Certains champs sont à compléter ou à corriger.');
       return;
     }
     setChamps({});
@@ -217,6 +264,12 @@ export function CatalogItemForm({
   const tsAdmise = taxeSpecifiqueAdmise(form.taxGroup);
   const codeDgi = codeDgiApercu(form);
   const titre = fiche.mode === 'creation' ? 'Nouvel article' : vue ? vue.name : 'Article';
+  // Erreur du serveur (ou de l'envoi) d'abord, sinon celle de la saisie ; une
+  // erreur effacée par une correction ne masque pas celle de la sortie du champ.
+  const affiches: Partial<Record<ChampArticle, string>> = { ...erreursSaisie };
+  for (const [k, m] of Object.entries(champs) as [ChampArticle, string | undefined][]) {
+    if (m) affiches[k] = m;
+  }
 
   return (
     <section
@@ -279,9 +332,9 @@ export function CatalogItemForm({
         </div>
       ) : null}
 
-      <form
+      <Form
         onSubmit={(e) => void enregistrer(e)}
-        noValidate
+        autoFocusFirst={vue === null}
         className="flex max-w-3xl flex-col gap-5"
       >
         {erreur ? (
@@ -321,311 +374,274 @@ export function CatalogItemForm({
           </Alerte>
         ) : null}
 
-        <fieldset disabled={lectureSeule || occupe} className="flex flex-col gap-5">
-          <fieldset className="flex flex-col gap-4">
-            <legend className="mb-2 text-sm font-semibold">Article</legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Champ
-                  id="ar-name"
-                  label="Désignation"
-                  requis
-                  aide="Le libellé imprimé sur la facture."
-                  erreur={champs.name}
-                >
-                  <input
-                    id="ar-name"
-                    value={form.name}
-                    onChange={(e) => maj('name', e.target.value)}
-                    maxLength={200}
-                    required
-                    className={CHAMP}
-                    {...aria('ar-name', champs.name, true)}
-                  />
-                </Champ>
-              </div>
-              <Champ
-                id="ar-code"
-                label="Référence interne"
-                aide="Facultative. Lettres sans accent, chiffres et . _ / - ; unique dans votre catalogue."
-                erreur={champs.code}
-              >
-                <input
-                  id="ar-code"
-                  value={form.code}
-                  onChange={(e) => maj('code', e.target.value)}
-                  maxLength={50}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className={`${CHAMP} font-mono`}
-                  {...aria('ar-code', champs.code, true)}
-                />
-              </Champ>
-              <Champ
-                id="ar-unit"
-                label="Unité"
-                requis
-                aide="Pièce, kg, litre, heure…"
-                erreur={champs.unit}
-              >
-                <input
-                  id="ar-unit"
-                  value={form.unit}
-                  onChange={(e) => maj('unit', e.target.value)}
-                  maxLength={20}
-                  required
-                  className={CHAMP}
-                  {...aria('ar-unit', champs.unit, true)}
-                />
-              </Champ>
-            </div>
-          </fieldset>
+        <ErrorSummary errors={resumerErreurs(affiches, RESUME)} submitCount={soumissions} />
 
-          <fieldset className="flex flex-col gap-4">
-            <legend className="mb-2 text-sm font-semibold">Taxation</legend>
-            <Champ
+        <fieldset disabled={lectureSeule || occupe} className="flex min-w-0 flex-col gap-6">
+          <FormSection title="Article">
+            <Field
+              id="ar-name"
+              label="Désignation"
+              required
+              size="lg"
+              hint="Le libellé imprimé sur la facture."
+              error={affiches.name}
+            >
+              <TextInput
+                value={form.name}
+                onChange={(e) => maj('name', e.target.value)}
+                onBlur={() => touch('name')}
+                maxLength={200}
+              />
+            </Field>
+            <Field
+              id="ar-code"
+              label="Référence interne"
+              optional
+              size="sm"
+              newRow
+              hint="Lettres sans accent, chiffres et . _ / - ; unique dans votre catalogue."
+              error={affiches.code}
+            >
+              <TextInput
+                value={form.code}
+                onChange={(e) => maj('code', e.target.value)}
+                onBlur={() => touch('code')}
+                maxLength={50}
+                autoComplete="off"
+                spellCheck={false}
+                className="font-mono"
+              />
+            </Field>
+            <Field
+              id="ar-unit"
+              label="Unité"
+              required
+              size="xs"
+              hint="Pièce, kg, litre, heure…"
+              error={affiches.unit}
+            >
+              <TextInput
+                value={form.unit}
+                onChange={(e) => maj('unit', e.target.value)}
+                onBlur={() => touch('unit')}
+                maxLength={20}
+              />
+            </Field>
+          </FormSection>
+
+          <FormSection title="Taxation">
+            <Field
               id="ar-group"
               label="Groupe de taxation"
-              requis
-              aide={groupes === null && !erreurGroupes ? 'Chargement des groupes…' : undefined}
-              erreur={champs.taxGroup}
+              required
+              size="lg"
+              hint={groupes === null && !erreurGroupes ? 'Chargement des groupes…' : undefined}
+              error={affiches.taxGroup}
             >
-              <select
-                id="ar-group"
+              <Select<TaxGroupLetter | ''>
                 value={form.taxGroup}
-                onChange={(e) => choisirGroupe(e.target.value as TaxGroupLetter | '')}
+                placeholder="Choisissez un groupe"
+                loading={groupes === null && !erreurGroupes}
                 disabled={groupes === null}
-                required
-                className={CHAMP}
-                {...aria('ar-group', champs.taxGroup, groupes === null && !erreurGroupes)}
-              >
-                <option value="">Choisissez un groupe</option>
-                {groupes?.groups.map((g) => (
-                  <option key={g.letter} value={g.letter}>
-                    {libelleGroupe(g)}
-                  </option>
-                ))}
-                {groupeRetire ? (
-                  <option value={groupeRetire}>{groupeRetire} — n’est plus proposé</option>
-                ) : null}
-              </select>
-            </Champ>
-
-            <fieldset
-              className="flex flex-col gap-2"
-              aria-describedby={champs.itemType ? 'ar-type-erreur' : 'ar-type-aide'}
+                onChange={(g) => {
+                  choisirGroupe(g);
+                  touch('taxGroup');
+                }}
+                onBlur={() => touch('taxGroup')}
+                options={[
+                  ...(groupes?.groups ?? []).map((g) => ({
+                    value: g.letter,
+                    label: libelleGroupe(g),
+                    keywords: g.letter,
+                  })),
+                  ...(groupeRetire
+                    ? [
+                        {
+                          value: groupeRetire,
+                          label: `${groupeRetire} — n’est plus proposé`,
+                          disabled: true,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </Field>
+            <Field
+              id="ar-type"
+              label="Type d’article"
+              required
+              size="md"
+              hint={
+                admis.length === 0
+                  ? 'Choisissez d’abord le groupe : il décide des types admis.'
+                  : admis.length === 1
+                    ? `Seul type admis dans le groupe ${form.taxGroup}.`
+                    : `Types admis dans le groupe ${form.taxGroup}.`
+              }
+              error={affiches.itemType}
             >
-              <legend className="text-sm font-medium">
-                Type d’article
-                <span className="text-[var(--foreground-muted)]" aria-hidden="true">
-                  {' '}
-                  *
-                </span>
-                <span className="sr-only"> (obligatoire)</span>
-              </legend>
-              {admis.length === 0 ? (
-                <p id="ar-type-aide" className="text-xs text-[var(--foreground-muted)]">
-                  Choisissez d’abord le groupe : il décide des types admis.
-                </p>
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-2">
-                    {admis.map((t) => (
-                      <RadioCarte
-                        key={t}
-                        name="ar-type"
-                        checked={form.itemType === t}
-                        onChange={() => maj('itemType', t as CatalogItemType)}
-                        label={ITEM_TYPE_LABELS[t]}
-                      />
-                    ))}
-                  </div>
-                  <p id="ar-type-aide" className="text-xs text-[var(--foreground-muted)]">
-                    {admis.length === 1
-                      ? `Seul type admis dans le groupe ${form.taxGroup}.`
-                      : `Types admis dans le groupe ${form.taxGroup}.`}
-                  </p>
-                </>
-              )}
-              {champs.itemType ? (
-                <p id="ar-type-erreur" className="text-xs font-medium text-[var(--danger)]">
-                  {champs.itemType}
-                </p>
-              ) : null}
-            </fieldset>
-
+              <Select<CatalogItemType | ''>
+                value={form.itemType}
+                placeholder={admis.length === 0 ? 'Groupe à choisir d’abord' : 'Choisissez un type'}
+                disabled={admis.length === 0}
+                onChange={(t) => {
+                  maj('itemType', t);
+                  touch('itemType');
+                }}
+                onBlur={() => touch('itemType')}
+                options={admis.map((t) => ({ value: t, label: ITEM_TYPE_LABELS[t] }))}
+              />
+            </Field>
             {groupe?.outOfScopeAllowed ? (
-              <div className="flex flex-col gap-1.5">
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.outOfScope}
-                    onChange={(e) => maj('outOfScope', e.target.checked)}
-                    className="mt-0.5 h-4 w-4"
-                    aria-describedby="ar-hc-aide"
-                  />
-                  <span>Opération hors champ</span>
-                </label>
-                <p id="ar-hc-aide" className="text-xs text-[var(--foreground-muted)]">
-                  {form.outOfScope
-                    ? `Code transmis à la DGI : « ${OUT_OF_SCOPE_ITEM_CODE} » (valeur imposée, orthographe à confirmer auprès de la DGI). Votre référence interne est conservée.`
-                    : 'À cocher pour une opération hors du champ de la TVA : la DGI exige alors un code d’article imposé.'}
-                </p>
-                {champs.outOfScope ? (
-                  <p className="text-xs font-medium text-[var(--danger)]">{champs.outOfScope}</p>
-                ) : null}
-              </div>
+              <Field
+                id="ar-hc"
+                label="Champ de la TVA"
+                group
+                size="full"
+                error={affiches.outOfScope}
+              >
+                <Checkbox
+                  checked={form.outOfScope}
+                  onChange={(v) => {
+                    maj('outOfScope', v);
+                    touch('outOfScope');
+                  }}
+                  label="Opération hors champ"
+                  description={
+                    form.outOfScope
+                      ? `Code transmis à la DGI : « ${OUT_OF_SCOPE_ITEM_CODE} » (valeur imposée, orthographe à confirmer auprès de la DGI). Votre référence interne est conservée.`
+                      : 'À cocher pour une opération hors du champ de la TVA : la DGI exige alors un code d’article imposé.'
+                  }
+                />
+              </Field>
             ) : null}
             {codeDgi ? (
-              <p className="text-xs text-[var(--foreground-muted)]">
+              <p className="col-span-full text-xs text-[var(--foreground-muted)]">
                 Code d’article envoyé à la DGI : <span className="font-mono">{codeDgi}</span>
               </p>
             ) : null}
-          </fieldset>
+          </FormSection>
 
-          <fieldset className="flex flex-col gap-4">
-            <legend className="mb-2 text-sm font-semibold">Prix</legend>
-            <fieldset
-              className="flex flex-col gap-1.5"
-              aria-describedby={champs.currency ? 'ar-devise-erreur' : 'ar-devise-aide'}
+          <FormSection title="Prix">
+            <Field
+              id="ar-devise"
+              label="Devise"
+              group
+              required
+              size="md"
+              hint="Le prix et la taxe spécifique par unité s’entendent dans cette devise. Lors de la normalisation d’une facture, ses montants sont convertis en CDF au taux de référence."
+              error={affiches.currency}
             >
-              <legend className="text-sm font-medium">
-                Devise
-                <span className="text-[var(--foreground-muted)]" aria-hidden="true">
-                  {' '}
-                  *
-                </span>
-                <span className="sr-only"> (obligatoire)</span>
-              </legend>
-              <div className="flex flex-wrap gap-2">
-                {CATALOG_CURRENCIES.map((d: CatalogCurrency) => (
-                  <RadioCarte
-                    key={d}
-                    name="ar-devise"
-                    checked={form.currency === d}
-                    onChange={() => maj('currency', d)}
-                    label={CURRENCY_LABELS[d]}
-                  />
-                ))}
-              </div>
-              <AideEtErreur
-                id="ar-devise"
-                aide="Le prix et la taxe spécifique par unité s’entendent dans cette devise. Lors de la normalisation d’une facture, ses montants sont convertis en CDF au taux de référence."
-                erreur={champs.currency}
+              <SegmentedControl<CatalogCurrency>
+                value={form.currency}
+                onChange={(d) => {
+                  maj('currency', d);
+                  touch('currency');
+                }}
+                options={CATALOG_CURRENCIES.map((d) => ({ value: d, label: CURRENCY_LABELS[d] }))}
               />
-            </fieldset>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Champ
-                id="ar-price"
-                label={`Prix unitaire (${form.currency})`}
-                requis
-                aide="Hors taxe spécifique. Deux décimales au plus, par exemple 1 234,50."
-                erreur={champs.unitPrice}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    id="ar-price"
-                    inputMode="decimal"
-                    value={form.unitPrice}
-                    onChange={(e) => maj('unitPrice', e.target.value)}
-                    maxLength={24}
-                    required
-                    autoComplete="off"
-                    className={`${CHAMP} fig text-right`}
-                    {...aria('ar-price', champs.unitPrice, true)}
-                  />
-                  <span className="text-sm text-[var(--foreground-muted)]">{form.currency}</span>
-                </div>
-              </Champ>
-              <fieldset
-                className="flex flex-col gap-1.5"
-                aria-describedby={champs.priceMode ? 'ar-mode-erreur' : 'ar-mode-aide'}
-              >
-                <legend className="text-sm font-medium">
-                  Le prix est
-                  <span className="text-[var(--foreground-muted)]" aria-hidden="true">
-                    {' '}
-                    *
-                  </span>
-                  <span className="sr-only"> (obligatoire)</span>
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {(['ttc', 'ht'] as CatalogPriceMode[]).map((m) => (
-                    <RadioCarte
-                      key={m}
-                      name="ar-mode"
-                      checked={form.priceMode === m}
-                      onChange={() => maj('priceMode', m)}
-                      label={PRICE_MODE_LABELS[m].long}
-                    />
-                  ))}
-                </div>
-                <AideEtErreur
-                  id="ar-mode"
-                  aide="Sur une facture dans l’autre mode, le prix sera converti par le calcul officiel et restera modifiable."
-                  erreur={champs.priceMode}
-                />
-              </fieldset>
-            </div>
-          </fieldset>
+            </Field>
+            <Field
+              id="ar-price"
+              label="Prix unitaire"
+              required
+              size="sm"
+              newRow
+              hint="Hors taxe spécifique. Deux décimales au plus, par exemple 1 234,50."
+              error={affiches.unitPrice}
+            >
+              <MoneyInput
+                value={form.unitPrice}
+                currency={form.currency}
+                onChange={(v) => maj('unitPrice', v)}
+                onBlur={() => touch('unitPrice')}
+                maxLength={24}
+                autoComplete="off"
+              />
+            </Field>
+            <Field
+              id="ar-mode"
+              label="Le prix est"
+              group
+              required
+              size="md"
+              hint="Sur une facture dans l’autre mode, le prix sera converti par le calcul officiel et restera modifiable."
+              error={affiches.priceMode}
+            >
+              <SegmentedControl<CatalogPriceMode>
+                value={form.priceMode}
+                onChange={(m) => {
+                  maj('priceMode', m);
+                  touch('priceMode');
+                }}
+                options={(['ttc', 'ht'] as CatalogPriceMode[]).map((m) => ({
+                  value: m,
+                  label: PRICE_MODE_LABELS[m].long,
+                }))}
+              />
+            </Field>
+          </FormSection>
 
           {tsAdmise ? (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="mb-1 text-sm font-semibold">Taxe spécifique</legend>
-              <p className="-mt-1 text-xs text-[var(--foreground-muted)]">
-                Facultative (accises, par exemple). Elle s’ajoute au prix et entre dans la base de
-                la TVA.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {(
-                  [
-                    ['none', 'Aucune'],
-                    ['per_unit', 'Montant par unité'],
-                    ['percent', 'Pourcentage'],
-                  ] as [TaxeSpecifiqueChoix, string][]
-                ).map(([k, label]) => (
-                  <RadioCarte
-                    key={k}
-                    name="ar-ts"
-                    checked={form.specificKind === k}
-                    onChange={() => {
-                      maj('specificKind', k);
-                      if (k === 'none') maj('specificValue', '');
-                    }}
-                    label={label}
-                  />
-                ))}
-              </div>
+            <FormSection
+              title="Taxe spécifique"
+              description="Facultative (accises, par exemple). Elle s’ajoute au prix et entre dans la base de la TVA."
+            >
+              <Field id="ar-ts" label="Nature" size="md" error={affiches.specificKind}>
+                <Select<TaxeSpecifiqueChoix>
+                  value={form.specificKind}
+                  onChange={(k) => {
+                    maj('specificKind', k);
+                    if (k === 'none') maj('specificValue', '');
+                  }}
+                  options={[
+                    { value: 'none', label: 'Aucune' },
+                    { value: 'per_unit', label: 'Montant par unité' },
+                    { value: 'percent', label: 'Pourcentage' },
+                  ]}
+                />
+              </Field>
               {form.specificKind !== 'none' ? (
-                <Champ
+                <Field
                   id="ar-ts-valeur"
                   label={
                     form.specificKind === 'per_unit'
-                      ? `Montant par ${form.unit.trim() || 'unité'} (${form.currency})`
-                      : 'Taux (%)'
+                      ? `Montant par ${form.unit.trim() || 'unité'}`
+                      : 'Taux'
                   }
-                  requis
-                  aide={
+                  required
+                  size="sm"
+                  hint={
                     form.specificKind === 'per_unit'
                       ? 'Deux décimales au plus.'
                       : 'Supérieur à 0 et inférieur à 100, deux décimales au plus.'
                   }
-                  erreur={champs.specificValue ?? champs.specificKind}
+                  error={affiches.specificValue}
                 >
-                  <input
-                    id="ar-ts-valeur"
-                    inputMode="decimal"
-                    value={form.specificValue}
-                    onChange={(e) => maj('specificValue', e.target.value)}
-                    maxLength={24}
-                    required
-                    autoComplete="off"
-                    className={`${CHAMP} fig max-w-xs text-right`}
-                    {...aria('ar-ts-valeur', champs.specificValue ?? champs.specificKind, true)}
-                  />
-                </Champ>
+                  {form.specificKind === 'per_unit' ? (
+                    <MoneyInput
+                      value={form.specificValue}
+                      currency={form.currency}
+                      onChange={(v) => maj('specificValue', v)}
+                      onBlur={() => touch('specificValue')}
+                      maxLength={24}
+                      autoComplete="off"
+                    />
+                  ) : (
+                    <TextInput
+                      inputMode="decimal"
+                      value={form.specificValue}
+                      onChange={(e) => maj('specificValue', e.target.value)}
+                      onBlur={() => touch('specificValue')}
+                      maxLength={24}
+                      autoComplete="off"
+                      trailing="%"
+                      className="text-right tabular-nums"
+                    />
+                  )}
+                </Field>
               ) : null}
-            </fieldset>
+            </FormSection>
           ) : form.taxGroup !== '' ? (
             <p className="text-xs text-[var(--foreground-muted)]">
               Aucune taxe spécifique dans le groupe {form.taxGroup}.
@@ -633,21 +649,22 @@ export function CatalogItemForm({
           ) : null}
         </fieldset>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          {lectureSeule ? null : (
-            <button type="submit" disabled={occupe || groupes === null} className={BOUTON}>
-              {occupe
-                ? 'Enregistrement…'
-                : fiche.mode === 'creation'
-                  ? 'Créer l’article'
-                  : 'Enregistrer les modifications'}
-            </button>
-          )}
-          <button type="button" onClick={() => onFermer()} className={BOUTON}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <Button onClick={() => onFermer()} className="max-sm:h-11">
             {lectureSeule ? 'Retour au catalogue' : 'Annuler'}
-          </button>
+          </Button>
+          {lectureSeule ? null : (
+            <SubmitButton
+              busy={occupe}
+              busyLabel="Enregistrement…"
+              disabled={groupes === null}
+              className="max-sm:h-11"
+            >
+              {fiche.mode === 'creation' ? 'Créer l’article' : 'Enregistrer les modifications'}
+            </SubmitButton>
+          )}
         </div>
-      </form>
+      </Form>
     </section>
   );
 }
@@ -666,30 +683,5 @@ export function BandeauGroupes({ liste }: { liste: TaxGroupList }): React.ReactE
       <p className="font-medium text-[var(--foreground)]">{b.titre}</p>
       <p className="mt-0.5 text-xs">{b.texte}</p>
     </div>
-  );
-}
-
-function RadioCarte({
-  name,
-  checked,
-  onChange,
-  label,
-}: {
-  name: string;
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}): React.ReactElement {
-  return (
-    <label
-      className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition ${
-        checked
-          ? 'border-[var(--accent)]'
-          : 'border-[var(--border)] hover:border-[var(--border-strong)]'
-      }`}
-    >
-      <input type="radio" name={name} checked={checked} onChange={onChange} className="h-4 w-4" />
-      {label}
-    </label>
   );
 }

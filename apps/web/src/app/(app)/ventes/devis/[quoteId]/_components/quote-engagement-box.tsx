@@ -7,7 +7,7 @@
 // pas modifié. Chaque geste ouvre une fenêtre modale ; une commande déjà créée pour ce
 // devis est signalée et ouverte (`409 ORDER_EXISTS_FOR_QUOTE`).
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { DatePicker, Field, FormGrid, Modal, TextInput, buttonClasses } from '@lalanda/ui';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 
@@ -15,7 +15,7 @@ import type { OrgAction } from '@/lib/api';
 import type { QuoteView } from '@/lib/api-crm';
 import { salesContractsApi } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, CHAMP, Champ, aria } from '../../../_components/form-ui';
+import { Alerte, BOUTON } from '../../../_components/form-ui';
 import { ChampsClauses } from '../../../contrats/_components/clauses-fields';
 import {
   COMMANDES_BASE,
@@ -158,33 +158,26 @@ function FenetreVersCommande({
             ne pas facturer deux fois.
           </p>
         ) : null}
-        <Champ id={`${id}-date`} label="Date de la commande">
-          <input
-            id={`${id}-date`}
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={CHAMP}
-          />
-        </Champ>
-        <Champ id={`${id}-ref`} label="Référence du bon de commande du client">
-          <input
-            id={`${id}-ref`}
-            value={reference}
-            maxLength={60}
-            onChange={(e) => setReference(e.target.value)}
-            className={CHAMP}
-          />
-        </Champ>
-        <Champ id={`${id}-livraison`} label="Livraison souhaitée">
-          <input
-            id={`${id}-livraison`}
-            type="date"
-            value={livraison}
-            onChange={(e) => setLivraison(e.target.value)}
-            className={CHAMP}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-date`} label="Date de la commande" optional size="sm">
+            <DatePicker value={date} onChange={setDate} shortcuts={['today']} />
+          </Field>
+          <Field id={`${id}-ref`} label="Référence du bon de commande du client" optional size="md">
+            <TextInput
+              value={reference}
+              maxLength={60}
+              onChange={(e) => setReference(e.target.value)}
+              className="font-mono"
+            />
+          </Field>
+          <Field id={`${id}-livraison`} label="Livraison souhaitée" optional size="sm">
+            <DatePicker
+              value={livraison}
+              onChange={setLivraison}
+              shortcuts={['plus7', 'plus30', 'endOfMonth']}
+            />
+          </Field>
+        </FormGrid>
       </div>
     </Modal>
   );
@@ -262,21 +255,18 @@ function FenetreVersContrat({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ
-          id={`${id}-titre`}
-          label="Titre du contrat"
-          aide="Vide : l’objet du devis, ou « Contrat — devis DV… »."
-          erreur={erreurs['title']}
-        >
-          <input
+        <FormGrid>
+          <Field
             id={`${id}-titre`}
-            value={titre}
-            maxLength={200}
-            onChange={(e) => setTitre(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-titre`, erreurs['title'], true)}
-          />
-        </Champ>
+            label="Titre du contrat"
+            optional
+            size="lg"
+            hint="Vide : l’objet du devis, ou « Contrat — devis DV… »."
+            error={erreurs['title']}
+          >
+            <TextInput value={titre} maxLength={200} onChange={(e) => setTitre(e.target.value)} />
+          </Field>
+        </FormGrid>
         <ChampsClauses
           prefixe={`${id}-cl`}
           f={clauses}

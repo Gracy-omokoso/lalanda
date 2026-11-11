@@ -12,7 +12,8 @@
 // référence `PF…`, jamais comme une facture (§ S25e.1). Les compteurs des onglets
 // et les graphiques viennent du même calcul serveur : ils concordent avec la liste.
 
-import { buttonClasses, StatusPill } from '@lalanda/ui';
+import { buttonClasses, Select, StatusPill, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -46,8 +47,6 @@ import {
   TYPE_LABELS,
 } from './invoice-model';
 
-const CHAMP_COMPACT =
-  'h-8 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-[13px] outline-none transition-colors duration-[var(--motion-fast)] focus:border-[var(--accent)]';
 const BOUTON_LIGNE =
   'relative z-10 inline-flex h-7 items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs font-medium transition-colors duration-[var(--motion-fast)] hover:border-[var(--accent)] hover:bg-[var(--surface-muted)]';
 
@@ -231,36 +230,31 @@ export function InvoiceList(): React.ReactElement {
             onSubmit={(e) => e.preventDefault()}
             className="flex min-w-0 flex-1 gap-2"
           >
-            <label htmlFor="fa-q" className="sr-only">
-              Rechercher une facture
-            </label>
-            <input
+            <TextInput
               id="fa-q"
               type="search"
+              aria-label="Rechercher une facture"
               value={filtres.q}
               onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
               maxLength={100}
               placeholder="Numéro, référence ou client"
-              className={`${CHAMP_COMPACT} min-w-0 flex-1`}
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
+              className="min-w-0 flex-1"
             />
-            <label htmlFor="fa-type" className="sr-only">
-              Type
-            </label>
-            <select
+            <Select<InvoiceType | ''>
               id="fa-type"
+              aria-label="Type"
               value={filtres.type}
-              onChange={(e) =>
-                setFiltres((f) => ({ ...f, type: e.target.value as InvoiceType | '' }))
-              }
-              className={`${CHAMP_COMPACT} w-36 shrink-0 sm:w-44`}
-            >
-              <option value="">Tous les types</option>
-              {(Object.keys(TYPE_LABELS) as InvoiceType[]).map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABELS[t]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFiltres((f) => ({ ...f, type: v }))}
+              options={[
+                { value: '', label: 'Tous les types' },
+                ...(Object.keys(TYPE_LABELS) as InvoiceType[]).map((t) => ({
+                  value: t,
+                  label: TYPE_LABELS[t],
+                })),
+              ]}
+              className="w-40 shrink-0 sm:w-48"
+            />
           </form>
         </div>
 

@@ -2,13 +2,16 @@
 
 // Fenêtre de saisie d'une commande client (création, ou modification du brouillon) —
 // ADR-0050 § 2.2, lot V7. Chaque « + » ouvre une fenêtre modale.
+//
+// ADR-0074 : dates en `DatePicker`, référence et notes en champs de
+// `@lalanda/ui`, largeurs sémantiques. Mêmes champs envoyés (`preparerCommande`).
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Button, DatePicker, Field, FormGrid, Modal, TextArea, TextInput } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { salesContractsApi, type SalesOrderView } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { Alerte } from '../../_components/form-ui';
 import type { FormulaireDocument } from '../../factures/_components/invoice-model';
 import { ChampsDocument } from '../../contrats/_components/engagement-document-fields';
 import {
@@ -74,9 +77,7 @@ export function FenetreCommande({
     }
   }
 
-  const champ =
-    (k: keyof MetaCommande) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setMeta((m) => ({ ...m, [k]: e.target.value }));
+  const majMeta = (k: keyof MetaCommande, v: string): void => setMeta((m) => ({ ...m, [k]: v }));
 
   return (
     <Modal
@@ -87,18 +88,18 @@ export function FenetreCommande({
       size="xl"
       busy={envoi}
       footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Annuler
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'md')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : vue ? 'Enregistrer le brouillon' : 'Créer la commande'}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -108,45 +109,48 @@ export function FenetreCommande({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Champ id={`${id}-date`} label="Date de la commande" requis erreur={erreurs['orderedOn']}>
-            <input
-              id={`${id}-date`}
-              type="date"
+        <FormGrid>
+          <Field
+            id={`${id}-date`}
+            label="Date de la commande"
+            required
+            size="sm"
+            error={erreurs['orderedOn']}
+          >
+            <DatePicker
               value={meta.orderedOn}
-              onChange={champ('orderedOn')}
-              className={CHAMP}
-              {...aria(`${id}-date`, erreurs['orderedOn'])}
+              onChange={(v) => majMeta('orderedOn', v)}
+              shortcuts={['today']}
             />
-          </Champ>
-          <Champ
+          </Field>
+          <Field
             id={`${id}-ref`}
             label="Référence du bon de commande du client"
-            erreur={erreurs['customerReference']}
+            optional
+            size="md"
+            error={erreurs['customerReference']}
           >
-            <input
-              id={`${id}-ref`}
+            <TextInput
               value={meta.customerReference}
               maxLength={60}
-              onChange={champ('customerReference')}
-              className={CHAMP}
-              {...aria(`${id}-ref`, erreurs['customerReference'])}
+              onChange={(e) => majMeta('customerReference', e.target.value)}
+              className="font-mono"
             />
-          </Champ>
-          <Champ
+          </Field>
+          <Field
             id={`${id}-livraison`}
             label="Livraison souhaitée"
-            erreur={erreurs['requestedDeliveryDate']}
+            optional
+            size="sm"
+            error={erreurs['requestedDeliveryDate']}
           >
-            <input
-              id={`${id}-livraison`}
-              type="date"
+            <DatePicker
               value={meta.requestedDeliveryDate}
-              onChange={champ('requestedDeliveryDate')}
-              className={CHAMP}
+              onChange={(v) => majMeta('requestedDeliveryDate', v)}
+              shortcuts={['plus7', 'plus30', 'endOfMonth']}
             />
-          </Champ>
-        </div>
+          </Field>
+        </FormGrid>
         <ChampsDocument
           prefixe={`${id}-doc`}
           form={form}
@@ -156,16 +160,16 @@ export function FenetreCommande({
           desactive={envoi}
           aJour={vue !== null}
         />
-        <Champ id={`${id}-notes`} label="Notes" erreur={erreurs['notes']}>
-          <textarea
-            id={`${id}-notes`}
-            value={meta.notes}
-            rows={3}
-            maxLength={1000}
-            onChange={champ('notes')}
-            className={CHAMP}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-notes`} label="Notes" optional size="full" error={erreurs['notes']}>
+            <TextArea
+              value={meta.notes}
+              rows={3}
+              maxLength={1000}
+              onChange={(e) => majMeta('notes', e.target.value)}
+            />
+          </Field>
+        </FormGrid>
       </div>
     </Modal>
   );

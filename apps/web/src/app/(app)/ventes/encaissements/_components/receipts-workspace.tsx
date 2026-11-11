@@ -13,7 +13,19 @@
 // Aucun montant n'est calculé ici : restes, statuts, totaux et chiffres viennent
 // du moteur. Lecture `sales.read` ; écriture `sales.receipt` ; échéance `sales.manage`.
 
-import { buttonClasses, StatusPill, type StatusTone } from '@lalanda/ui';
+import {
+  buttonClasses,
+  DatePicker,
+  Field,
+  FormGrid,
+  MoneyInput,
+  Select,
+  StatusPill,
+  SubmitButton,
+  TextInput,
+  type StatusTone,
+} from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type ReceiptStats, type ReceiptView, type SettlementView } from '@/lib/api';
@@ -21,20 +33,11 @@ import { api, type ReceiptStats, type ReceiptView, type SettlementView } from '@
 import {
   BOUTON_LIGNE,
   CARTE,
-  CHAMP_COMPACT,
   IconePlus,
   OngletsStatut,
   type EtatTableau,
 } from '../../_components/dashboard-ui';
-import {
-  Alerte,
-  BOUTON,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  aria,
-} from '../../_components/form-ui';
+import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatMontant, messageVentes } from '../../_components/sales-model';
 
@@ -293,15 +296,16 @@ export function ReceiptsWorkspace(): React.ReactElement {
                     </span>
                     <span className="flex flex-wrap items-center gap-2 md:justify-end">
                       {gerer ? (
-                        <label className="flex items-center gap-1 text-xs text-[var(--foreground-muted)]">
+                        <span className="flex items-center gap-1.5 text-xs text-[var(--foreground-muted)]">
                           Échéance
-                          <input
-                            type="date"
+                          <DatePicker
+                            aria-label={`Échéance de la facture ${v.number ?? ''}`.trim()}
                             value={v.dueDate ?? ''}
-                            onChange={(e) => void echeance(v, e.target.value)}
-                            className={`${CHAMP_COMPACT} w-auto text-xs`}
+                            onChange={(iso) => void echeance(v, iso)}
+                            shortcuts={['plus30', 'endOfMonth']}
+                            className="w-40"
                           />
-                        </label>
+                        </span>
                       ) : v.dueDate ? (
                         <span className="text-xs text-[var(--foreground-muted)]">
                           Échéance {libelleJour(v.dueDate)}
@@ -347,33 +351,33 @@ export function ReceiptsWorkspace(): React.ReactElement {
                     {form.lignes.map((l, i) => (
                       <li
                         key={l.invoiceId}
-                        className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] sm:items-end"
+                        className="flex flex-col gap-2 sm:flex-row sm:items-end"
                       >
-                        <span className="text-sm">{l.libelle}</span>
-                        <Champ
+                        <span className="min-w-0 flex-1 text-sm break-words sm:pb-2">
+                          {l.libelle}
+                        </span>
+                        <Field
                           id={`enc-ligne-${i}`}
-                          label={`Montant imputé (${form.currency})`}
-                          erreur={erreursForm[`ligne.${i}`]}
+                          label="Montant imputé"
+                          className="sm:w-48"
+                          error={erreursForm[`ligne.${i}`]}
                         >
-                          <input
-                            id={`enc-ligne-${i}`}
-                            inputMode="decimal"
+                          <MoneyInput
                             value={l.montant}
-                            onChange={(e) =>
+                            currency={form.currency}
+                            onChange={(v) =>
                               setForm((f) => ({
                                 ...f,
                                 lignes: f.lignes.map((x, j) =>
-                                  j === i ? { ...x, montant: e.target.value } : x,
+                                  j === i ? { ...x, montant: v } : x,
                                 ),
                               }))
                             }
-                            className={CHAMP}
-                            {...aria(`enc-ligne-${i}`, erreursForm[`ligne.${i}`])}
                           />
-                        </Champ>
+                        </Field>
                         <button
                           type="button"
-                          className={BOUTON_PETIT}
+                          className={`${BOUTON_PETIT} max-sm:h-11`}
                           onClick={() =>
                             setForm((f) => ({ ...f, lignes: f.lignes.filter((_, j) => j !== i) }))
                           }
@@ -387,93 +391,78 @@ export function ReceiptsWorkspace(): React.ReactElement {
                 {erreursForm.lignes ? (
                   <p className="text-xs font-medium text-[var(--danger)]">{erreursForm.lignes}</p>
                 ) : null}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Champ
+                <FormGrid>
+                  <Field
                     id="enc-date"
                     label="Date de réception"
-                    requis
-                    erreur={erreursForm.receivedOn}
+                    required
+                    size="sm"
+                    error={erreursForm.receivedOn}
                   >
-                    <input
-                      id="enc-date"
-                      type="date"
+                    <DatePicker
                       value={form.receivedOn}
-                      onChange={(e) => setForm((f) => ({ ...f, receivedOn: e.target.value }))}
-                      className={CHAMP}
-                      {...aria('enc-date', erreursForm.receivedOn)}
+                      onChange={(iso) => setForm((f) => ({ ...f, receivedOn: iso }))}
+                      shortcuts={['today']}
                     />
-                  </Champ>
-                  <Champ
+                  </Field>
+                  <Field
                     id="enc-moyen"
                     label="Moyen de règlement"
-                    requis
-                    erreur={erreursForm.method}
+                    required
+                    size="md"
+                    error={erreursForm.method}
                   >
-                    <select
-                      id="enc-moyen"
+                    <Select<FormulaireEncaissement['method']>
                       value={form.method}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          method: e.target.value as FormulaireEncaissement['method'],
-                        }))
-                      }
-                      className={CHAMP}
-                      {...aria('enc-moyen', erreursForm.method)}
-                    >
-                      <option value="">Choisir…</option>
-                      {RECEIPT_METHODS.map((m) => (
-                        <option key={m.valeur} value={m.valeur}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Champ>
+                      placeholder="Choisir…"
+                      onChange={(m) => setForm((f) => ({ ...f, method: m }))}
+                      options={RECEIPT_METHODS.map((m) => ({ value: m.valeur, label: m.label }))}
+                    />
+                  </Field>
                   {form.lignes.length > 1 ? (
-                    <Champ
+                    <Field
                       id="enc-total"
-                      label={`Montant reçu (${form.currency})`}
-                      aide="Égal à la somme des montants imputés : le serveur le vérifie."
-                      requis
-                      erreur={erreursForm.total}
+                      label="Montant reçu"
+                      hint="Égal à la somme des montants imputés : le serveur le vérifie."
+                      required
+                      size="sm"
+                      newRow
+                      error={erreursForm.total}
                     >
-                      <input
-                        id="enc-total"
-                        inputMode="decimal"
+                      <MoneyInput
                         value={form.total}
-                        onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-                        className={CHAMP}
-                        {...aria('enc-total', erreursForm.total, true)}
+                        currency={form.currency}
+                        onChange={(v) => setForm((f) => ({ ...f, total: v }))}
                       />
-                    </Champ>
+                    </Field>
                   ) : null}
-                  <Champ
+                  <Field
                     id="enc-ref"
                     label="Référence"
-                    aide="N° de virement, de chèque ou de transaction."
+                    optional
+                    size="md"
+                    hint="N° de virement, de chèque ou de transaction."
                   >
-                    <input
-                      id="enc-ref"
+                    <TextInput
                       value={form.reference}
                       maxLength={100}
                       onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
-                      className={CHAMP}
-                      {...aria('enc-ref', undefined, true)}
+                      className="font-mono"
                     />
-                  </Champ>
-                </div>
+                  </Field>
+                </FormGrid>
                 {message ? (
                   <p role="status" className="text-sm">
                     {message}
                   </p>
                 ) : null}
-                <button
-                  type="submit"
-                  className={buttonClasses('primary', 'md', 'self-start')}
-                  disabled={envoi}
+                <SubmitButton
+                  busy={envoi}
+                  busyLabel="Enregistrement…"
+                  className="self-start max-sm:h-11 max-sm:w-full"
                 >
-                  {envoi ? 'Enregistrement…' : 'Enregistrer l’encaissement'}
-                </button>
+                  Enregistrer l’encaissement
+                </SubmitButton>
               </form>
             </section>
           ) : message ? (
@@ -502,17 +491,16 @@ export function ReceiptsWorkspace(): React.ReactElement {
                 onSubmit={(e) => e.preventDefault()}
                 className="flex min-w-0 flex-1"
               >
-                <label htmlFor="enc-q" className="sr-only">
-                  Rechercher un encaissement
-                </label>
-                <input
+                <TextInput
                   id="enc-q"
                   type="search"
+                  aria-label="Rechercher un encaissement"
                   value={recherche}
                   onChange={(e) => setRecherche(e.target.value)}
                   maxLength={100}
                   placeholder="N° de facture ou référence"
-                  className={`${CHAMP_COMPACT} min-w-0 flex-1`}
+                  leading={<Search aria-hidden="true" className="h-4 w-4" />}
+                  className="min-w-0 flex-1"
                 />
               </form>
             </div>
@@ -636,15 +624,19 @@ export function ReceiptsWorkspace(): React.ReactElement {
             )}
             {annulation ? (
               <div className="flex flex-col gap-2 border-t border-[var(--border)] p-3 sm:flex-row sm:items-end sm:px-4">
-                <Champ id={`motif-${annulation.id}`} label="Motif de l’annulation" requis>
-                  <input
-                    id={`motif-${annulation.id}`}
+                <Field
+                  id={`motif-${annulation.id}`}
+                  label="Motif de l’annulation"
+                  required
+                  className="min-w-0 flex-1"
+                  hint="Trois caractères au moins."
+                >
+                  <TextInput
                     value={annulation.motif}
                     maxLength={500}
                     onChange={(e) => setAnnulation({ id: annulation.id, motif: e.target.value })}
-                    className={CHAMP}
                   />
-                </Champ>
+                </Field>
                 <button
                   type="button"
                   className={BOUTON_DANGER}
