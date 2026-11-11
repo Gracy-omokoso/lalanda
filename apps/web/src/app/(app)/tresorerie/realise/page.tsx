@@ -5,7 +5,13 @@
 // l'utilisateur, jamais devinée), synchroniser de façon idempotente, puis lire
 // l'écart au plan, expliqué ligne par ligne. Sans projet validé, l'écran le dit :
 // RUN fonctionne seul, la comparaison exige BUILD.
+//
+// ADR-0074 : initiative, correspondances et exercice en `Select`, report en
+// interrupteur, champs à leur largeur. Mêmes champs envoyés. Le mois
+// d'ouverture reste un champ « mois » du navigateur : `@lalanda/ui` n'a pas de
+// sélecteur de mois (décision ouverte).
 
+import { Button, Field, FormGrid, Select, SubmitButton, Switch, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type ProjectView } from '@/lib/api';
@@ -26,10 +32,7 @@ import {
   libelleMois,
 } from '../_components/treasury-model';
 
-const CHAMP =
-  'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-60';
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
+const EXERCICES = [1, 2, 3, 4, 5] as const;
 
 const STATUT_COULEUR: Record<string, string> = {
   favorable: 'text-[var(--success,#15803d)]',
@@ -135,43 +138,38 @@ export default function RealisePage(): React.ReactElement {
             (Encaissements) : les changer ici les change là-bas, et c’est refusé tant que l’autre
             pont est actif.
           </p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex flex-col gap-1 text-sm">
-              Initiative
-              <select
-                className={CHAMP}
+          <FormGrid>
+            <Field id="rea-initiative" label="Initiative" size="lg" disabled={!relier}>
+              <Select<string>
                 value={form.projectId}
-                disabled={!relier}
-                onChange={(e) => setForm({ ...form, projectId: e.target.value, mapping: {} })}
-              >
-                <option value="">— Aucun —</option>
-                {projets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Mois d’ouverture de l’exercice 1
-              <input
+                onChange={(v) => setForm({ ...form, projectId: v, mapping: {} })}
+                options={[
+                  { value: '', label: '— Aucun —' },
+                  ...projets.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+              />
+            </Field>
+            <Field
+              id="rea-premier-mois"
+              label="Mois d’ouverture de l’exercice 1"
+              size="sm"
+              disabled={!relier}
+            >
+              <TextInput
                 type="month"
-                className={CHAMP}
                 value={form.firstMonth}
-                disabled={!relier}
                 onChange={(e) => setForm({ ...form, firstMonth: e.target.value })}
               />
-            </label>
-            <label className="flex items-center gap-2 pt-6 text-sm">
-              <input
-                type="checkbox"
+            </Field>
+            <Field id="rea-actif" label="Report" group size="md" newRow disabled={!relier}>
+              <Switch
                 checked={form.enabled}
                 disabled={!relier}
-                onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+                onChange={(v) => setForm({ ...form, enabled: v })}
+                label="Report actif"
               />
-              Report actif
-            </label>
-          </div>
+            </Field>
+          </FormGrid>
           {pont && pont.projectId === form.projectId && pont.mappableLines.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -185,25 +183,24 @@ export default function RealisePage(): React.ReactElement {
                       <td className="py-1.5 pr-3">{c.label}</td>
                       <td className="py-1.5">
                         {c.mappable ? (
-                          <select
+                          <Select<string>
                             aria-label={`Ligne du plan pour ${c.label}`}
-                            className={CHAMP}
                             value={form.mapping[c.code] ?? ''}
                             disabled={!relier}
-                            onChange={(e) =>
+                            onChange={(v) =>
                               setForm({
                                 ...form,
-                                mapping: { ...form.mapping, [c.code]: e.target.value },
+                                mapping: { ...form.mapping, [c.code]: v },
                               })
                             }
-                          >
-                            <option value="">— Non rattachée —</option>
-                            {pont.mappableLines.map((l) => (
-                              <option key={l.lineId} value={l.lineId}>
-                                {l.label}
-                              </option>
-                            ))}
-                          </select>
+                            options={[
+                              { value: '', label: '— Non rattachée —' },
+                              ...pont.mappableLines.map((l) => ({
+                                value: l.lineId,
+                                label: l.label,
+                              })),
+                            ]}
+                          />
                         ) : (
                           <span className="text-xs text-[var(--foreground-muted)]">
                             Hors compte d’exploitation : suivie en trésorerie seulement.
@@ -222,18 +219,16 @@ export default function RealisePage(): React.ReactElement {
             </p>
           ) : null}
           {relier ? (
-            <div className="flex flex-wrap gap-2">
-              <button type="submit" className={BOUTON}>
-                Enregistrer
-              </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <SubmitButton className="max-sm:h-11">Enregistrer</SubmitButton>
               {pont?.status === 'enabled' ? (
                 <>
-                  <button type="button" className={BOUTON} onClick={() => void synchroniser(true)}>
+                  <Button onClick={() => void synchroniser(true)} className="max-sm:h-11">
                     Simuler la synchronisation
-                  </button>
-                  <button type="button" className={BOUTON} onClick={() => void synchroniser(false)}>
+                  </Button>
+                  <Button onClick={() => void synchroniser(false)} className="max-sm:h-11">
                     Synchroniser le réalisé
-                  </button>
+                  </Button>
                 </>
               ) : null}
             </div>
@@ -252,18 +247,13 @@ export default function RealisePage(): React.ReactElement {
           titre={`Réalisé vs prévu — exercice ${rapprochement.year}`}
           description={`${rapprochement.projectName}, plan validé v${rapprochement.planVersion}, en ${rapprochement.projectCurrency}. Prévu mensuel = plan annuel ÷ 12 ; réalisé = dépenses rattachées. Une case vide n’est pas un zéro.`}
           actions={
-            <select
+            <Select<string>
               aria-label="Exercice"
-              className={CHAMP + ' w-36'}
-              value={annee}
-              onChange={(e) => setAnnee(Number(e.target.value))}
-            >
-              {[1, 2, 3, 4, 5].map((a) => (
-                <option key={a} value={a}>
-                  Exercice {a}
-                </option>
-              ))}
-            </select>
+              className="w-40"
+              value={String(annee)}
+              onChange={(v) => setAnnee(EXERCICES.find((a) => String(a) === v) ?? 1)}
+              options={EXERCICES.map((a) => ({ value: String(a), label: `Exercice ${a}` }))}
+            />
           }
         >
           {rapprochement.lines.length === 0 ? (

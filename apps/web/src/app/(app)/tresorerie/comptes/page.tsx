@@ -4,8 +4,26 @@
 // mouvements, virements, et prévision 7 / 30 / 90 / 180 jours en trois scénarios
 // à hypothèses explicites, avec alertes et incertitude. Le jour 0 est une
 // observation (soldes) ; tout le reste est une ESTIMATION, et l'écran le dit.
+//
+// ADR-0074 : formulaires sur les composants de `@lalanda/ui` — dates en
+// `DatePicker`, montants en `MoneyInput` (mise en forme seulement : les
+// lecteurs existants, `lireMontantSaisi` et `lireMontantSigne`, lisent la
+// valeur), listes en `Select`, devise en segments, largeurs sémantiques.
+// Mêmes champs envoyés, mêmes contrôles.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -51,10 +69,6 @@ import {
 } from '../_components/treasury-model';
 import { barresComptes, cartesComptes, noteComptes } from '../_components/tableau-tresorerie-model';
 
-const CHAMP =
-  'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-60';
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 const PETIT =
   'rounded-md border border-[var(--border)] px-2.5 py-1 text-xs font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 
@@ -301,19 +315,16 @@ export default function ComptesPage(): React.ReactElement {
       <Section
         titre="Mouvements"
         actions={
-          <select
+          <Select<string>
             aria-label="Compte"
-            className={CHAMP + ' w-56'}
+            className="w-56 max-w-full"
             value={compteFiltre}
-            onChange={(e) => setCompteFiltre(e.target.value)}
-          >
-            <option value="">Tous les comptes</option>
-            {(page?.items ?? []).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+            onChange={setCompteFiltre}
+            options={[
+              { value: '', label: 'Tous les comptes' },
+              ...(page?.items ?? []).map((a) => ({ value: a.id, label: a.name })),
+            ]}
+          />
         }
       >
         {gerer && page ? (
@@ -772,10 +783,11 @@ function HypothesesSection({
                     </td>
                     {(Object.keys(SCENARIO_LABELS) as ScenarioId[]).map((id) => (
                       <td key={id} className="py-1 pr-3">
-                        <input
+                        <TextInput
                           aria-label={`${SCENARIO_LABELS[id]} — ${l.label}`}
-                          className={CHAMP + ' w-24'}
+                          className="w-28 text-right tabular-nums"
                           inputMode="decimal"
+                          trailing={l.unite === '%' ? '%' : 'j'}
                           value={champs[id][l.key]}
                           onChange={(e) =>
                             setChamps({
@@ -791,27 +803,30 @@ function HypothesesSection({
               </tbody>
             </table>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <FormGrid>
             {(['USD', 'CDF'] as const).map((d) => (
-              <label key={d} className="flex flex-col gap-1 text-sm">
-                Minimum de trésorerie {d}
-                <input
-                  className={CHAMP + ' w-40'}
-                  inputMode="decimal"
-                  placeholder="0"
+              <Field key={d} id={`hyp-minimum-${d}`} label={`Minimum de trésorerie ${d}`} size="sm">
+                <MoneyInput
                   value={minimums[d]}
-                  onChange={(e) => setMinimums({ ...minimums, [d]: e.target.value })}
+                  currency={d}
+                  allowNegative
+                  placeholder="0"
+                  onChange={(v) => setMinimums({ ...minimums, [d]: v })}
                 />
-              </label>
+              </Field>
             ))}
-          </div>
-          <div className="flex gap-2">
-            <button type="button" className={BOUTON} onClick={() => void enregistrer(false)}>
+          </FormGrid>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
+              variant="primary"
+              onClick={() => void enregistrer(false)}
+              className="max-sm:h-11"
+            >
               Enregistrer
-            </button>
-            <button type="button" className={BOUTON} onClick={() => void enregistrer(true)}>
+            </Button>
+            <Button onClick={() => void enregistrer(true)} className="max-sm:h-11">
               Revenir aux valeurs proposées
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -841,6 +856,10 @@ function NouveauCompte({
   });
   async function creer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    if (f.openingDate === '') {
+      onError('Indiquez la date d’ouverture.');
+      return;
+    }
     const solde = lireMontantSigne(f.openingBalance || '0');
     if (!solde.ok) {
       onError(solde.erreur);
@@ -862,64 +881,61 @@ function NouveauCompte({
     <form
       onSubmit={(e) => void creer(e)}
       aria-label="Nouveau compte"
-      className="grid gap-3 sm:grid-cols-2"
+      className="flex min-w-0 flex-col gap-4"
     >
-      <input
-        aria-label="Nom du compte"
-        placeholder="Nom du compte"
-        className={CHAMP}
-        value={f.name}
-        required
-        onChange={(e) => setF({ ...f, name: e.target.value })}
-      />
-      <select
-        aria-label="Nature"
-        className={CHAMP}
-        value={f.kind}
-        onChange={(e) => setF({ ...f, kind: e.target.value as TreasuryAccountKind })}
-      >
-        {(Object.keys(ACCOUNT_KIND_LABELS) as TreasuryAccountKind[]).map((k) => (
-          <option key={k} value={k}>
-            {ACCOUNT_KIND_LABELS[k]}
-          </option>
-        ))}
-      </select>
-      <input
-        aria-label="Banque ou opérateur"
-        placeholder="Banque ou opérateur"
-        className={CHAMP}
-        value={f.institution}
-        onChange={(e) => setF({ ...f, institution: e.target.value })}
-      />
-      <select
-        aria-label="Devise"
-        className={CHAMP}
-        value={f.currency}
-        onChange={(e) => setF({ ...f, currency: e.target.value as TreasuryCurrency })}
-      >
-        <option value="USD">USD</option>
-        <option value="CDF">CDF</option>
-      </select>
-      <input
-        aria-label="Solde d’ouverture"
-        placeholder="Solde d’ouverture"
-        inputMode="decimal"
-        className={CHAMP}
-        value={f.openingBalance}
-        onChange={(e) => setF({ ...f, openingBalance: e.target.value })}
-      />
-      <input
-        aria-label="Date d’ouverture"
-        type="date"
-        className={CHAMP}
-        value={f.openingDate}
-        required
-        onChange={(e) => setF({ ...f, openingDate: e.target.value })}
-      />
-      <div className="sm:col-span-2">
-        <button type="submit" className={BOUTON}>
-          Créer le compte
-        </button>
+      <FormGrid>
+        <Field id="cpt-nom" label="Nom du compte" required size="lg">
+          <TextInput
+            value={f.name}
+            required
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+          />
+        </Field>
+        <Field id="cpt-nature" label="Nature" size="md" newRow>
+          <Select<TreasuryAccountKind>
+            value={f.kind}
+            onChange={(v) => setF({ ...f, kind: v })}
+            options={(Object.keys(ACCOUNT_KIND_LABELS) as TreasuryAccountKind[]).map((k) => ({
+              value: k,
+              label: ACCOUNT_KIND_LABELS[k],
+            }))}
+          />
+        </Field>
+        <Field id="cpt-institution" label="Banque ou opérateur" optional size="md">
+          <TextInput
+            value={f.institution}
+            onChange={(e) => setF({ ...f, institution: e.target.value })}
+          />
+        </Field>
+        <Field id="cpt-devise" label="Devise" group size="sm" newRow>
+          <SegmentedControl<TreasuryCurrency>
+            value={f.currency}
+            onChange={(v) => setF({ ...f, currency: v })}
+            options={[
+              { value: 'USD', label: 'USD' },
+              { value: 'CDF', label: 'CDF' },
+            ]}
+          />
+        </Field>
+        <Field id="cpt-solde" label="Solde d’ouverture" optional size="sm" hint="Vide : zéro.">
+          <MoneyInput
+            value={f.openingBalance}
+            currency={f.currency}
+            allowNegative
+            onChange={(v) => setF({ ...f, openingBalance: v })}
+          />
+        </Field>
+        <Field id="cpt-date" label="Date d’ouverture" required size="sm">
+          <DatePicker
+            value={f.openingDate}
+            required
+            onChange={(v) => setF({ ...f, openingDate: v })}
+            shortcuts={['today']}
+          />
+        </Field>
+      </FormGrid>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <SubmitButton className="max-sm:h-11">Créer le compte</SubmitButton>
       </div>
     </form>
   );
@@ -950,6 +966,10 @@ function NouveauMouvement({
 
   async function enregistrer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    if ((f.type !== 'other_in' && f.from === '') || (f.type !== 'other_out' && f.to === '')) {
+      onError('Choisissez le compte.');
+      return;
+    }
     const sortie = lireMontantSaisi(f.amountOut);
     if (!sortie.ok) {
       onError(sortie.erreur);
@@ -990,97 +1010,110 @@ function NouveauMouvement({
     <form
       onSubmit={(e) => void enregistrer(e)}
       aria-label="Nouveau mouvement"
-      className="grid gap-3 sm:grid-cols-2"
+      className="flex min-w-0 flex-col gap-4"
     >
-      <select
-        aria-label="Type de mouvement"
-        className={CHAMP}
-        value={f.type}
-        onChange={(e) => setF({ ...f, type: e.target.value as typeof f.type })}
-      >
-        <option value="transfer">Virement interne</option>
-        <option value="other_in">Autre entrée (apport, prêt reçu)</option>
-        <option value="other_out">Autre sortie (prélèvement)</option>
-      </select>
-      <input
-        aria-label="Date"
-        type="date"
-        className={CHAMP}
-        value={f.date}
-        max={aujourdhui()}
-        onChange={(e) => setF({ ...f, date: e.target.value })}
-      />
-      {f.type !== 'other_in' ? (
-        <select
-          aria-label="Compte débité"
-          className={CHAMP}
-          value={f.from}
+      <FormGrid>
+        <Field id="mvt-type" label="Type de mouvement" size="lg">
+          <Select<typeof f.type>
+            value={f.type}
+            onChange={(v) => setF({ ...f, type: v })}
+            options={[
+              { value: 'transfer', label: 'Virement interne' },
+              { value: 'other_in', label: 'Autre entrée (apport, prêt reçu)' },
+              { value: 'other_out', label: 'Autre sortie (prélèvement)' },
+            ]}
+          />
+        </Field>
+        <Field id="mvt-date" label="Date" size="sm">
+          <DatePicker
+            value={f.date}
+            max={aujourdhui()}
+            onChange={(v) => setF({ ...f, date: v })}
+            shortcuts={['today']}
+          />
+        </Field>
+        {f.type !== 'other_in' ? (
+          <Field id="mvt-depuis" label="Compte débité" required size="md" newRow>
+            <Select<string>
+              value={f.from}
+              placeholder="Depuis…"
+              required
+              onChange={(v) => setF({ ...f, from: v })}
+              options={comptes.map((c) => ({
+                value: c.id,
+                label: `${c.name} (${c.currency})`,
+              }))}
+            />
+          </Field>
+        ) : null}
+        {f.type !== 'other_out' ? (
+          <Field
+            id="mvt-vers"
+            label="Compte crédité"
+            required
+            size="md"
+            newRow={f.type === 'other_in'}
+          >
+            <Select<string>
+              value={f.to}
+              placeholder="Vers…"
+              required
+              onChange={(v) => setF({ ...f, to: v })}
+              options={comptes.map((c) => ({
+                value: c.id,
+                label: `${c.name} (${c.currency})`,
+              }))}
+            />
+          </Field>
+        ) : null}
+        <Field
+          id="mvt-sortie"
+          label={deuxDevises ? 'Montant sorti' : 'Montant'}
           required
-          onChange={(e) => setF({ ...f, from: e.target.value })}
+          size="sm"
+          newRow
         >
-          <option value="">Depuis…</option>
-          {comptes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.currency})
-            </option>
-          ))}
-        </select>
-      ) : null}
-      {f.type !== 'other_out' ? (
-        <select
-          aria-label="Compte crédité"
-          className={CHAMP}
-          value={f.to}
-          required
-          onChange={(e) => setF({ ...f, to: e.target.value })}
+          <MoneyInput
+            value={f.amountOut}
+            currency={source?.currency ?? cible?.currency ?? null}
+            required
+            onChange={(v) => setF({ ...f, amountOut: v })}
+          />
+        </Field>
+        {deuxDevises ? (
+          <Field id="mvt-entree" label="Montant entré" required size="sm">
+            <MoneyInput
+              value={f.amountIn}
+              currency={cible?.currency ?? null}
+              required
+              onChange={(v) => setF({ ...f, amountIn: v })}
+            />
+          </Field>
+        ) : null}
+        <Field
+          id="mvt-libelle"
+          label="Libellé"
+          required={f.type !== 'transfer'}
+          optional={f.type === 'transfer'}
+          size="lg"
+          newRow
         >
-          <option value="">Vers…</option>
-          {comptes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.currency})
-            </option>
-          ))}
-        </select>
-      ) : null}
-      <input
-        aria-label={deuxDevises ? 'Montant sorti' : 'Montant'}
-        placeholder={deuxDevises ? `Sorti (${source?.currency})` : 'Montant'}
-        inputMode="decimal"
-        className={CHAMP}
-        value={f.amountOut}
-        required
-        onChange={(e) => setF({ ...f, amountOut: e.target.value })}
-      />
+          <TextInput
+            value={f.label}
+            required={f.type !== 'transfer'}
+            onChange={(e) => setF({ ...f, label: e.target.value })}
+          />
+        </Field>
+      </FormGrid>
       {deuxDevises ? (
-        <input
-          aria-label="Montant entré"
-          placeholder={`Entré (${cible?.currency})`}
-          inputMode="decimal"
-          className={CHAMP}
-          value={f.amountIn}
-          required
-          onChange={(e) => setF({ ...f, amountIn: e.target.value })}
-        />
-      ) : null}
-      <input
-        aria-label="Libellé"
-        placeholder="Libellé"
-        className={CHAMP}
-        value={f.label}
-        required={f.type !== 'transfer'}
-        onChange={(e) => setF({ ...f, label: e.target.value })}
-      />
-      <div className="flex items-end">
-        <button type="submit" className={BOUTON}>
-          Enregistrer
-        </button>
-      </div>
-      {deuxDevises ? (
-        <p className="text-xs text-[var(--foreground-muted)] sm:col-span-2">
+        <p className="text-xs text-[var(--foreground-muted)]">
           Entre deux devises, saisissez les deux montants constatés : Lalanda ne calcule aucun taux
           de change.
         </p>
       ) : null}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <SubmitButton className="max-sm:h-11">Enregistrer</SubmitButton>
+      </div>
     </form>
   );
 }

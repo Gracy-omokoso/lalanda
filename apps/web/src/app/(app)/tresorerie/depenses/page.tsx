@@ -3,8 +3,26 @@
 // Onglet « Dépenses » (ADR-0034 § 2 et § 3) : saisie, liste, pièce justificative,
 // totaux du mois par catégorie (moteur), dépenses récurrentes et échéances à
 // confirmer. Fonctionne SANS projet ni plan : RUN est utilisable seul.
+//
+// ADR-0074 : formulaires sur les composants de `@lalanda/ui` — date en
+// `DatePicker` (bornée à aujourd'hui comme avant), montants en `MoneyInput`
+// (mise en forme seulement : `lireMontantSaisi` lit la valeur, point ou
+// virgule), devise en segments, catégorie, compte et fréquence en `Select`,
+// largeurs sémantiques. Mêmes champs envoyés, mêmes contrôles.
 
-import { Modal, StatusPill, buttonClasses } from '@lalanda/ui';
+import {
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  StatusPill,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -68,10 +86,6 @@ import {
   type OngletDepenses,
 } from '../_components/tableau-tresorerie-model';
 
-const CHAMP =
-  'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-60';
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 const PETIT =
   'rounded-md border border-[var(--border)] px-2.5 py-1 text-xs font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 
@@ -202,6 +216,10 @@ export default function DepensesPage(): React.ReactElement {
     e.preventDefault();
     setErreurCreation(null);
     setInfo(null);
+    if (form.spentOn === '') {
+      setErreurCreation('Indiquez la date de la dépense.');
+      return;
+    }
     const montant = lireMontantSaisi(form.amount);
     if (!montant.ok) {
       setErreurCreation(montant.erreur);
@@ -484,140 +502,124 @@ export default function DepensesPage(): React.ReactElement {
           <form
             aria-label="Nouvelle dépense"
             onSubmit={(e) => void enregistrer(e)}
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            className="flex min-w-0 flex-col gap-4"
           >
-            <label className="flex flex-col gap-1 text-sm">
-              Date
-              <input
-                type="date"
-                className={CHAMP}
-                value={form.spentOn}
-                max={aujourdhui()}
-                required
-                onChange={(e) => setForm({ ...form, spentOn: e.target.value })}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Montant payé
-              <span className="flex gap-2">
-                <input
-                  className={CHAMP}
-                  inputMode="decimal"
+            <FormGrid>
+              <Field id="dep-date" label="Date" required size="sm">
+                <DatePicker
+                  value={form.spentOn}
+                  max={aujourdhui()}
+                  required
+                  onChange={(v) => setForm({ ...form, spentOn: v })}
+                  shortcuts={['today']}
+                />
+              </Field>
+              <Field id="dep-montant" label="Montant payé" required size="sm">
+                <MoneyInput
                   value={form.amount}
+                  currency={form.currency}
                   required
                   placeholder="0,00"
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  onChange={(v) => setForm({ ...form, amount: v })}
                 />
-                <select
-                  className={CHAMP + ' w-24'}
+              </Field>
+              <Field id="dep-devise" label="Devise" group size="sm">
+                <SegmentedControl<TreasuryCurrency>
                   value={form.currency}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      currency: e.target.value as TreasuryCurrency,
-                      accountId: '',
-                    })
-                  }
-                >
-                  <option value="USD">USD</option>
-                  <option value="CDF">CDF</option>
-                </select>
-              </span>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Catégorie
-              <select
-                className={CHAMP}
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  onChange={(v) => setForm({ ...form, currency: v, accountId: '' })}
+                  options={[
+                    { value: 'USD', label: 'USD' },
+                    { value: 'CDF', label: 'CDF' },
+                  ]}
+                />
+              </Field>
+              <Field id="dep-libelle" label="Libellé" required size="lg" newRow>
+                <TextInput
+                  value={form.label}
+                  required
+                  maxLength={200}
+                  onChange={(e) => setForm({ ...form, label: e.target.value })}
+                />
+              </Field>
+              <Field id="dep-categorie" label="Catégorie" size="md">
+                <Select<string>
+                  value={form.category}
+                  onChange={(v) => setForm({ ...form, category: v })}
+                  options={categories.map((c) => ({ value: c.code, label: c.label }))}
+                  loading={categories.length === 0}
+                />
+              </Field>
+              <Field
+                id="dep-fournisseur"
+                label="Fournisseur"
+                optional
+                size="md"
+                newRow
+                hint="Nom libre ; les fournisseurs déjà saisis sont proposés."
               >
-                {categories.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-              Libellé
-              <input
-                className={CHAMP}
-                value={form.label}
-                required
-                maxLength={200}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Fournisseur (facultatif)
-              <input
-                className={CHAMP}
-                list="fournisseurs-connus"
-                value={form.supplierName}
-                maxLength={120}
-                onChange={(e) => setForm({ ...form, supplierName: e.target.value })}
-              />
+                <TextInput
+                  list="fournisseurs-connus"
+                  value={form.supplierName}
+                  maxLength={120}
+                  onChange={(e) => setForm({ ...form, supplierName: e.target.value })}
+                />
+              </Field>
               <datalist id="fournisseurs-connus">
                 {fournisseurs.map((f) => (
                   <option key={f} value={f} />
                 ))}
               </datalist>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Payé depuis
-              <select
-                className={CHAMP}
-                value={form.accountId}
-                onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-              >
-                <option value="">— Aucun compte —</option>
-                {comptesDevise.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <WorkProjectSelect
-              className={CHAMP}
-              value={form.workProjectId}
-              onChange={(workProjectId) => setForm({ ...form, workProjectId })}
-            />
-            {/* ADR-0045 — H7 (§ 6.3) : rappel du double comptage, rien n'est retranché. */}
-            {rappelPersonnel(form.category, form.workProjectId) ? (
-              <p
-                role="note"
-                className="rounded-[var(--radius-md)] border border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_10%,transparent)] p-3 text-xs"
-              >
-                {rappelPersonnel(form.category, form.workProjectId)}
-              </p>
-            ) : null}
-            <label className="flex flex-col gap-1 text-sm">
-              TVA déductible (facultatif)
-              <input
-                className={CHAMP}
-                inputMode="decimal"
-                value={form.deductibleVat}
-                onChange={(e) => setForm({ ...form, deductibleVat: e.target.value })}
+              <Field id="dep-compte" label="Payé depuis" optional size="md">
+                <Select<string>
+                  value={form.accountId}
+                  onChange={(v) => setForm({ ...form, accountId: v })}
+                  options={[
+                    { value: '', label: '— Aucun compte —' },
+                    ...comptesDevise.map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+              </Field>
+              <WorkProjectSelect
+                id="dep-projet"
+                value={form.workProjectId}
+                onChange={(workProjectId) => setForm({ ...form, workProjectId })}
               />
-              <span className="text-xs text-[var(--foreground-muted)]">
-                Conservée pour votre comptable ; le réalisé reçoit le montant payé (décision
-                ouverte).
-              </span>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Référence (reçu, transaction)
-              <input
-                className={CHAMP}
-                value={form.reference}
-                maxLength={100}
-                onChange={(e) => setForm({ ...form, reference: e.target.value })}
-              />
-            </label>
-            <div className="flex items-end">
-              <button type="submit" className={BOUTON} disabled={enCours}>
+              {/* ADR-0045 — H7 (§ 6.3) : rappel du double comptage, rien n'est retranché. */}
+              {rappelPersonnel(form.category, form.workProjectId) ? (
+                <p
+                  role="note"
+                  className="col-span-full rounded-[var(--radius-md)] border border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_10%,transparent)] p-3 text-xs"
+                >
+                  {rappelPersonnel(form.category, form.workProjectId)}
+                </p>
+              ) : null}
+              <Field
+                id="dep-tva"
+                label="TVA déductible"
+                optional
+                size="sm"
+                newRow
+                hint="Conservée pour votre comptable ; le réalisé reçoit le montant payé (décision ouverte)."
+              >
+                <MoneyInput
+                  value={form.deductibleVat}
+                  currency={form.currency}
+                  onChange={(v) => setForm({ ...form, deductibleVat: v })}
+                />
+              </Field>
+              <Field id="dep-reference" label="Référence (reçu, transaction)" optional size="md">
+                <TextInput
+                  value={form.reference}
+                  maxLength={100}
+                  onChange={(e) => setForm({ ...form, reference: e.target.value })}
+                  className="font-mono"
+                />
+              </Field>
+            </FormGrid>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <SubmitButton busy={enCours} busyLabel="Enregistrement…" className="max-sm:h-11">
                 Enregistrer la dépense
-              </button>
+              </SubmitButton>
             </div>
           </form>
         </div>
@@ -649,19 +651,16 @@ export default function DepensesPage(): React.ReactElement {
               value={mois}
               onChange={(e) => setMois(e.target.value || moisCourant())}
             />
-            <select
+            <Select<string>
               aria-label="Catégorie"
-              className={`${CHAMP_COMPACT} min-w-0 max-w-full shrink sm:w-52`}
+              className="min-w-0 max-w-full shrink sm:w-52"
               value={filtreCategorie}
-              onChange={(e) => setFiltreCategorie(e.target.value)}
-            >
-              <option value="">Toutes les catégories</option>
-              {categories.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onChange={setFiltreCategorie}
+              options={[
+                { value: '', label: 'Toutes les catégories' },
+                ...categories.map((c) => ({ value: c.code, label: c.label })),
+              ]}
+            />
           </div>
         </div>
         {visibles.length === 0 ? (
@@ -817,6 +816,10 @@ function RecurringSection({
 
   async function creer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    if (f.startDate === '') {
+      setErreurCreation('Indiquez la première échéance.');
+      return;
+    }
     const montant = lireMontantSaisi(f.amount);
     if (!montant.ok) {
       setErreurCreation(montant.erreur);
@@ -922,100 +925,83 @@ function RecurringSection({
         <form
           onSubmit={(e) => void creer(e)}
           aria-label="Nouvelle dépense récurrente"
-          className="mt-3 grid gap-3 sm:grid-cols-2"
+          className="mt-3 flex min-w-0 flex-col gap-4"
         >
-          <input
-            aria-label="Libellé"
-            placeholder="Libellé (ex. Loyer du local)"
-            className={CHAMP}
-            value={f.label}
-            required
-            onChange={(e) => setF({ ...f, label: e.target.value })}
-          />
-          <span className="flex gap-2">
-            <input
-              aria-label="Montant"
-              placeholder="Montant"
-              inputMode="decimal"
-              className={CHAMP}
-              value={f.amount}
-              required
-              onChange={(e) => setF({ ...f, amount: e.target.value })}
-            />
-            <select
-              aria-label="Devise"
-              className={CHAMP + ' w-24'}
-              value={f.currency}
-              onChange={(e) =>
-                setF({ ...f, currency: e.target.value as TreasuryCurrency, accountId: '' })
-              }
-            >
-              <option value="USD">USD</option>
-              <option value="CDF">CDF</option>
-            </select>
-          </span>
-          <select
-            aria-label="Catégorie"
-            className={CHAMP}
-            value={f.category}
-            onChange={(e) => setF({ ...f, category: e.target.value })}
-          >
-            {categories.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Fréquence"
-            className={CHAMP}
-            value={f.frequency}
-            onChange={(e) => setF({ ...f, frequency: e.target.value as RecurrenceFrequency })}
-          >
-            {(Object.keys(FREQUENCY_LABELS) as RecurrenceFrequency[]).map((k) => (
-              <option key={k} value={k}>
-                {FREQUENCY_LABELS[k]}
-              </option>
-            ))}
-          </select>
-          <label className="flex flex-col gap-1 text-xs">
-            Première échéance
-            <input
-              type="date"
-              className={CHAMP}
-              value={f.startDate}
-              required
-              onChange={(e) => setF({ ...f, startDate: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs">
-            Dernière échéance (facultatif)
-            <input
-              type="date"
-              className={CHAMP}
-              value={f.endDate}
-              onChange={(e) => setF({ ...f, endDate: e.target.value })}
-            />
-          </label>
-          <select
-            aria-label="Compte"
-            className={CHAMP}
-            value={f.accountId}
-            onChange={(e) => setF({ ...f, accountId: e.target.value })}
-          >
-            <option value="">— Aucun compte —</option>
-            {comptes
-              .filter((c) => c.currency === f.currency)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-          <div className="flex items-end">
-            <button type="submit" className={BOUTON}>
-              Ajouter la règle
-            </button>
+          <FormGrid>
+            <Field id="rec-libelle" label="Libellé" required size="lg">
+              <TextInput
+                placeholder="Loyer du local"
+                value={f.label}
+                required
+                onChange={(e) => setF({ ...f, label: e.target.value })}
+              />
+            </Field>
+            <Field id="rec-montant" label="Montant" required size="sm" newRow>
+              <MoneyInput
+                value={f.amount}
+                currency={f.currency}
+                required
+                onChange={(v) => setF({ ...f, amount: v })}
+              />
+            </Field>
+            <Field id="rec-devise" label="Devise" group size="sm">
+              <SegmentedControl<TreasuryCurrency>
+                value={f.currency}
+                onChange={(v) => setF({ ...f, currency: v, accountId: '' })}
+                options={[
+                  { value: 'USD', label: 'USD' },
+                  { value: 'CDF', label: 'CDF' },
+                ]}
+              />
+            </Field>
+            <Field id="rec-categorie" label="Catégorie" size="md" newRow>
+              <Select<string>
+                value={f.category}
+                onChange={(v) => setF({ ...f, category: v })}
+                options={categories.map((c) => ({ value: c.code, label: c.label }))}
+                loading={categories.length === 0}
+              />
+            </Field>
+            <Field id="rec-frequence" label="Fréquence" size="md">
+              <Select<RecurrenceFrequency>
+                value={f.frequency}
+                onChange={(v) => setF({ ...f, frequency: v })}
+                options={(Object.keys(FREQUENCY_LABELS) as RecurrenceFrequency[]).map((k) => ({
+                  value: k,
+                  label: FREQUENCY_LABELS[k],
+                }))}
+              />
+            </Field>
+            <Field id="rec-debut" label="Première échéance" required size="sm" newRow>
+              <DatePicker
+                value={f.startDate}
+                required
+                onChange={(v) => setF({ ...f, startDate: v })}
+                shortcuts={['today', 'endOfMonth']}
+              />
+            </Field>
+            <Field id="rec-fin" label="Dernière échéance" optional size="sm">
+              <DatePicker
+                value={f.endDate}
+                onChange={(v) => setF({ ...f, endDate: v })}
+                shortcuts={['endOfYear']}
+              />
+            </Field>
+            <Field id="rec-compte" label="Compte" optional size="md" newRow>
+              <Select<string>
+                value={f.accountId}
+                onChange={(v) => setF({ ...f, accountId: v })}
+                options={[
+                  { value: '', label: '— Aucun compte —' },
+                  ...comptes
+                    .filter((c) => c.currency === f.currency)
+                    .map((c) => ({ value: c.id, label: c.name })),
+                ]}
+              />
+            </Field>
+          </FormGrid>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <SubmitButton className="max-sm:h-11">Ajouter la règle</SubmitButton>
           </div>
         </form>
       </Modal>
