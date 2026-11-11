@@ -1,6 +1,8 @@
 // Comportements de formulaire (ADR-0074 § 9) :
 // - `Form` : Cmd/Ctrl+Entrée enregistre, focus automatique du premier champ,
-//   avertissement avant de quitter la page avec des modifications ;
+//   avertissement avant de quitter la page avec des modifications (rechargement,
+//   fermeture d'onglet : `beforeunload` ; lien interne de l'application : petite
+//   fenêtre « Quitter sans enregistrer ? », décision n° 3 du 11 nov. 2026) ;
 // - `SubmitButton` : état de chargement annoncé (`aria-busy`) ;
 // - `StickyActions` : barre d'actions collée en bas des longs formulaires ;
 // - `ErrorSummary` : résumé cliquable des erreurs en tête, à la soumission ;
@@ -8,25 +10,168 @@
 //   chaque frappe, et disparaît dès que la valeur est corrigée.
 
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { Button, type ButtonProps } from '../components/button.js';
 import { cn } from '../utils.js';
 
-import { estRaccourciEnregistrer, phraseResume, type ErreurResumee } from './logic.js';
+import {
+  estRaccourciEnregistrer,
+  navigationInterne,
+  phraseResume,
+  type ErreurResumee,
+} from './logic.js';
 
-/** Avertit avant de quitter la page (rechargement, fermeture d'onglet) si `actif`. */
-export function useUnsavedChangesWarning(actif: boolean): void {
+/**
+ * Avertit avant de quitter la page (rechargement, fermeture d'onglet) si `actif`.
+ * `libere` (facultatif) : départ déjà confirmé dans la fenêtre du garde de
+ * navigation — le navigateur ne redemande pas.
+ */
+export function useUnsavedChangesWarning(actif: boolean, libere?: React.RefObject<boolean>): void {
   useEffect(() => {
     if (!actif) return;
     const avant = (e: BeforeUnloadEvent): void => {
+      if (libere?.current) return;
       e.preventDefault();
       // Requis par certains navigateurs ; le texte affiché est le leur.
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', avant);
     return () => window.removeEventListener('beforeunload', avant);
+  }, [actif, libere]);
+}
+
+/** Durée après « Quitter » pendant laquelle le garde se tait (le temps de partir). */
+const DUREE_LIBERATION_MS = 1500;
+
+/**
+ * Garde des modifications non enregistrées (ADR-0074 § 9, décision n° 3) :
+ * `beforeunload` pour le rechargement et la fermeture d'onglet, et capture des
+ * clics sur les liens internes de l'application (même origine, sans touche de
+ * modification, hors `target="_blank"` et téléchargements) — le routeur de
+ * Next n'offre pas d'API pour cela. Le clic est retenu, une petite fenêtre
+ * demande « Quitter sans enregistrer ? » ; « Quitter » rejoue le clic sur le
+ * même lien (le routeur le traite comme avant), « Rester » ne fait rien.
+ *
+ * Actif seulement si `actif` (formulaire modifié) : il se tait dès que
+ * l'écran remet `actif` à `false` (envoi réussi, retour à l'état enregistré).
+ * Rend la fenêtre à afficher (portail vers `document.body`).
+ */
+export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | null {
+  const libere = useRef(false);
+  const [lien, setLien] = useState<HTMLAnchorElement | null>(null);
+  useUnsavedChangesWarning(actif, libere);
+
+  useEffect(() => {
+    if (!actif) {
+      setLien(null);
+      return;
+    }
+    libere.current = false;
+    const surClic = (e: MouseEvent): void => {
+      if (libere.current) return;
+      const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
+      if (!(a instanceof HTMLAnchorElement)) return;
+      const cible = navigationInterne(
+        e,
+        { href: a.href, target: a.target, hasDownload: a.hasAttribute('download') },
+        window.location.href,
+      );
+      if (cible === null) return;
+      // Capture sur `document` : le clic n'atteint ni le lien ni le routeur.
+      e.preventDefault();
+      e.stopPropagation();
+      setLien(a);
+    };
+    document.addEventListener('click', surClic, true);
+    return () => document.removeEventListener('click', surClic, true);
   }, [actif]);
+
+  const rester = useCallback(() => setLien(null), []);
+  const quitter = useCallback(() => {
+    const a = lien;
+    setLien(null);
+    if (!a || !a.isConnected) return;
+    libere.current = true;
+    window.setTimeout(() => {
+      libere.current = false;
+    }, DUREE_LIBERATION_MS);
+    a.click();
+  }, [lien]);
+
+  if (!lien || typeof document === 'undefined') return null;
+  return createPortal(<ConfirmLeaveDialog onStay={rester} onLeave={quitter} />, document.body);
+}
+
+export interface ConfirmLeaveDialogProps {
+  onStay: () => void;
+  onLeave: () => void;
+  title?: string;
+  description?: string;
+}
+
+/**
+ * Petite fenêtre « Quitter sans enregistrer ? » : `<dialog>` modal (le reste de
+ * la page devient inerte), focus sur « Rester » (le choix sans perte), Échap
+ * et clic sur le fond valent « Rester ». Compacte aussi sur téléphone.
+ */
+export function ConfirmLeaveDialog({
+  onStay,
+  onLeave,
+  title = 'Quitter sans enregistrer ?',
+  description = 'Les modifications de ce formulaire ne sont pas enregistrées : elles seront perdues.',
+}: ConfirmLeaveDialogProps): React.ReactElement {
+  const ref = useRef<HTMLDialogElement>(null);
+  const rester = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    const origine = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!d.open) d.showModal();
+    rester.current?.focus();
+    return () => {
+      if (d.open) d.close();
+      if (origine && origine.isConnected) origine.focus();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby={`${id}-titre`}
+      aria-describedby={`${id}-desc`}
+      onCancel={(e) => {
+        e.preventDefault();
+        onStay();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onStay();
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-0 text-[var(--foreground)] shadow-[var(--shadow-pop)] backdrop:bg-[color-mix(in_srgb,var(--foreground)_45%,transparent)]"
+    >
+      <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-1.5">
+          <h2 id={`${id}-titre`} className="text-base font-semibold">
+            {title}
+          </h2>
+          <p id={`${id}-desc`} className="text-sm text-[var(--foreground-muted)]">
+            {description}
+          </p>
+        </div>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>*]:max-sm:h-11 [&>*]:max-sm:w-full">
+          <Button type="button" variant="danger" onClick={onLeave}>
+            Quitter
+          </Button>
+          <Button ref={rester} type="button" variant="primary" onClick={onStay}>
+            Rester
+          </Button>
+        </div>
+      </div>
+    </dialog>
+  );
 }
 
 const PREMIER_CHAMP =
@@ -34,7 +179,11 @@ const PREMIER_CHAMP =
 
 export interface FormProps extends Omit<React.FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  /** Modifications non enregistrées : avertissement avant de quitter la page. */
+  /**
+   * Modifications non enregistrées : avertissement avant de quitter la page
+   * (rechargement, fermeture d'onglet, lien interne). Remis à `false` après un
+   * envoi réussi, il ne garde plus rien.
+   */
   dirty?: boolean;
   /** Focus sur le premier champ au montage (défaut oui). */
   autoFocusFirst?: boolean;
@@ -46,7 +195,7 @@ export const Form = forwardRef<HTMLFormElement, FormProps>(function Form(
   ref,
 ) {
   const interne = useRef<HTMLFormElement | null>(null);
-  useUnsavedChangesWarning(dirty);
+  const garde = useUnsavedChangesGuard(dirty);
   useEffect(() => {
     if (!autoFocusFirst || !interne.current) return;
     // Pas de vol de focus si l'utilisateur est déjà ailleurs dans le formulaire.
@@ -72,6 +221,7 @@ export const Form = forwardRef<HTMLFormElement, FormProps>(function Form(
       }}
     >
       {children}
+      {garde}
     </form>
   );
 });

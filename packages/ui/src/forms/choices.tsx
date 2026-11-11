@@ -421,10 +421,16 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
   );
   if (!label) return <span className={cn('inline-flex', className)}>{boite}</span>;
   return (
-    <div className={cn('flex items-start gap-2.5 max-sm:min-h-11 max-sm:items-center', className)}>
-      <span className="pt-0.5 max-sm:pt-0">{boite}</span>
+    // La case s'aligne sur la PREMIÈRE ligne du libellé, jamais au centre d'un
+    // libellé de plusieurs lignes : sa boîte a la hauteur d'une ligne (20 px,
+    // `leading-5`) et la case y est centrée. Sur téléphone, la marge verticale
+    // porte la cible à 44 px sans décentrer une ligne seule.
+    <div className={cn('flex items-start gap-2.5 max-sm:min-h-11 max-sm:py-3', className)}>
+      <span data-alignement="premiere-ligne" className="flex h-5 shrink-0 items-center">
+        {boite}
+      </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <label htmlFor={id} className="cursor-pointer text-sm leading-snug">
+        <label htmlFor={id} className="cursor-pointer text-sm leading-5">
           {label}
         </label>
         {description ? (

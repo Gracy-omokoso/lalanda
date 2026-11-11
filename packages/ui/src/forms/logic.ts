@@ -597,3 +597,191 @@ export function ecrireTelephone(indicatif: string, national: string): string {
   const n = national.replace(/\D/g, '').replace(/^0+/, '');
   return n === '' ? '' : `${indicatif} ${grouperNational(indicatif, n)}`;
 }
+
+// ─── Jours marqués (fériés de l'organisation) ────────────────────────────────
+
+/** Jour marqué : date ISO, nom ; `recurring` vaut chaque année (même jour, même mois). */
+export interface JourMarque {
+  date: string;
+  label: string;
+  recurring?: boolean | undefined;
+}
+
+/**
+ * Index des jours marqués : rend le nom d'un jour (`undefined` s'il n'est pas
+ * marqué). Une date précise l'emporte sur un jour récurrent ; deux noms le même
+ * jour sont joints (« Fermeture · Fête du travail »). Purement informatif : un
+ * jour marqué reste choisissable.
+ */
+export function indexerMarques(
+  marks: readonly JourMarque[] | null | undefined,
+): (iso: string) => string | undefined {
+  const exacts = new Map<string, string>();
+  const annuels = new Map<string, string>();
+  for (const m of marks ?? []) {
+    if (!estIsoValide(m.date) || m.label.trim() === '') continue;
+    const cible = m.recurring ? annuels : exacts;
+    const cle = m.recurring ? m.date.slice(5) : m.date;
+    const deja = cible.get(cle);
+    cible.set(cle, deja && deja !== m.label ? `${deja} · ${m.label}` : m.label);
+  }
+  return (iso) => exacts.get(iso) ?? annuels.get(iso.slice(5));
+}
+
+// ─── Mois (`AAAA-MM`, la valeur des champs natifs `type="month"`) ─────────────
+
+const AAAA_MM = /^(\d{4})-(\d{2})$/;
+
+/** Décompose un mois `AAAA-MM` valide ; `null` sinon. */
+export function lireMoisIso(ym: string): { annee: number; mois: number } | null {
+  const m = AAAA_MM.exec(ym);
+  if (!m) return null;
+  const annee = parseInt(m[1]!, 10);
+  const mois = parseInt(m[2]!, 10);
+  if (mois < 1 || mois > 12) return null;
+  return { annee, mois };
+}
+
+export function moisDe(annee: number, mois1: number): string {
+  return `${String(annee).padStart(4, '0')}-${pad2(mois1)}`;
+}
+
+/** Mois en cours dans le fuseau du navigateur. */
+export function moisActuel(maintenant: Date = new Date()): string {
+  return moisDe(maintenant.getFullYear(), maintenant.getMonth() + 1);
+}
+
+export function ajouterMoisCivils(ym: string, n: number): string {
+  const d = lireMoisIso(ym);
+  if (!d) throw new RangeError(`Mois invalide : ${ym}`);
+  const total = d.annee * 12 + (d.mois - 1) + n;
+  return moisDe(Math.floor(total / 12), (total % 12) + 1);
+}
+
+/** « nov. 2026 » ; chaîne vide pour une valeur vide ou invalide. */
+export function formatMoisCourt(ym: string): string {
+  const d = lireMoisIso(ym);
+  return d ? `${MOIS_COURTS_FR[d.mois - 1]} ${d.annee}` : '';
+}
+
+/** « novembre 2026 » — nom accessible d'un mois. */
+export function formatMoisLong(ym: string): string {
+  const d = lireMoisIso(ym);
+  return d ? `${MOIS_FR[d.mois - 1]} ${d.annee}` : '';
+}
+
+const MOIS_NORMALISES = MOIS_FR.map((m) => normaliserRecherche(m));
+
+/** Numéro (1 à 12) d'un nom de mois, complet ou abrégé sans ambiguïté (« nov », « fév. ») ; `null` sinon. */
+function moisParNom(brut: string): number | null {
+  const t = normaliserRecherche(brut).replace(/\.$/, '');
+  if (t.length < 3) return null;
+  const exact = MOIS_NORMALISES.indexOf(t);
+  if (exact >= 0) return exact + 1;
+  const candidats = MOIS_NORMALISES.flatMap((m, i) => (m.startsWith(t) ? [i + 1] : []));
+  return candidats.length === 1 ? candidats[0]! : null;
+}
+
+function annee4(a: string | undefined, reference: string): number {
+  if (a === undefined) return parseInt(reference.slice(0, 4), 10);
+  return a.length === 2 ? 2000 + parseInt(a, 10) : parseInt(a, 10);
+}
+
+/**
+ * Saisie tolérante d'un mois : `2026-11` (ISO), `11/2026`, `11-26`, `11.2026`,
+ * `11 2026`, `112026`, `11` (année de référence), `nov. 2026`, `novembre 26`,
+ * `nov` ; accents et casse indifférents. `null` si rien ne se lit.
+ */
+export function lireMoisSaisi(texte: string, reference: string = moisActuel()): string | null {
+  const t = texte.trim();
+  if (t === '') return null;
+  const valide = (a: number, m: number): string | null =>
+    m >= 1 && m <= 12 && a >= 1 && a <= 9999 ? moisDe(a, m) : null;
+  const iso = /^(\d{4})-(\d{1,2})$/.exec(t);
+  if (iso) return valide(parseInt(iso[1]!, 10), parseInt(iso[2]!, 10));
+  const chiffres = /^(\d{1,2})(?:[/.\-\s]+(\d{2}|\d{4}))?$/.exec(t);
+  if (chiffres) return valide(annee4(chiffres[2], reference), parseInt(chiffres[1]!, 10));
+  const colle = /^(\d{2})(\d{4})$/.exec(t);
+  if (colle) return valide(parseInt(colle[2]!, 10), parseInt(colle[1]!, 10));
+  const nom = /^(\p{L}+\.?)(?:[\s/.\-]+(\d{2}|\d{4}))?$/u.exec(t);
+  if (nom) {
+    const m = moisParNom(nom[1]!);
+    return m === null ? null : valide(annee4(nom[2], reference), m);
+  }
+  return null;
+}
+
+/** Déplacement du mois actif au clavier dans la grille de 3 colonnes × 4 lignes. */
+export function deplacerMoisClavier(ym: string, touche: string): string | null {
+  const d = lireMoisIso(ym);
+  if (!d) return null;
+  switch (touche) {
+    case 'ArrowLeft':
+      return ajouterMoisCivils(ym, -1);
+    case 'ArrowRight':
+      return ajouterMoisCivils(ym, 1);
+    case 'ArrowUp':
+      return ajouterMoisCivils(ym, -3);
+    case 'ArrowDown':
+      return ajouterMoisCivils(ym, 3);
+    case 'Home':
+      return moisDe(d.annee, 1);
+    case 'End':
+      return moisDe(d.annee, 12);
+    case 'PageUp':
+      return ajouterMoisCivils(ym, -12);
+    case 'PageDown':
+      return ajouterMoisCivils(ym, 12);
+    default:
+      return null;
+  }
+}
+
+// ─── Garde de navigation interne (modifications non enregistrées) ────────────
+
+/** Ce que le garde lit d'un clic (sous-ensemble de `MouseEvent`, pour les tests). */
+export interface ClicLien {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  defaultPrevented: boolean;
+}
+
+/** Ce que le garde lit d'un lien (sous-ensemble de `HTMLAnchorElement`). */
+export interface LienCible {
+  href: string;
+  target: string;
+  hasDownload: boolean;
+}
+
+/**
+ * Le clic sur ce lien quitte-t-il l'écran courant DANS l'application ? Rend
+ * l'adresse visée, ou `null` quand le garde doit laisser faire : clic modifié
+ * (nouvel onglet), bouton autre que le gauche, clic déjà traité, `target`
+ * autre que `_self`, téléchargement, autre origine, autre protocole
+ * (`mailto:`, `tel:`), ou simple ancre dans la même page.
+ */
+export function navigationInterne(
+  clic: ClicLien,
+  lien: LienCible,
+  actuelle: string,
+): string | null {
+  if (clic.defaultPrevented || clic.button !== 0) return null;
+  if (clic.metaKey || clic.ctrlKey || clic.shiftKey || clic.altKey) return null;
+  if (lien.hasDownload) return null;
+  if (lien.target !== '' && lien.target !== '_self') return null;
+  let cible: URL;
+  let ici: URL;
+  try {
+    ici = new URL(actuelle);
+    cible = new URL(lien.href, ici);
+  } catch {
+    return null;
+  }
+  if (cible.protocol !== 'http:' && cible.protocol !== 'https:') return null;
+  if (cible.origin !== ici.origin) return null;
+  if (cible.pathname === ici.pathname && cible.search === ici.search) return null;
+  return cible.href;
+}

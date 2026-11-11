@@ -9,12 +9,23 @@
 // - Titre cliquable : vue des douze mois et changement d'année rapide.
 // - Raccourcis (Aujourd'hui, Fin de mois, +30 j…) choisis par l'écran.
 // - Bornes min/max ; jours marqués (fériés de l'organisation) fournis par
-//   l'écran — ce composant n'en invente aucun.
+//   l'écran (`marks`) ou par un `DateMarksProvider` englobant — ce composant
+//   n'en invente aucun et n'appelle aucune API. Un jour marqué porte un point
+//   discret et son nom en infobulle ; il reste choisissable (jamais bloquant).
 //
 // Valeur : chaîne ISO `AAAA-MM-JJ`, ou chaîne vide.
 
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { cn } from '../utils.js';
 
@@ -31,6 +42,7 @@ import {
   formatDateLongue,
   grilleMois,
   idSur,
+  indexerMarques,
   isoDe,
   JOURS_COURTS_FR,
   JOURS_FR,
@@ -39,14 +51,35 @@ import {
   lireIso,
   MOIS_COURTS_FR,
   MOIS_FR,
+  type JourMarque,
   type RaccourciDate,
 } from './logic.js';
 import { Popover, VoileTelephone } from './listbox.js';
 import { useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
 
-export interface DateMark {
-  date: string;
-  label: string;
+/** Jour marqué (férié…) ; `recurring` : même jour chaque année. */
+export type DateMark = JourMarque;
+
+const MarquesContexte = createContext<readonly DateMark[] | null>(null);
+
+/**
+ * Jours marqués de TOUS les sélecteurs de date englobés (fériés de
+ * l'organisation, chargés une fois par l'application). Un `marks` passé à un
+ * sélecteur l'emporte. `@lalanda/ui` n'appelle jamais l'API lui-même.
+ */
+export function DateMarksProvider({
+  marks,
+  children,
+}: {
+  marks: readonly DateMark[] | null;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return <MarquesContexte.Provider value={marks}>{children}</MarquesContexte.Provider>;
+}
+
+/** Jours marqués du `DateMarksProvider` englobant (`null` hors fournisseur). */
+export function useDateMarks(): readonly DateMark[] | null {
+  return useContext(MarquesContexte);
 }
 
 interface CalendrierProps {
@@ -82,7 +115,7 @@ function Calendrier({
   const grille = useRef<HTMLTableElement>(null);
   const aujourdhui = aujourdhuiIso();
   const d = lireIso(focus)!;
-  const marques = new Map((marks ?? []).map((m) => [m.date, m.label]));
+  const nomDuJour = useMemo(() => indexerMarques(marks), [marks]);
 
   // Le jour actif reçoit le focus (tabindex mobile, une seule cellule à 0).
   useEffect(() => {
@@ -215,7 +248,7 @@ function Calendrier({
                     jour.iso > debutPlage &&
                     jour.iso < finPlage;
                   const permis = dansLesBornes(jour.iso, min, max);
-                  const marque = marques.get(jour.iso);
+                  const marque = nomDuJour(jour.iso);
                   const nom = `${formatDateLongue(jour.iso)}${marque ? `, ${marque}` : ''}${jour.iso === aujourdhui ? ', aujourd’hui' : ''}`;
                   return (
                     <td
@@ -238,7 +271,6 @@ function Calendrier({
                           !jour.duMois && 'text-[var(--foreground-muted)] opacity-60',
                           jour.iso === aujourdhui &&
                             'font-semibold ring-1 ring-inset ring-[var(--accent)]',
-                          marque && 'text-[var(--warn)]',
                           choisi &&
                             'bg-[var(--accent)] font-semibold text-[var(--accent-foreground)] hover:bg-[var(--accent)]',
                         )}
@@ -360,6 +392,7 @@ export function DatePicker({
   'aria-invalid': ariaInvalid,
 }: DatePickerProps): React.ReactElement {
   const ctx = useField();
+  const marquesFournies = useDateMarks();
   const base = idSur(useId(), 'date');
   const [texte, setTexte] = useState(formatDateFr(value));
   const [probleme, setProbleme] = useState<string | null>(null);
@@ -474,7 +507,7 @@ export function DatePicker({
               selection={{ start: value, end: '' }}
               min={min}
               max={max}
-              marks={marks}
+              marks={marks ?? marquesFournies ?? undefined}
               shortcuts={shortcuts}
               libelle="Choisir une date"
               onChoisir={choisir}
@@ -538,6 +571,7 @@ export function DateRangePicker({
   onBlur,
 }: DateRangePickerProps): React.ReactElement {
   const ctx = useField();
+  const marquesFournies = useDateMarks();
   const base = idSur(useId(), 'plage');
   const a11y = controlA11y(ctx, { id: idDonne, required, disabled });
   const idDebut = a11y.id ?? `${base}-du`;
@@ -654,7 +688,7 @@ export function DateRangePicker({
               selection={enCours}
               min={min}
               max={max}
-              marks={marks}
+              marks={marks ?? marquesFournies ?? undefined}
               shortcuts={shortcuts}
               libelle="Choisir une période"
               onChoisir={(iso) => {

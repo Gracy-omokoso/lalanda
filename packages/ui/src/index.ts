@@ -23,6 +23,7 @@ export * from './forms/select.js';
 export * from './forms/entity-picker.js';
 export * from './forms/otp-input.js';
 export * from './forms/date-picker.js';
+export * from './forms/month-picker.js';
 export * from './forms/choices.js';
 export * from './forms/inputs.js';
 export * from './forms/form-kit.js';

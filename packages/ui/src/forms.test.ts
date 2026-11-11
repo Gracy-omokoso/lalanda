@@ -8,14 +8,21 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { ChoiceCards, Checkbox, SegmentedControl, Switch } from './forms/choices';
-import { DatePicker, DateRangePicker, messageDate } from './forms/date-picker';
+import {
+  DateMarksProvider,
+  DatePicker,
+  DateRangePicker,
+  messageDate,
+  useDateMarks,
+} from './forms/date-picker';
 import { EntityPicker } from './forms/entity-picker';
 import { Field, FormGrid, PasswordInput, TextInput } from './forms/field';
-import { ErrorSummary, StickyActions, SubmitButton } from './forms/form-kit';
+import { ConfirmLeaveDialog, ErrorSummary, StickyActions, SubmitButton } from './forms/form-kit';
 import { MoneyInput, PhoneInput } from './forms/inputs';
 import {
   ajouterJours,
   ajouterMois,
+  ajouterMoisCivils,
   ajouterRecent,
   aujourdhuiIso,
   avecRecherche,
@@ -24,6 +31,7 @@ import {
   correspondRecherche,
   dateRaccourci,
   deplacerJour,
+  deplacerMoisClavier,
   describedBy,
   ecrireTelephone,
   effacerOtp,
@@ -32,12 +40,19 @@ import {
   finDeMois,
   formatDateFr,
   formatDateLongue,
+  formatMoisCourt,
+  formatMoisLong,
   grilleMois,
   grouperNational,
   idSur,
+  indexerMarques,
   indexParLettre,
   jourSemaine,
   lireDateSaisie,
+  lireMoisIso,
+  lireMoisSaisi,
+  moisActuel,
+  navigationInterne,
   lireTelephone,
   phraseResume,
   prochainIndex,
@@ -51,6 +66,7 @@ import {
   formaterSaisieMontant,
   valeurMontant,
 } from './forms/money';
+import { MonthPicker, messageMois } from './forms/month-picker';
 import { OtpInput } from './forms/otp-input';
 import { placerPopover } from './forms/popover';
 import { Select } from './forms/select';
@@ -528,5 +544,226 @@ describe('rendu accessible', () => {
     );
     expect(e).toContain('role="alert"');
     expect(e).toContain('href="#nom"');
+  });
+});
+
+describe('mois (MonthPicker, décision n° 6)', () => {
+  const ref = '2026-11';
+
+  it('valeur AAAA-MM, celle du champ natif type="month"', () => {
+    expect(lireMoisIso('2026-11')).toEqual({ annee: 2026, mois: 11 });
+    expect(lireMoisIso('2026-13')).toBeNull();
+    expect(lireMoisIso('2026-1')).toBeNull();
+    expect(lireMoisIso('')).toBeNull();
+    expect(moisActuel(new Date(2026, 10, 30, 23, 30))).toBe('2026-11');
+  });
+
+  it('lit les saisies tolérantes', () => {
+    expect(lireMoisSaisi('2026-11', ref)).toBe('2026-11');
+    expect(lireMoisSaisi('2026-3', ref)).toBe('2026-03');
+    expect(lireMoisSaisi('11/2026', ref)).toBe('2026-11');
+    expect(lireMoisSaisi('3-27', ref)).toBe('2027-03');
+    expect(lireMoisSaisi('11.2026', ref)).toBe('2026-11');
+    expect(lireMoisSaisi('11 2026', ref)).toBe('2026-11');
+    expect(lireMoisSaisi('112026', ref)).toBe('2026-11');
+    expect(lireMoisSaisi('4', ref)).toBe('2026-04');
+    expect(lireMoisSaisi('nov. 2026', ref)).toBe('2026-11');
+    expect(lireMoisSaisi('Novembre 27', ref)).toBe('2027-11');
+    expect(lireMoisSaisi('fevrier 2026', ref)).toBe('2026-02');
+    expect(lireMoisSaisi('févr.', ref)).toBe('2026-02');
+    expect(lireMoisSaisi('août 2025', ref)).toBe('2025-08');
+    expect(lireMoisSaisi('juin', ref)).toBe('2026-06');
+    expect(lireMoisSaisi('juil 2026', ref)).toBe('2026-07');
+  });
+
+  it('refuse ce qui ne se lit pas', () => {
+    expect(lireMoisSaisi('13/2026', ref)).toBeNull();
+    expect(lireMoisSaisi('0/2026', ref)).toBeNull();
+    expect(lireMoisSaisi('ju 2026', ref)).toBeNull();
+    expect(lireMoisSaisi('jui', ref)).toBeNull();
+    expect(lireMoisSaisi('bientôt', ref)).toBeNull();
+    expect(lireMoisSaisi('', ref)).toBeNull();
+  });
+
+  it('affiche « nov. 2026 » et nomme « novembre 2026 »', () => {
+    expect(formatMoisCourt('2026-11')).toBe('nov. 2026');
+    expect(formatMoisCourt('2026-05')).toBe('mai 2026');
+    expect(formatMoisCourt('')).toBe('');
+    expect(formatMoisLong('2026-02')).toBe('février 2026');
+  });
+
+  it('arithmétique et clavier de la grille (3 × 4)', () => {
+    expect(ajouterMoisCivils('2026-12', 1)).toBe('2027-01');
+    expect(ajouterMoisCivils('2026-01', -1)).toBe('2025-12');
+    expect(deplacerMoisClavier('2026-11', 'ArrowRight')).toBe('2026-12');
+    expect(deplacerMoisClavier('2026-11', 'ArrowUp')).toBe('2026-08');
+    expect(deplacerMoisClavier('2026-11', 'ArrowDown')).toBe('2027-02');
+    expect(deplacerMoisClavier('2026-11', 'Home')).toBe('2026-01');
+    expect(deplacerMoisClavier('2026-11', 'End')).toBe('2026-12');
+    expect(deplacerMoisClavier('2026-11', 'PageUp')).toBe('2025-11');
+    expect(deplacerMoisClavier('2026-11', 'PageDown')).toBe('2027-11');
+    expect(deplacerMoisClavier('2026-11', 'a')).toBeNull();
+  });
+
+  it('bornes min/max : message clair', () => {
+    expect(messageMois('', '2026-01')).toBeNull();
+    expect(messageMois('13/2026')).toMatch(/MM\/AAAA/);
+    expect(messageMois('12/2025', '2026-01')).toBe('Le mois ne peut pas précéder janvier 2026.');
+    expect(messageMois('01/2027', undefined, '2026-12')).toBe(
+      'Le mois ne peut pas dépasser décembre 2026.',
+    );
+  });
+
+  it('rendu : champ texte « nov. 2026 », bouton de grille, relié au Field', () => {
+    const m = rendre(h(MonthPicker, { value: '2026-11', onChange: () => undefined }));
+    expect(m).toContain('value="nov. 2026"');
+    expect(m).toContain('placeholder="MM/AAAA"');
+    expect(m).toContain('aria-haspopup="dialog"');
+    expect(m).toContain('aria-label="Changer le mois, novembre 2026"');
+    const vide = rendre(
+      h(MonthPicker, { value: '', onChange: () => undefined, 'aria-label': 'Mois' }),
+    );
+    expect(vide).toContain('value=""');
+    expect(vide).toContain('aria-label="Choisir un mois"');
+    const champ = rendre(
+      h(
+        Field,
+        { label: 'Mois', id: 'm' },
+        h(MonthPicker, { value: '', onChange: () => undefined }),
+      ),
+    );
+    expect(champ).toContain('id="m"');
+    expect(champ).toContain('for="m"');
+  });
+});
+
+describe('jours marqués (fériés, décision n° 1)', () => {
+  it('date précise, jour récurrent, noms joints, jamais d’invention', () => {
+    const nom = indexerMarques([
+      { date: '2026-06-30', label: 'Indépendance' },
+      { date: '2024-05-01', label: 'Fête du travail', recurring: true },
+      { date: '2026-05-01', label: 'Fermeture' },
+      { date: '2026-12-25', label: 'Noël' },
+      { date: '2026-12-25', label: 'Fermeture annuelle' },
+      { date: '2026-02-31', label: 'Invalide' },
+      { date: '2026-03-01', label: '  ' },
+    ]);
+    expect(nom('2026-06-30')).toBe('Indépendance');
+    expect(nom('2027-06-30')).toBeUndefined();
+    expect(nom('2031-05-01')).toBe('Fête du travail');
+    expect(nom('2026-05-01')).toBe('Fermeture');
+    expect(nom('2026-12-25')).toBe('Noël · Fermeture annuelle');
+    expect(nom('2026-03-01')).toBeUndefined();
+    expect(nom('2026-11-11')).toBeUndefined();
+    expect(indexerMarques(null)('2026-01-01')).toBeUndefined();
+  });
+
+  it('DateMarksProvider : transmis aux sélecteurs, sans rien changer au champ', () => {
+    let lu: unknown = 'non lu';
+    const Sonde = (): null => {
+      lu = useDateMarks();
+      return null;
+    };
+    rendre(h(Sonde));
+    expect(lu).toBeNull();
+    const marks = [{ date: '2026-06-30', label: 'Indépendance' }];
+    const html = rendre(
+      h(
+        DateMarksProvider,
+        { marks },
+        h(Sonde),
+        h(DatePicker, { value: '2026-06-30', onChange: () => undefined }),
+      ),
+    );
+    expect(lu).toBe(marks);
+    // Valeur inchangée : le férié n'est qu'une indication.
+    expect(html).toContain('value="30/06/2026"');
+  });
+
+  it('le sélecteur de date ne cite aucun férié en dur et n’appelle aucune API', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('./forms/date-picker.tsx', import.meta.url)),
+      'utf8',
+    );
+    expect(source).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(source).not.toMatch(/fetch\(|\/hr\/holidays/);
+  });
+});
+
+describe('garde de navigation interne (décision n° 3)', () => {
+  const ici = 'https://app.lalanda.cd/ventes/clients/nouveau';
+  const clic = {
+    button: 0,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    defaultPrevented: false,
+  };
+  const lien = (
+    href: string,
+    extra: Partial<{ target: string; hasDownload: boolean }> = {},
+  ): { href: string; target: string; hasDownload: boolean } => ({
+    href,
+    target: '',
+    hasDownload: false,
+    ...extra,
+  });
+
+  it('retient un lien interne de l’application', () => {
+    expect(navigationInterne(clic, lien('/ventes/factures'), ici)).toBe(
+      'https://app.lalanda.cd/ventes/factures',
+    );
+    expect(navigationInterne(clic, lien('https://app.lalanda.cd/rh?vue=liste'), ici)).toBe(
+      'https://app.lalanda.cd/rh?vue=liste',
+    );
+    expect(navigationInterne(clic, lien('/ventes/clients/nouveau?etape=2'), ici)).not.toBeNull();
+    expect(navigationInterne(clic, lien('/accueil', { target: '_self' }), ici)).not.toBeNull();
+  });
+
+  it('laisse passer nouvel onglet, téléchargement, autre site, ancre, clic déjà traité', () => {
+    expect(navigationInterne({ ...clic, metaKey: true }, lien('/rh'), ici)).toBeNull();
+    expect(navigationInterne({ ...clic, ctrlKey: true }, lien('/rh'), ici)).toBeNull();
+    expect(navigationInterne({ ...clic, shiftKey: true }, lien('/rh'), ici)).toBeNull();
+    expect(navigationInterne({ ...clic, altKey: true }, lien('/rh'), ici)).toBeNull();
+    expect(navigationInterne({ ...clic, button: 1 }, lien('/rh'), ici)).toBeNull();
+    expect(navigationInterne({ ...clic, defaultPrevented: true }, lien('/rh'), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('/rh', { target: '_blank' }), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('/export.csv', { hasDownload: true }), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('https://dgi.gouv.cd/'), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('mailto:contact@lalanda.cd'), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('tel:+243812345678'), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('#adresse'), ici)).toBeNull();
+    expect(navigationInterne(clic, lien('/rh'), 'pas une adresse')).toBeNull();
+  });
+
+  it('fenêtre « Quitter sans enregistrer ? » : Rester et Quitter', () => {
+    const html = rendre(
+      h(ConfirmLeaveDialog, { onStay: () => undefined, onLeave: () => undefined }),
+    );
+    expect(html).toContain('role="alertdialog"');
+    expect(html).toContain('Quitter sans enregistrer ?');
+    expect(html).toContain('>Rester<');
+    expect(html).toContain('>Quitter<');
+    expect(html).not.toContain('type="submit"');
+  });
+});
+
+describe('case à cocher : alignée sur la première ligne du libellé', () => {
+  it('la case ne se centre pas sur un libellé de plusieurs lignes', () => {
+    const html = rendre(
+      h(Checkbox, {
+        checked: false,
+        onChange: () => undefined,
+        label:
+          'J’accepte les conditions générales d’utilisation et la politique de confidentialité',
+      }),
+    );
+    const conteneur = /<div class="([^"]+)"/.exec(html)![1]!;
+    expect(conteneur).toContain('items-start');
+    expect(conteneur).not.toContain('items-center');
+    // Boîte de la hauteur d'une ligne du libellé (20 px, `leading-5`), case centrée dedans.
+    expect(html).toMatch(/data-alignement="premiere-ligne" class="[^"]*\bh-5\b[^"]*items-center/);
+    expect(html).toMatch(/<label[^>]*class="[^"]*leading-5/);
   });
 });
