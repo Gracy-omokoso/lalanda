@@ -11,7 +11,16 @@ import {
   type AccountingBookCurrency,
   type AccountingMode,
 } from '@lalanda/shared/accounting';
-import { Badge, Button, Modal } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  ChoiceCards,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+} from '@lalanda/ui';
 import { ListChecks, Power } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -22,8 +31,6 @@ import {
   type AccountingRuleSetView,
   type AccountingSettingsView,
 } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_CONDITION,
@@ -144,83 +151,67 @@ function FenetreEtape({
           ) : packs.valeur.length === 0 ? (
             <p>Aucun plan comptable n’est encore publié.</p>
           ) : (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="mb-2 font-medium">Plans comptables publiés</legend>
-              {packs.valeur.map((p) => {
-                const cle = `${p.slug}@${p.version}`;
-                return (
-                  <label
-                    key={cle}
-                    className="flex cursor-pointer flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--border)] p-3 has-[:checked]:border-[var(--module-run)]"
-                  >
-                    <span className="flex flex-wrap items-center gap-2 font-medium">
-                      <input
-                        type="radio"
-                        name="pack"
-                        value={cle}
-                        checked={pack === cle}
-                        onChange={() => setPack(cle)}
-                      />
-                      {p.slug}, version {p.version}
-                      <Badge tone={packActivable(p.status) ? 'success' : 'warning'}>
-                        {LIBELLES_STATUT_PACK[p.status]}
-                      </Badge>
-                    </span>
-                    {p.warnings.length > 0 ? (
-                      <ul className="ml-6 list-disc text-[var(--foreground-muted)]">
-                        {p.warnings.map((w) => (
-                          <li key={w}>{w}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </label>
-                );
-              })}
-            </fieldset>
+            <FormGrid>
+              <Field label="Plans comptables publiés" size="full" group>
+                <ChoiceCards
+                  value={pack}
+                  onChange={setPack}
+                  columns={1}
+                  options={packs.valeur.map((p) => ({
+                    value: `${p.slug}@${p.version}`,
+                    label: (
+                      <span className="flex flex-wrap items-center gap-2">
+                        {p.slug}, version {p.version}
+                        <Badge tone={packActivable(p.status) ? 'success' : 'warning'}>
+                          {LIBELLES_STATUT_PACK[p.status]}
+                        </Badge>
+                      </span>
+                    ),
+                    description:
+                      p.warnings.length > 0 ? (
+                        <ul className="ml-4 list-disc">
+                          {p.warnings.map((w) => (
+                            <li key={w}>{w}</li>
+                          ))}
+                        </ul>
+                      ) : undefined,
+                  }))}
+                />
+              </Field>
+            </FormGrid>
           )
         ) : null}
         {etape === 'monnaie' ? (
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2">
-              La balance et les états sont tenus dans cette monnaie. Chaque ligne garde aussi le
-              montant de la pièce dans sa devise. Elle ne change plus après la première écriture
-              validée.
-            </legend>
-            {ACCOUNTING_BOOK_CURRENCIES.map((c) => (
-              <label key={c} className="flex items-center gap-2 font-medium">
-                <input
-                  type="radio"
-                  name="devise"
-                  value={c}
-                  checked={devise === c}
-                  onChange={() => setDevise(c)}
-                />
-                {c === 'CDF' ? 'Franc congolais (CDF)' : 'Dollar américain (USD)'}
-              </label>
-            ))}
-            <p className="text-[var(--foreground-muted)]">
-              Quelle monnaie retenir ? C’est une question pour votre expert-comptable.
-            </p>
-          </fieldset>
+          <FormGrid>
+            <Field
+              label="Monnaie de tenue"
+              size="full"
+              group
+              hint="La balance et les états sont tenus dans cette monnaie. Chaque ligne garde aussi le montant de la pièce dans sa devise. Elle ne change plus après la première écriture validée. Quelle monnaie retenir ? C’est une question pour votre expert-comptable."
+            >
+              <SegmentedControl<AccountingBookCurrency>
+                value={devise}
+                onChange={setDevise}
+                options={ACCOUNTING_BOOK_CURRENCIES.map((c) => ({
+                  value: c,
+                  label: c === 'CDF' ? 'Franc congolais (CDF)' : 'Dollar américain (USD)',
+                }))}
+              />
+            </Field>
+          </FormGrid>
         ) : null}
         {etape === 'bascule' ? (
-          <div className="flex flex-col gap-2">
-            <label htmlFor="compta-bascule" className="font-medium">
-              Date de bascule
-            </label>
-            <input
+          <FormGrid>
+            <Field
               id="compta-bascule"
-              type="date"
-              className={`${CHAMP} sm:w-56`}
-              value={bascule}
-              onChange={(e) => setBascule(e.target.value)}
-            />
-            <p className="text-[var(--foreground-muted)]">
-              Les pièces antérieures ne sont jamais passées en écritures. La situation à cette date
-              entre par des à-nouveaux de reprise, que vous saisissez et validez : Lalanda propose
-              les soldes de trésorerie et les factures ouvertes, sans rien valider à votre place.
-            </p>
-          </div>
+              label="Date de bascule"
+              size="md"
+              required
+              hint="Les pièces antérieures ne sont jamais passées en écritures. La situation à cette date entre par des à-nouveaux de reprise, que vous saisissez et validez : Lalanda propose les soldes de trésorerie et les factures ouvertes, sans rien valider à votre place."
+            >
+              <DatePicker value={bascule} onChange={setBascule} />
+            </Field>
+          </FormGrid>
         ) : null}
         {erreur ? (
           <p role="alert" className="font-medium text-[var(--danger)]">

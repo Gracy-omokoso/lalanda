@@ -5,14 +5,12 @@
 // « À comptabiliser ». Tout vient de l'API ; une route pas encore livrée (404) affiche
 // « bientôt disponible ».
 
-import { Badge, Button, Modal } from '@lalanda/ui';
+import { Badge, Button, Field, Modal, Select, TextInput } from '@lalanda/ui';
 import { Inbox, NotebookPen } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import { accountingApi, type AccountingEntryView } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { useAccesCompta } from './comptabilite-access';
 import { formatJour, formatMontant, formatValeur, moisDe } from './comptabilite-model';
@@ -143,53 +141,39 @@ export function Ecritures(): React.ReactElement {
         sousTitre="Chaque écriture est reliée à sa pièce. Une écriture validée ne se supprime jamais : elle se contre-passe."
       >
         <div className="flex flex-wrap items-end gap-3">
-          <label
-            htmlFor="compta-filtre-journal"
-            className="flex flex-col gap-1 text-sm font-medium"
-          >
-            Journal
-            <select
-              id="compta-filtre-journal"
-              className={`${CHAMP} sm:w-48`}
+          <Field id="compta-filtre-journal" label="Journal" className="w-full sm:w-56">
+            <Select<string>
               value={filtres.journal}
-              onChange={(e) => maj('journal', e.target.value)}
-            >
-              <option value="">Tous les journaux</option>
-              {journaux?.ok
-                ? journaux.valeur.map((j) => (
-                    <option key={j.code} value={j.code}>
-                      {j.code} — {j.label}
-                    </option>
-                  ))
-                : null}
-            </select>
-          </label>
+              onChange={(v) => maj('journal', v)}
+              loading={journaux === null}
+              options={[
+                { value: '', label: 'Tous les journaux' },
+                ...(journaux?.ok
+                  ? journaux.valeur.map((j) => ({ value: j.code, label: `${j.code} — ${j.label}` }))
+                  : []),
+              ]}
+            />
+          </Field>
           <ChoixMois
             id="compta-filtre-mois"
             libelle="Mois"
             valeur={filtres.mois}
             onChange={(v) => maj('mois', v)}
           />
-          <label htmlFor="compta-filtre-compte" className="flex flex-col gap-1 text-sm font-medium">
-            Compte
-            <input
-              id="compta-filtre-compte"
+          <Field id="compta-filtre-compte" label="Compte" className="w-full sm:w-40">
+            <TextInput
               inputMode="numeric"
-              className={`${CHAMP} sm:w-40`}
               value={filtres.compte}
               onChange={(e) => maj('compte', e.target.value.replace(/\D/g, ''))}
             />
-          </label>
-          <label htmlFor="compta-filtre-piece" className="flex flex-col gap-1 text-sm font-medium">
-            Pièce
-            <input
-              id="compta-filtre-piece"
-              className={`${CHAMP} sm:w-48`}
+          </Field>
+          <Field id="compta-filtre-piece" label="Pièce" className="w-full sm:w-48">
+            <TextInput
               placeholder="Numéro de la pièce"
               value={filtres.piece}
               onChange={(e) => maj('piece', e.target.value)}
             />
-          </label>
+          </Field>
         </div>
       </Bandeau>
 

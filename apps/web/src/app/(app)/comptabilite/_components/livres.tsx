@@ -9,7 +9,7 @@ import {
   ACCOUNTING_TO_CONFIRM_LABEL,
   type AccountingAuxiliaryKind,
 } from '@lalanda/shared/accounting';
-import { Badge } from '@lalanda/ui';
+import { Badge, Field, SegmentedControl, TextInput } from '@lalanda/ui';
 import { BookOpen, Scale, Users } from 'lucide-react';
 import { useState } from 'react';
 
@@ -18,8 +18,6 @@ import {
   type AccountingAuxiliaryBalanceView,
   type AccountingTrialBalanceView,
 } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { useAccesCompta } from './comptabilite-access';
 import {
@@ -191,16 +189,13 @@ export function GrandLivre(): React.ReactElement {
       >
         <div className="flex flex-wrap items-end gap-3">
           <ChoixMois id="compta-gl-mois" libelle="Mois" valeur={mois} onChange={setMois} />
-          <label htmlFor="compta-gl-compte" className="flex flex-col gap-1 text-sm font-medium">
-            Compte (facultatif)
-            <input
-              id="compta-gl-compte"
+          <Field id="compta-gl-compte" label="Compte" optional className="w-full sm:w-40">
+            <TextInput
               inputMode="numeric"
-              className={`${CHAMP} sm:w-40`}
               value={compte}
               onChange={(e) => setCompte(e.target.value.replace(/\D/g, ''))}
             />
-          </label>
+          </Field>
         </div>
       </Bandeau>
       <EnTeteReserves l={l} />
@@ -321,24 +316,15 @@ export function Tiers(): React.ReactElement {
       >
         <div className="flex flex-wrap items-end gap-3">
           <ChoixMois id="compta-tiers-mois" libelle="Mois" valeur={mois} onChange={setMois} />
-          <fieldset className="flex gap-2">
-            <legend className="sr-only">Nature des comptes</legend>
-            {(['customer', 'supplier'] as const).map((k) => (
-              <label
-                key={k}
-                className={`cursor-pointer rounded-[var(--radius-sm)] border px-3 py-2 text-sm font-medium ${nature === k ? 'border-[var(--module-run)]' : 'border-[var(--border)]'}`}
-              >
-                <input
-                  type="radio"
-                  name="nature-tiers"
-                  className="sr-only"
-                  checked={nature === k}
-                  onChange={() => setNature(k)}
-                />
-                {k === 'customer' ? 'Clients' : 'Fournisseurs'}
-              </label>
-            ))}
-          </fieldset>
+          <SegmentedControl<AccountingAuxiliaryKind>
+            aria-label="Nature des comptes"
+            value={nature}
+            onChange={setNature}
+            options={[
+              { value: 'customer', label: 'Clients' },
+              { value: 'supplier', label: 'Fournisseurs' },
+            ]}
+          />
         </div>
       </Bandeau>
       <EnTeteReserves l={l} />

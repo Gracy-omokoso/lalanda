@@ -3,13 +3,11 @@
 // Clôtures (ADR-0049 § 4, § 13) : mois et exercices, conditions manquantes listées,
 // réouverture par le Propriétaire seul, motif obligatoire.
 
-import { Badge, Button, Modal } from '@lalanda/ui';
+import { Badge, Button, Field, FormGrid, Modal, TextArea } from '@lalanda/ui';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 
 import { accountingApi } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { actionsPeriode, raisonsDuRefus } from './clotures-model';
 import { useAccesCompta } from './comptabilite-access';
@@ -236,17 +234,17 @@ export function Clotures(): React.ReactElement {
             </>
           }
         >
-          <label htmlFor="compta-motif" className="flex flex-col gap-1 text-sm font-medium">
-            Motif (obligatoire)
-            <textarea
-              id="compta-motif"
-              className={CHAMP}
-              rows={3}
-              maxLength={500}
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-            />
-          </label>
+          <FormGrid>
+            <Field id="compta-motif" label="Motif" required size="full">
+              <TextArea
+                rows={3}
+                maxLength={500}
+                value={motif}
+                autoFocus
+                onChange={(e) => setMotif(e.target.value)}
+              />
+            </Field>
+          </FormGrid>
         </Modal>
       ) : null}
       {clotureExercice !== null ? (
@@ -283,17 +281,22 @@ export function Clotures(): React.ReactElement {
             </>
           }
         >
-          <label htmlFor="compta-motif-attente" className="flex flex-col gap-1 text-sm font-medium">
-            Si le compte d’attente n’est pas soldé : motif pour accepter son solde (facultatif)
-            <textarea
+          <FormGrid>
+            <Field
               id="compta-motif-attente"
-              className={CHAMP}
-              rows={3}
-              maxLength={500}
-              value={motifAttente}
-              onChange={(e) => setMotifAttente(e.target.value)}
-            />
-          </label>
+              label="Motif pour accepter le solde du compte d’attente"
+              optional
+              size="full"
+              hint="Seulement si le compte d’attente n’est pas soldé."
+            >
+              <TextArea
+                rows={3}
+                maxLength={500}
+                value={motifAttente}
+                onChange={(e) => setMotifAttente(e.target.value)}
+              />
+            </Field>
+          </FormGrid>
         </Modal>
       ) : null}
     </section>

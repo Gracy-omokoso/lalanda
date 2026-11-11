@@ -9,7 +9,17 @@
 // Le serveur reste juge de tout (droits, séparation des tâches, plan, révisions).
 
 import { ACCOUNTING_TO_CONFIRM_LABEL } from '@lalanda/shared/accounting';
-import { Badge, Button, Modal } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { useState } from 'react';
 
 import {
@@ -19,8 +29,6 @@ import {
   type AccountingRuleSetView,
   type AccountingSettingsView,
 } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { reglesAConfirmer } from './activation-model';
 import { useAccesCompta } from './comptabilite-access';
@@ -247,52 +255,22 @@ function FenetreValidation({
             ? ` ${aRevoir} règle${aRevoir > 1 ? 's restent' : ' reste'} « à revoir » : elles ne seront pas appliquées et leurs opérations iront au compte d’attente.`
             : ''}
         </p>
-        <label className="flex items-start gap-2 font-medium">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={coche}
-            onChange={(e) => setCoche(e.target.checked)}
-          />
-          Ces règles ont été relues par notre expert-comptable.
-        </label>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="relecture-nom" className="font-medium">
-            Nom de l’expert-comptable ou du cabinet
-          </label>
-          <input
-            id="relecture-nom"
-            className={CHAMP}
-            maxLength={120}
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="relecture-date" className="font-medium">
-            Date de la relecture
-          </label>
-          <input
-            id="relecture-date"
-            type="date"
-            className={`${CHAMP} sm:w-56`}
-            max={aujourdhui}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="relecture-note" className="font-medium">
-            Note (facultative)
-          </label>
-          <textarea
-            id="relecture-note"
-            className={CHAMP}
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
+        <Checkbox
+          checked={coche}
+          onChange={setCoche}
+          label="Ces règles ont été relues par notre expert-comptable."
+        />
+        <FormGrid>
+          <Field id="relecture-nom" label="Nom de l’expert-comptable ou du cabinet" size="lg">
+            <TextInput maxLength={120} value={nom} onChange={(e) => setNom(e.target.value)} />
+          </Field>
+          <Field id="relecture-date" label="Date de la relecture" size="sm" newRow>
+            <DatePicker value={date} max={aujourdhui} onChange={setDate} />
+          </Field>
+          <Field id="relecture-note" label="Note" optional size="full">
+            <TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+        </FormGrid>
         <p className="text-[var(--foreground-muted)]">
           Lalanda enregistre cette déclaration de relecture sans la vérifier. La personne qui a
           modifié les règles en dernier ne les valide pas, sauf si elle est seule habilitée.
@@ -506,37 +484,27 @@ function FenetreRegle({
           Opération <span className="font-mono">{regle.key}</span>. Saisissez des numéros du plan de
           l’organisation, ou un jeton comme {'{customer}'}, séparés par des virgules.
         </p>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="regle-debit" className="font-medium">
-            Débit
-          </label>
-          <input
-            id="regle-debit"
-            className={`${CHAMP} font-mono`}
-            value={debit}
-            onChange={(e) => setDebit(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="regle-credit" className="font-medium">
-            Crédit
-          </label>
-          <input
-            id="regle-credit"
-            className={`${CHAMP} font-mono`}
-            value={credit}
-            onChange={(e) => setCredit(e.target.value)}
-          />
-        </div>
-        <label className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={aRevoir}
-            onChange={(e) => setARevoir(e.target.checked)}
-          />
-          À revoir : la règle n’est pas appliquée, ses opérations vont au compte d’attente.
-        </label>
+        <FormGrid>
+          <Field id="regle-debit" label="Débit" size="lg">
+            <TextInput
+              className="font-mono"
+              value={debit}
+              onChange={(e) => setDebit(e.target.value)}
+            />
+          </Field>
+          <Field id="regle-credit" label="Crédit" size="lg" newRow>
+            <TextInput
+              className="font-mono"
+              value={credit}
+              onChange={(e) => setCredit(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
+        <Checkbox
+          checked={aRevoir}
+          onChange={setARevoir}
+          label="À revoir : la règle n’est pas appliquée, ses opérations vont au compte d’attente."
+        />
         <Erreur texte={erreur} />
       </div>
     </Modal>

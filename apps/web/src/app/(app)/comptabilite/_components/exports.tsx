@@ -5,7 +5,7 @@
 // valider par un expert-comptable » et, en simulation, la marque « SIMULATION ».
 
 import type { AccountingMode } from '@lalanda/shared/accounting';
-import { Badge, Button } from '@lalanda/ui';
+import { Badge, Button, Field, Select } from '@lalanda/ui';
 import { Download, History } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,8 +14,6 @@ import {
   type AccountingExportFormat,
   type AccountingExportKind,
 } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { useAccesCompta } from './comptabilite-access';
 import {
@@ -91,43 +89,23 @@ export function Exports(): React.ReactElement {
         {phrase ? <p className="text-sm font-medium">{phrase}</p> : null}
         {autorise ? (
           <div className="flex flex-wrap items-end gap-3">
-            <label htmlFor="compta-export-type" className="flex flex-col gap-1 text-sm font-medium">
-              Contenu
-              <select
-                id="compta-export-type"
-                className={`${CHAMP} sm:w-72`}
+            <Field id="compta-export-type" label="Contenu" className="w-full sm:w-72">
+              <Select<AccountingExportKind>
                 value={kind}
-                onChange={(e) => {
-                  const k = e.target.value as AccountingExportKind;
+                onChange={(k) => {
                   setKind(k);
                   setFormat(formatsDe(k)[0] ?? 'csv');
                 }}
-              >
-                {TYPES_EXPORT.map((t) => (
-                  <option key={t.kind} value={t.kind}>
-                    {t.libelle}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label
-              htmlFor="compta-export-format"
-              className="flex flex-col gap-1 text-sm font-medium"
-            >
-              Format
-              <select
-                id="compta-export-format"
-                className={`${CHAMP} sm:w-60`}
+                options={TYPES_EXPORT.map((t) => ({ value: t.kind, label: t.libelle }))}
+              />
+            </Field>
+            <Field id="compta-export-format" label="Format" className="w-full sm:w-60">
+              <Select<AccountingExportFormat>
                 value={format}
-                onChange={(e) => setFormat(e.target.value as AccountingExportFormat)}
-              >
-                {formatsDe(kind).map((f) => (
-                  <option key={f} value={f}>
-                    {LIBELLES_FORMAT[f]}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onChange={setFormat}
+                options={formatsDe(kind).map((f) => ({ value: f, label: LIBELLES_FORMAT[f] }))}
+              />
+            </Field>
             <ChoixMois id="compta-export-mois" libelle="Mois" valeur={mois} onChange={setMois} />
             <Button
               variant="primary"

@@ -8,13 +8,11 @@ import {
   ACCOUNTING_TO_CONFIRM_LABEL,
   type AccountingStatementKind,
 } from '@lalanda/shared/accounting';
-import { Badge } from '@lalanda/ui';
+import { Badge, Field, TextInput } from '@lalanda/ui';
 import { FileText, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { accountingApi } from '@/lib/api-accounting';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { useAccesCompta } from './comptabilite-access';
 import { formatJour, formatValeur } from './comptabilite-model';
@@ -63,18 +61,15 @@ export function Etats(): React.ReactElement {
               </button>
             ))}
           </div>
-          <label htmlFor="compta-etat-annee" className="flex flex-col gap-1 text-sm font-medium">
-            Exercice
-            <input
-              id="compta-etat-annee"
+          <Field id="compta-etat-annee" label="Exercice" className="w-28">
+            <TextInput
               type="number"
               min={2000}
               max={2999}
-              className={`${CHAMP} w-28`}
               value={annee}
               onChange={(e) => setAnnee(Number(e.target.value) || annee)}
             />
-          </label>
+          </Field>
         </div>
       </Bandeau>
 
