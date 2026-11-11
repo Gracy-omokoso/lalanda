@@ -3,9 +3,11 @@
 // Fournisseurs — ADR-0044 § 3.1 et § 8 : liste triée par nom, recherche,
 // archivés ; création en fenêtre modale (`purchase.manage`). Le reste dû par
 // devise n'apparaît que si l'API le sert (droit `treasury.read` en plus).
+//
+// ADR-0074 : recherche en `TextInput` (icône), archivés en interrupteur.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
-import { Plus, Truck } from 'lucide-react';
+import { Badge, Field, FormGrid, Modal, Switch, TextInput, buttonClasses } from '@lalanda/ui';
+import { Plus, Search, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -13,7 +15,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { purchasesApi, type SupplierListItem } from '@/lib/api-purchases';
 
 import { Bandeau, MontantsLignes } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesAchats } from './achats-access';
 import { lienFournisseur, messageAchats, peutGererAchats } from './achats-model';
@@ -78,24 +80,30 @@ export function FournisseursListe(): React.ReactElement {
           ) : null
         }
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="search"
-            aria-label="Rechercher un fournisseur"
-            placeholder="Rechercher par nom ou NIF…"
-            className={`${CHAMP} sm:max-w-sm`}
-            value={filtres.q}
-            onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
-          />
-          <button
-            type="button"
-            className={`${BOUTON_PETIT} self-start sm:self-auto`}
-            aria-pressed={filtres.archives}
-            onClick={() => setFiltres({ ...filtres, archives: !filtres.archives })}
-          >
-            Archivés
-          </button>
-        </div>
+        <form
+          role="search"
+          aria-label="Rechercher un fournisseur"
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <FormGrid>
+            <Field id="fo-liste-q" label="Rechercher" size="lg">
+              <TextInput
+                type="search"
+                placeholder="Nom ou NIF…"
+                value={filtres.q}
+                onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
+                leading={<Search aria-hidden="true" className="h-4 w-4" />}
+              />
+            </Field>
+            <Field id="fo-liste-archives" label="Archivés" size="sm">
+              <Switch
+                checked={filtres.archives}
+                onChange={(v) => setFiltres({ ...filtres, archives: v })}
+                label="Afficher"
+              />
+            </Field>
+          </FormGrid>
+        </form>
       </Bandeau>
 
       {erreur ? (

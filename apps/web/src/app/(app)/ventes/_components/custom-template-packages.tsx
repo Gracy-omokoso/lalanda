@@ -8,12 +8,16 @@
 // EXEMPLE, activer une version. L'aperçu est obligatoire avant l'activation :
 // le moteur garantit la zone DGI, pas la lisibilité du reste.
 // Consultation : `sales.read` ; téléversement et activation : `organization.manage`.
+//
+// ADR-0074 : palette en segments, police en `Select` (champs dans `Field`) ;
+// fichier .zip et nuancier restent natifs. Mêmes options envoyées.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Field, FormGrid, SegmentedControl, Select, buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   api,
+  type InvoicePalette,
   type TemplatePackageReport,
   type TemplatePackagesView,
   type TemplatePackageView,
@@ -400,20 +404,18 @@ function VersionPaquet({
       {ouvert ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div className="flex flex-col gap-4">
-            <fieldset className="flex flex-col gap-2">
-              <legend className="text-sm font-medium">Palette</legend>
-              {p.options.palettes.map((pal) => (
-                <label key={pal} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name={`palette-${p.packageId}`}
-                    checked={affichees.palette === pal}
-                    onChange={() => setSel({ ...sel, palette: pal })}
-                  />
-                  {PALETTE_LABELS[pal]}
-                </label>
-              ))}
-            </fieldset>
+            <FormGrid>
+              <Field id={`palette-${p.packageId}`} label="Palette" group size="full">
+                <SegmentedControl<InvoicePalette>
+                  value={affichees.palette}
+                  onChange={(pal) => setSel({ ...sel, palette: pal })}
+                  options={p.options.palettes.map((pal) => ({
+                    value: pal,
+                    label: PALETTE_LABELS[pal],
+                  }))}
+                />
+              </Field>
+            </FormGrid>
             <div className="flex flex-wrap items-center gap-2">
               <label htmlFor={`accent-${p.packageId}`} className="text-sm font-medium">
                 Couleur d’accent
@@ -436,23 +438,15 @@ function VersionPaquet({
                 </button>
               ) : null}
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={`police-${p.packageId}`} className="text-sm font-medium">
-                Police
-              </label>
-              <select
-                id={`police-${p.packageId}`}
-                value={affichees.font}
-                onChange={(e) => setSel({ ...sel, font: e.target.value })}
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
-              >
-                {p.options.fonts.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormGrid>
+              <Field id={`police-${p.packageId}`} label="Police" size="lg">
+                <Select<string>
+                  value={affichees.font}
+                  onChange={(f) => setSel({ ...sel, font: f })}
+                  options={p.options.fonts.map((f) => ({ value: f.id, label: f.label }))}
+                />
+              </Field>
+            </FormGrid>
             <div className="flex flex-wrap gap-2">
               <button type="button" className={BOUTON} onClick={() => void ouvrirPdf()}>
                 Ouvrir l’aperçu PDF complet

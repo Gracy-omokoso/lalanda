@@ -2,11 +2,12 @@
 
 // Fenêtre de confirmation avec motif (annulation, litige, forçage) ou sans saisie.
 // Le motif obligatoire est vérifié ici ; l'API le revérifie et reste juge.
+// ADR-0074 : `Field` + `TextArea`, boutons `Button` avec état d'envoi.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Button, Field, Modal, TextArea } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import { messageAchats } from './achats-model';
 
@@ -65,35 +66,35 @@ export function DialogueMotif({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
             onClick={() => void valider()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Envoi…' : bouton}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
         {children}
         {motif === 'obligatoire' ? (
-          <Champ id={`${id}-motif`} label={libelle} requis erreur={champ}>
-            <textarea
-              id={`${id}-motif`}
+          <Field id={`${id}-motif`} label={libelle} required size="full" error={champ}>
+            <TextArea
               rows={3}
-              className={CHAMP}
               value={texte}
               maxLength={1000}
-              onChange={(e) => setTexte(e.target.value)}
-              {...aria(`${id}-motif`, champ)}
+              onChange={(e) => {
+                setTexte(e.target.value);
+                if (champ && e.target.value.trim() !== '') setChamp(undefined);
+              }}
             />
-          </Champ>
+          </Field>
         ) : null}
         {erreur ? (
           <Alerte>

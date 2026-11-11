@@ -2,8 +2,12 @@
 
 // Fenêtre de saisie d'un contrat (création, ou modification du brouillon) — ADR-0050
 // § 2.3, lot V7. Document de vente (client, lignes) + clauses SAISIES + échéancier.
+//
+// ADR-0074 : titre en `Field` + `TextInput` (largeur d'un intitulé), boutons de
+// la bibliothèque ; client, lignes et clauses viennent de leurs blocs déjà
+// migrés. Mêmes champs envoyés, mêmes validations.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Button, Field, FormGrid, Modal, TextInput } from '@lalanda/ui';
 import { useId, useMemo, useState } from 'react';
 
 import {
@@ -12,7 +16,7 @@ import {
   type SalesContractView,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { Alerte } from '../../_components/form-ui';
 import {
   preparerDocument,
   type FormulaireDocument,
@@ -123,18 +127,18 @@ export function FenetreContrat({
       size="xl"
       busy={envoi}
       footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Annuler
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'md')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : vue ? 'Enregistrer le brouillon' : 'Créer le contrat'}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -144,16 +148,17 @@ export function FenetreContrat({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <Champ id={`${id}-titre`} label="Titre du contrat" requis erreur={erreurs['title']}>
-          <input
+        <FormGrid>
+          <Field
             id={`${id}-titre`}
-            value={titre}
-            maxLength={200}
-            onChange={(e) => setTitre(e.target.value)}
-            className={CHAMP}
-            {...aria(`${id}-titre`, erreurs['title'])}
-          />
-        </Champ>
+            label="Titre du contrat"
+            required
+            size="lg"
+            error={erreurs['title']}
+          >
+            <TextInput value={titre} maxLength={200} onChange={(e) => setTitre(e.target.value)} />
+          </Field>
+        </FormGrid>
         <ChampsDocument
           prefixe={`${id}-doc`}
           form={form}

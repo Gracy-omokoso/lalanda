@@ -11,14 +11,18 @@
 //
 // Personne ne saisit d'éléments de sécurité : si la facture a été normalisée,
 // la revérification automatique finira par le voir.
+//
+// ADR-0074 : motif en `Field` + `TextArea` (aide, compteur et erreur reliés).
+// Même lecture du motif (`lireMotifDeclaration`), même requête.
 
+import { Field, FormGrid, TextArea } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api, type InvoiceView } from '@/lib/api';
 
 import { avecReauth } from '../../../organisation/_components/fiscal-model';
 import { useReauthDialog } from '../../../organisation/_components/reauth-dialog';
-import { Alerte, BOUTON, CHAMP, aria } from '../../_components/form-ui';
+import { Alerte, BOUTON } from '../../_components/form-ui';
 
 import { Dialogue } from './dialog-ui';
 import { lireMotifDeclaration, messageFacture, MOTIF_MAX, MOTIF_MIN } from './invoice-model';
@@ -94,29 +98,28 @@ export function DeclareNotNormalizedDialog({
       </div>
 
       <form onSubmit={(e) => void declarer(e)} className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="declarer-motif" className="text-sm font-medium">
-            Motif ({MOTIF_MIN} à {MOTIF_MAX} caractères)
-          </label>
-          <textarea
+        <FormGrid>
+          <Field
             id="declarer-motif"
-            value={motif}
-            onChange={(e) => setMotif(e.target.value)}
-            rows={4}
-            maxLength={MOTIF_MAX}
-            className={CHAMP}
-            {...aria('declarer-motif', champ ?? undefined, true)}
-          />
-          <p id="declarer-motif-aide" className="text-xs text-[var(--foreground-muted)]">
-            Par exemple : qui vous avez contacté à la DGI, quand, et ce qu’elle a répondu.{' '}
-            {motif.trim().length}/{MOTIF_MAX}
-          </p>
-          {champ ? (
-            <p id="declarer-motif-erreur" className="text-xs font-medium text-[var(--danger)]">
-              {champ}
-            </p>
-          ) : null}
-        </div>
+            label={`Motif (${MOTIF_MIN} à ${MOTIF_MAX} caractères)`}
+            required
+            size="full"
+            error={champ}
+            hint={
+              <>
+                Par exemple : qui vous avez contacté à la DGI, quand, et ce qu’elle a répondu.{' '}
+                {motif.trim().length}/{MOTIF_MAX}
+              </>
+            }
+          >
+            <TextArea
+              value={motif}
+              onChange={(e) => setMotif(e.target.value)}
+              rows={4}
+              maxLength={MOTIF_MAX}
+            />
+          </Field>
+        </FormGrid>
 
         {erreur ? (
           <Alerte>

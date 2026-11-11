@@ -7,7 +7,11 @@
 // couleurs de l'organisation). Choix des options, aperçu agrandi, PDF complet,
 // enregistrement. Consultation : `sales.read` ; enregistrement :
 // `organization.manage` — l'API refuse de toute façon, l'écran l'annonce.
+//
+// ADR-0074 : palette en segments, police en `Select`, champs dans `Field` ; le
+// nuancier natif (`type="color"`) reste tel quel. Même envoi (`versEnvoi`).
 
+import { Field, FormGrid, SegmentedControl, Select } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -15,6 +19,7 @@ import {
   api,
   type InvoiceTemplateCatalogEntry,
   type InvoiceTemplateId,
+  type InvoicePalette,
   type InvoiceTemplateOptions,
   type InvoiceTemplatesView,
 } from '@/lib/api';
@@ -372,20 +377,15 @@ function OptionsEtApercu({
           Options — {entree.label}
         </h2>
 
-        <fieldset className="flex flex-col gap-2" disabled={desactive}>
-          <legend className="text-sm font-medium">Palette</legend>
-          {entree.palettes.map((p) => (
-            <label key={p} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="palette"
-                checked={affichees.palette === p}
-                onChange={() => onChange({ ...sel, palette: p })}
-              />
-              {PALETTE_LABELS[p]}
-            </label>
-          ))}
-        </fieldset>
+        <FormGrid>
+          <Field id="modele-palette" label="Palette" group size="full" disabled={desactive}>
+            <SegmentedControl<InvoicePalette>
+              value={affichees.palette}
+              onChange={(p) => onChange({ ...sel, palette: p })}
+              options={entree.palettes.map((p) => ({ value: p, label: PALETTE_LABELS[p] }))}
+            />
+          </Field>
+        </FormGrid>
 
         <fieldset
           className="flex flex-col gap-2"
@@ -431,24 +431,20 @@ function OptionsEtApercu({
           ) : null}
         </fieldset>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="modele-police" className="text-sm font-medium">
-            {entree.id === 'editoriale' ? 'Paire de polices (titres + texte)' : 'Police'}
-          </label>
-          <select
+        <FormGrid>
+          <Field
             id="modele-police"
+            label={entree.id === 'editoriale' ? 'Paire de polices (titres + texte)' : 'Police'}
+            size="lg"
             disabled={desactive}
-            value={affichees.font}
-            onChange={(e) => onChange({ ...sel, font: e.target.value })}
-            className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
           >
-            {entree.fonts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
+            <Select<string>
+              value={affichees.font}
+              onChange={(f) => onChange({ ...sel, font: f })}
+              options={entree.fonts.map((f) => ({ value: f.id, label: f.label }))}
+            />
+          </Field>
+        </FormGrid>
 
         <button
           type="button"

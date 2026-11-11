@@ -6,8 +6,10 @@
 //
 // Les boutons viennent de `actionsCommande` (droits servis par le serveur,
 // séparation des tâches affichée) ; l'API reste juge et ses refus s'affichent.
+//
+// ADR-0074 : commentaire et motif en `Field` + `TextArea`, boutons `Button`.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Badge, Button, Field, Modal, TextArea, buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck, ClipboardList, History, ListOrdered } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,7 +19,7 @@ import { purchasesApi, type PurchaseOrderView } from '@/lib/api-purchases';
 
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
 import { ApercuDocument } from '../../ventes/_components/apercu-document';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -121,18 +123,18 @@ function DialogueDecision({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
             onClick={() => void valider()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Envoi…' : bouton}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -150,17 +152,23 @@ function DialogueDecision({
                 ({o.supplierName ?? 'fournisseur à préciser'}).
               </p>
             ) : null}
-            <Champ id={`${id}-texte`} label={label} requis={obligatoire} erreur={champ}>
-              <textarea
-                id={`${id}-texte`}
+            <Field
+              id={`${id}-texte`}
+              label={label}
+              required={obligatoire}
+              size="full"
+              error={champ}
+            >
+              <TextArea
                 rows={3}
-                className={CHAMP}
                 value={texte}
                 maxLength={dialogue === 'annuler' ? 1000 : 2000}
-                onChange={(e) => setTexte(e.target.value)}
-                {...aria(`${id}-texte`, champ)}
+                onChange={(e) => {
+                  setTexte(e.target.value);
+                  if (champ && e.target.value.trim() !== '') setChamp(undefined);
+                }}
               />
-            </Champ>
+            </Field>
           </>
         )}
         {erreur ? (
