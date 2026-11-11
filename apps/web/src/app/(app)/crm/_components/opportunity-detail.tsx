@@ -8,12 +8,30 @@
 //
 // « Créer le projet » d'une opportunité gagnée : encadré du lot C7
 // (`opportunites/[opportunityId]/_components/creer-projet.tsx`).
+//
+// ADR-0074 : informations en grille sémantique (compte en `EntityPicker` avec
+// « + » prospect sous `crm.manage`, source du montant et devise en segments,
+// montant et prix en `MoneyInput`, clôture et échéance en `DatePicker`) ;
+// `preparerOpportunite`, `preparerLignes` et `preparerActivite` inchangés.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { CalendarClock, FileText, History, ListOrdered, Plus, Target } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import {
   crmApi,
@@ -22,11 +40,12 @@ import {
   type OpportunityView,
 } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 import { DEVIS_BASE, QUOTE_STATUS_LABELS } from '../../ventes/devis/_components/quote-model';
 
 import { libelleEcheance, jourKinshasa, tonActivite } from './activites-model';
+import { creationProspect } from './comptes-liste';
 import { useAccesCrm } from './crm-access';
 import {
   ACTIVITY_KINDS,
@@ -68,6 +87,8 @@ function EditeurLignes({
   erreurs: Record<number, string>;
   desactive: boolean;
 }): React.ReactElement {
+  // Identifiants stables entre serveur et navigateur : `useId` et position.
+  const base = useId();
   const maj = (i: number, champ: keyof FormulaireLigne, v: string) =>
     setLignes(lignes.map((l, n) => (n === i ? { ...l, [champ]: v } : l)));
   return (
@@ -83,47 +104,48 @@ function EditeurLignes({
             key={i}
             className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]"
           >
-            <input
+            <TextInput
+              id={`${base}-l${i}-libelle`}
               aria-label={`Libellé de la ligne ${i + 1}`}
               placeholder="Libellé"
-              className={CHAMP}
               value={l.label}
               maxLength={200}
               disabled={desactive}
               onChange={(e) => maj(i, 'label', e.target.value)}
             />
-            <input
+            <TextInput
+              id={`${base}-l${i}-quantite`}
               aria-label={`Quantité de la ligne ${i + 1}`}
               placeholder="Quantité"
               inputMode="decimal"
-              className={CHAMP}
+              className="text-right tabular-nums"
               value={l.quantite}
               disabled={desactive}
               onChange={(e) => maj(i, 'quantite', e.target.value)}
             />
-            <input
+            <TextInput
+              id={`${base}-l${i}-unite`}
               aria-label={`Unité de la ligne ${i + 1}`}
               placeholder="Unité"
-              className={CHAMP}
               value={l.unite}
               maxLength={20}
               disabled={desactive}
               onChange={(e) => maj(i, 'unite', e.target.value)}
             />
-            <input
+            <MoneyInput
+              id={`${base}-l${i}-prix`}
               aria-label={`Prix unitaire hors taxes de la ligne ${i + 1}`}
               placeholder="Prix HT"
-              inputMode="decimal"
-              className={CHAMP}
               value={l.prix}
               disabled={desactive}
-              onChange={(e) => maj(i, 'prix', e.target.value)}
+              onChange={(prix) => maj(i, 'prix', prix)}
             />
-            <input
+            <TextInput
+              id={`${base}-l${i}-remise`}
               aria-label={`Remise en pour cent de la ligne ${i + 1}`}
               placeholder="Remise %"
               inputMode="decimal"
-              className={CHAMP}
+              className="text-right tabular-nums"
               value={l.remise}
               disabled={desactive}
               onChange={(e) => maj(i, 'remise', e.target.value)}
@@ -365,16 +387,13 @@ export function OpportunityDetail({
 
       {gerer ? (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-sm">
-            Déplacer vers
-            <select className={CHAMP} value={v.stageKey} onChange={(e) => deplacer(e.target.value)}>
-              {settings.stages.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Field id="op-deplacer" label="Déplacer vers" size="md" className="w-64 max-w-full">
+            <Select
+              value={v.stageKey}
+              onChange={deplacer}
+              options={settings.stages.map((s) => ({ value: s.key, label: s.label }))}
+            />
+          </Field>
           <button
             type="button"
             className={BOUTON_PETIT}
@@ -393,83 +412,89 @@ export function OpportunityDetail({
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <Panneau titre="Informations" icone={Target} id="op-infos" className="lg:col-span-2">
-          <fieldset disabled={!gerer} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <fieldset disabled={!gerer} className="min-w-0">
             <legend className="sr-only">Informations de l’opportunité</legend>
-            <Champ id="ed-titre" label="Titre" requis erreur={champs['title']}>
-              <input
-                id="ed-titre"
-                className={CHAMP}
-                value={form.title}
-                maxLength={200}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                {...aria('ed-titre', champs['title'])}
-              />
-            </Champ>
-            <Champ id="ed-compte" label="Compte" requis erreur={champs['accountId']}>
-              <ChoixCompte
-                id="ed-compte"
-                valeur={form.accountId}
-                nomInitial={v.accountName}
-                onChange={(accountId) => setForm({ ...form, accountId })}
-              />
-            </Champ>
-            <Champ id="ed-responsable" label="Responsable">
-              <ChoixMembre
-                id="ed-responsable"
-                valeur={form.ownerId}
-                membres={membres}
-                vide={v.ownerId ? nomMembre(membres, v.ownerId) : 'Choisir…'}
-                onChange={(ownerId) => setForm({ ...form, ownerId })}
-              />
-            </Champ>
-            <Champ id="ed-source" label="Montant estimé">
-              <select
-                id="ed-source"
-                className={CHAMP}
-                value={source}
-                onChange={(e) => setSource(e.target.value as 'manual' | 'lines')}
-              >
-                <option value="manual">Saisi à la main</option>
-                <option value="lines">Tiré des lignes (hors taxes, calculé par Lalanda)</option>
-              </select>
-            </Champ>
-            {source === 'manual' ? (
-              <Champ id="ed-montant" label="Montant" erreur={champs['amount']}>
-                <input
-                  id="ed-montant"
-                  inputMode="decimal"
-                  className={CHAMP}
-                  value={form.montant}
-                  onChange={(e) => setForm({ ...form, montant: e.target.value })}
-                  {...aria('ed-montant', champs['amount'])}
+            <FormGrid>
+              <Field id="ed-titre" label="Titre" required size="lg" error={champs['title']}>
+                <TextInput
+                  value={form.title}
+                  maxLength={200}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
                 />
-              </Champ>
-            ) : (
-              <div className="flex flex-col justify-end text-sm">
-                <span className="font-medium">Montant calculé</span>
-                <span className="font-mono">{montantEstime(v)}</span>
-              </div>
-            )}
-            <Champ id="ed-devise" label="Devise">
-              <select
-                id="ed-devise"
-                className={CHAMP}
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value as 'CDF' | 'USD' })}
+              </Field>
+              <Field
+                id="ed-compte"
+                label="Compte"
+                required
+                size="lg"
+                newRow
+                error={champs['accountId']}
               >
-                <option value="CDF">CDF</option>
-                <option value="USD">USD</option>
-              </select>
-            </Champ>
-            <Champ id="ed-cloture" label="Clôture prévue">
-              <input
-                id="ed-cloture"
-                type="date"
-                className={CHAMP}
-                value={form.expectedCloseDate}
-                onChange={(e) => setForm({ ...form, expectedCloseDate: e.target.value })}
-              />
-            </Champ>
+                <ChoixCompte
+                  id="ed-compte"
+                  valeur={form.accountId}
+                  nomInitial={v.accountName}
+                  onChange={(accountId) => setForm({ ...form, accountId })}
+                  creer={creationProspect(gerer)}
+                />
+              </Field>
+              <Field id="ed-responsable" label="Responsable" size="md">
+                <ChoixMembre
+                  id="ed-responsable"
+                  valeur={form.ownerId}
+                  membres={membres}
+                  vide={v.ownerId ? nomMembre(membres, v.ownerId) : 'Choisir…'}
+                  onChange={(ownerId) => setForm({ ...form, ownerId })}
+                />
+              </Field>
+              <Field id="ed-source" label="Montant estimé" size="full" group>
+                <SegmentedControl<'manual' | 'lines'>
+                  value={source}
+                  onChange={setSource}
+                  options={[
+                    { value: 'manual', label: 'Saisi à la main' },
+                    { value: 'lines', label: 'Tiré des lignes' },
+                  ]}
+                />
+              </Field>
+              {source === 'manual' ? (
+                <Field id="ed-montant" label="Montant" size="sm" error={champs['amount']}>
+                  <MoneyInput
+                    value={form.montant}
+                    currency={form.currency}
+                    onChange={(montant) => setForm({ ...form, montant })}
+                  />
+                </Field>
+              ) : (
+                <Field
+                  id="ed-montant-calcule"
+                  label="Montant calculé"
+                  size="sm"
+                  hint="Hors taxes, calculé par Lalanda."
+                >
+                  <span className="flex h-[var(--control-h)] items-center font-mono text-sm max-sm:h-11">
+                    {montantEstime(v)}
+                  </span>
+                </Field>
+              )}
+              <Field id="ed-devise" label="Devise" size="sm" group>
+                <SegmentedControl
+                  value={form.currency}
+                  onChange={(currency) => setForm({ ...form, currency })}
+                  options={[
+                    { value: 'CDF', label: 'CDF' },
+                    { value: 'USD', label: 'USD' },
+                  ]}
+                />
+              </Field>
+              <Field id="ed-cloture" label="Clôture prévue" size="sm">
+                <DatePicker
+                  value={form.expectedCloseDate}
+                  onChange={(expectedCloseDate) => setForm({ ...form, expectedCloseDate })}
+                  shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+                />
+              </Field>
+            </FormGrid>
           </fieldset>
         </Panneau>
 
@@ -558,8 +583,7 @@ export function OpportunityDetail({
               return (
                 <li key={a.id} className="flex flex-wrap items-center gap-2">
                   {gerer && a.kind !== 'note' ? (
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={a.done}
                       aria-label={`${a.done ? 'Rouvrir' : 'Marquer faite'} : ${a.subject}`}
                       onChange={() =>
@@ -607,7 +631,7 @@ export function OpportunityDetail({
             busy={envoiAct}
           >
             <form
-              className="grid gap-3 sm:grid-cols-2"
+              className="flex flex-col gap-4"
               aria-label="Nouvelle activité"
               noValidate
               onSubmit={(e) => {
@@ -631,66 +655,63 @@ export function OpportunityDetail({
                   .finally(() => setEnvoiAct(false));
               }}
             >
-              <Champ id="act-kind" label="Nature">
-                <select
-                  id="act-kind"
-                  className={CHAMP}
-                  value={f.kind}
-                  onChange={(e) =>
-                    setF({ ...f, kind: e.target.value as FormulaireActivite['kind'] })
-                  }
-                >
-                  {ACTIVITY_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {ACTIVITY_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </Champ>
-              <Champ id="act-objet" label="Objet" requis erreur={champsAct['subject']}>
-                <input
+              <FormGrid>
+                <Field id="act-kind" label="Nature" size="md">
+                  <Select<FormulaireActivite['kind']>
+                    value={f.kind}
+                    onChange={(kind) => setF({ ...f, kind })}
+                    options={ACTIVITY_KINDS.map((k) => ({ value: k, label: ACTIVITY_LABELS[k] }))}
+                  />
+                </Field>
+                <Field
                   id="act-objet"
-                  className={CHAMP}
-                  value={f.subject}
-                  maxLength={200}
-                  onChange={(e) => setF({ ...f, subject: e.target.value })}
-                />
-              </Champ>
-              {f.kind !== 'note' ? (
-                <>
-                  <Champ id="act-echeance" label="Échéance" erreur={champsAct['dueAt']}>
-                    <input
-                      id="act-echeance"
-                      type="date"
-                      className={CHAMP}
-                      value={f.echeance}
-                      onChange={(e) => setF({ ...f, echeance: e.target.value })}
-                    />
-                  </Champ>
-                  <Champ id="act-assigne" label="Assignée à">
-                    <ChoixMembre
-                      id="act-assigne"
-                      valeur={f.assigneeUserId ?? ''}
-                      membres={membres}
-                      onChange={(assigneeUserId) => setF({ ...f, assigneeUserId })}
-                    />
-                  </Champ>
-                </>
-              ) : null}
+                  label="Objet"
+                  required
+                  size="full"
+                  error={champsAct['subject']}
+                >
+                  <TextInput
+                    value={f.subject}
+                    maxLength={200}
+                    autoFocus
+                    onChange={(e) => setF({ ...f, subject: e.target.value })}
+                  />
+                </Field>
+                {f.kind !== 'note' ? (
+                  <>
+                    <Field id="act-echeance" label="Échéance" size="sm" error={champsAct['dueAt']}>
+                      <DatePicker
+                        value={f.echeance}
+                        onChange={(echeance) => setF({ ...f, echeance })}
+                        shortcuts={['today', 'plus7', 'plus30']}
+                      />
+                    </Field>
+                    <Field id="act-assigne" label="Assignée à" size="md">
+                      <ChoixMembre
+                        id="act-assigne"
+                        valeur={f.assigneeUserId ?? ''}
+                        membres={membres}
+                        onChange={(assigneeUserId) => setF({ ...f, assigneeUserId })}
+                      />
+                    </Field>
+                  </>
+                ) : null}
+              </FormGrid>
               {erreurAct ? (
-                <div className="sm:col-span-2">
-                  <Alerte>
-                    <p>{erreurAct}</p>
-                  </Alerte>
-                </div>
+                <Alerte>
+                  <p>{erreurAct}</p>
+                </Alerte>
               ) : null}
-              <button
-                type="submit"
-                disabled={envoiAct}
-                className={`${BOUTON} sm:col-span-2 sm:justify-self-start`}
-              >
-                {envoiAct ? 'Ajout…' : 'Ajouter l’activité'}
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <SubmitButton
+                  showShortcut={false}
+                  busy={envoiAct}
+                  busyLabel="Ajout…"
+                  className="max-sm:h-11"
+                >
+                  Ajouter l’activité
+                </SubmitButton>
+              </div>
             </form>
           </Modal>
         </Panneau>

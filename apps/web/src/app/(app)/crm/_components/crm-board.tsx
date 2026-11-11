@@ -8,16 +8,34 @@
 // retard, inactives, orphelines. Sous 768 px : une colonne à la fois, menu seul.
 //
 // Chiffres recopiés de l'API (moteur) : rien n'est additionné ici.
+//
+// ADR-0074 : nouvelle opportunité en grille sémantique (compte en
+// `EntityPicker` avec « + » prospect sous `crm.manage`, montant en
+// `MoneyInput` lu par le même `lireMontantSaisi`, devise en segments, clôture en
+// `DatePicker`) ; filtres et vue en segments ; « Déplacer vers… » en `Select`.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { AlarmClock, KanbanSquare, Moon, Plus, UserX } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type OpportunitySummary, type PipelineView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
+import { creationProspect } from './comptes-liste';
 import { useAccesCrm } from './crm-access';
 import {
   ACTIVITY_LABELS,
@@ -117,28 +135,25 @@ function Carte({
         {o.stale ? <Badge tone="warning">Inactive depuis {o.daysSinceActivity} j</Badge> : null}
       </span>
       {mobile ? (
-        <label className="relative z-10 mt-1 flex flex-col gap-1 text-xs">
-          <span className="text-[var(--foreground-muted)]">Déplacer vers…</span>
-          <select
-            className={`${CHAMP} py-1 text-xs`}
+        <div className="relative z-10 mt-1 flex flex-col gap-1 text-xs">
+          <span aria-hidden="true" className="text-[var(--foreground-muted)]">
+            Déplacer vers…
+          </span>
+          <Select
             value={o.stageKey}
             aria-label={`Déplacer « ${o.title} » vers une autre étape`}
-            onChange={(e) => onDeplacer(o, e.target.value)}
-          >
-            {board.settings.stages.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={(stageKey) => onDeplacer(o, stageKey)}
+            options={board.settings.stages.map((s) => ({ value: s.key, label: s.label }))}
+          />
+        </div>
       ) : null}
     </li>
   );
 }
 
 function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactElement {
-  const { membres } = useAccesCrm();
+  const { actions, membres } = useAccesCrm();
+  const gerer = peutGererCrm(actions);
   const [f, setF] = useState<FormulaireOpportunite>(formulaireOpportunite());
   const [champs, setChamps] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
@@ -166,83 +181,88 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
   }
 
   return (
-    <form onSubmit={(e) => void creer(e)} className="grid gap-3 sm:grid-cols-2" noValidate>
-      <Champ id="op-titre" label="Titre" requis erreur={champs['title']}>
-        <input
-          id="op-titre"
-          value={f.title}
-          onChange={(e) => setF({ ...f, title: e.target.value })}
-          className={CHAMP}
-          maxLength={200}
-          {...aria('op-titre', champs['title'])}
-        />
-      </Champ>
-      <Champ id="op-compte" label="Compte" requis erreur={champs['accountId']}>
-        <ChoixCompte
+    <form onSubmit={(e) => void creer(e)} className="flex flex-col gap-4" noValidate>
+      <FormGrid>
+        <Field id="op-titre" label="Titre" required size="lg" error={champs['title']}>
+          <TextInput
+            value={f.title}
+            autoFocus
+            onChange={(e) => setF({ ...f, title: e.target.value })}
+            maxLength={200}
+          />
+        </Field>
+        <Field
           id="op-compte"
-          valeur={f.accountId}
-          onChange={(accountId) => setF({ ...f, accountId })}
-          aria={aria('op-compte', champs['accountId'])}
-        />
-      </Champ>
-      <Champ id="op-responsable" label="Responsable">
-        <ChoixMembre
-          id="op-responsable"
-          valeur={f.ownerId}
-          membres={membres}
-          onChange={(ownerId) => setF({ ...f, ownerId })}
-        />
-      </Champ>
-      <Champ
-        id="op-montant"
-        label="Montant estimé"
-        aide="Facultatif ; il peut aussi être tiré des lignes d’articles sur la fiche."
-        erreur={champs['amount']}
-      >
-        <input
-          id="op-montant"
-          inputMode="decimal"
-          value={f.montant}
-          onChange={(e) => setF({ ...f, montant: e.target.value })}
-          placeholder="1 500,00"
-          className={CHAMP}
-          {...aria('op-montant', champs['amount'], true)}
-        />
-      </Champ>
-      <Champ id="op-devise" label="Devise">
-        <select
-          id="op-devise"
-          value={f.currency}
-          onChange={(e) => setF({ ...f, currency: e.target.value as 'CDF' | 'USD' })}
-          className={CHAMP}
+          label="Compte"
+          required
+          size="lg"
+          newRow
+          hint="Tapez pour chercher un prospect ou un client."
+          error={champs['accountId']}
         >
-          <option value="CDF">CDF</option>
-          <option value="USD">USD</option>
-        </select>
-      </Champ>
-      <Champ id="op-cloture" label="Clôture prévue">
-        <input
-          id="op-cloture"
-          type="date"
-          value={f.expectedCloseDate}
-          onChange={(e) => setF({ ...f, expectedCloseDate: e.target.value })}
-          className={CHAMP}
-        />
-      </Champ>
+          <ChoixCompte
+            id="op-compte"
+            valeur={f.accountId}
+            onChange={(accountId) => setF({ ...f, accountId })}
+            creer={creationProspect(gerer)}
+          />
+        </Field>
+        <Field id="op-responsable" label="Responsable" size="md" newRow>
+          <ChoixMembre
+            id="op-responsable"
+            valeur={f.ownerId}
+            membres={membres}
+            onChange={(ownerId) => setF({ ...f, ownerId })}
+          />
+        </Field>
+        <Field
+          id="op-montant"
+          label="Montant estimé"
+          size="sm"
+          newRow
+          hint="Facultatif ; il peut aussi être tiré des lignes d’articles sur la fiche."
+          error={champs['amount']}
+        >
+          <MoneyInput
+            value={f.montant}
+            onChange={(montant) => setF({ ...f, montant })}
+            currency={f.currency}
+            placeholder="1 500,00"
+          />
+        </Field>
+        <Field id="op-devise" label="Devise" size="sm" group>
+          <SegmentedControl
+            value={f.currency}
+            onChange={(currency) => setF({ ...f, currency })}
+            options={[
+              { value: 'CDF', label: 'CDF' },
+              { value: 'USD', label: 'USD' },
+            ]}
+          />
+        </Field>
+        <Field id="op-cloture" label="Clôture prévue" size="sm">
+          <DatePicker
+            value={f.expectedCloseDate}
+            onChange={(expectedCloseDate) => setF({ ...f, expectedCloseDate })}
+            shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
-        <div className="sm:col-span-2 lg:col-span-3">
-          <Alerte>
-            <p>{erreur}</p>
-          </Alerte>
-        </div>
+        <Alerte>
+          <p>{erreur}</p>
+        </Alerte>
       ) : null}
-      <button
-        type="submit"
-        disabled={envoi}
-        className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
-      >
-        {envoi ? 'Création…' : 'Créer l’opportunité'}
-      </button>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <SubmitButton
+          showShortcut={false}
+          busy={envoi}
+          busyLabel="Création…"
+          className="max-sm:h-11"
+        >
+          Créer l’opportunité
+        </SubmitButton>
+      </div>
     </form>
   );
 }
@@ -493,40 +513,25 @@ export function CrmBoard(): React.ReactElement {
           ) : null
         }
       >
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Affichage">
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            aria-pressed={filtre === 'tous'}
-            onClick={() => setFiltre('tous')}
-          >
-            Tout le pipeline
-          </button>
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            aria-pressed={filtre === 'miennes'}
-            onClick={() => setFiltre('miennes')}
-          >
-            Mes opportunités
-          </button>
-          <span aria-hidden="true" className="mx-1 h-4 w-px bg-[var(--border)]" />
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            aria-pressed={!vueListe}
-            onClick={() => setVueListe(false)}
-          >
-            Kanban
-          </button>
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            aria-pressed={vueListe}
-            onClick={() => setVueListe(true)}
-          >
-            Liste
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <SegmentedControl<FiltreResponsable>
+            aria-label="Opportunités affichées"
+            value={filtre ?? ''}
+            onChange={setFiltre}
+            options={[
+              { value: 'tous', label: 'Tout le pipeline' },
+              { value: 'miennes', label: 'Mes opportunités' },
+            ]}
+          />
+          <SegmentedControl<'kanban' | 'liste'>
+            aria-label="Affichage"
+            value={vueListe ? 'liste' : 'kanban'}
+            onChange={(v) => setVueListe(v === 'liste')}
+            options={[
+              { value: 'kanban', label: 'Kanban' },
+              { value: 'liste', label: 'Liste' },
+            ]}
+          />
         </div>
       </Bandeau>
 
@@ -685,20 +690,18 @@ export function CrmBoard(): React.ReactElement {
             </div>
           ) : (
             <>
-              <label className="flex flex-col gap-1 text-sm md:hidden">
-                Étape affichée
-                <select
-                  className={CHAMP}
-                  value={colonneVisible ?? ''}
-                  onChange={(e) => setColonneMobile(e.target.value)}
-                >
-                  {board.stages.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label} ({s.opportunities.length})
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <FormGrid className="md:hidden">
+                <Field id="pipeline-etape-mobile" label="Étape affichée" size="lg">
+                  <Select
+                    value={colonneVisible ?? ''}
+                    onChange={setColonneMobile}
+                    options={board.stages.map((s) => ({
+                      value: s.key,
+                      label: `${s.label} (${s.opportunities.length})`,
+                    }))}
+                  />
+                </Field>
+              </FormGrid>
               {/* Le tableau défile À L'INTÉRIEUR de sa zone : la page ne déborde pas. */}
               <div className="relative min-w-0 overflow-x-auto pb-2">
                 <div className="flex gap-3">

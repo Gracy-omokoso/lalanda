@@ -11,6 +11,8 @@
 //
 // Graphiques : barres HTML/CSS (aucune bibliothèque), décoratives — chaque
 // valeur est écrite en texte à côté, et chaque bloc propose son tableau.
+//
+// ADR-0074 : filtres « Période » et « Responsable » en `Select` (même requête).
 
 import {
   BarChart3,
@@ -25,10 +27,11 @@ import {
 import { useEffect, useState } from 'react';
 
 import { CRM_REPORT_ESTIMATE_LABEL } from '@lalanda/shared/crm';
+import { Field, FormGrid, Select } from '@lalanda/ui';
 
 import { crmReportsApi, type CrmReportsView } from '@/lib/api-crm-reports';
 
-import { Alerte, CHAMP } from '../../../ventes/_components/form-ui';
+import { Alerte } from '../../../ventes/_components/form-ui';
 import { jourKinshasa } from '../../_components/activites-model';
 import { useAccesCrm } from '../../_components/crm-access';
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../_components/crm-ui';
@@ -95,39 +98,29 @@ export function RapportsEcran(): React.ReactElement {
           vue ? phrasePeriode(vue) : 'Entonnoir, conversion, cycle, responsables, prévision.'
         }
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
-            Période
-            <select
-              className={CHAMP}
-              value={periode}
-              onChange={(e) => setPeriode(periodeDepuis(e.target.value))}
-            >
-              {PERIODES_MOIS.map((m) => (
-                <option key={m} value={m}>
-                  {libellePeriode(m)}
-                  {m === PERIODE_PAR_DEFAUT ? ' (par défaut)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
-            Responsable
-            <select
-              className={CHAMP}
+        <FormGrid className="lg:max-w-3xl">
+          <Field id="rapports-periode" label="Période" size="md">
+            <Select
+              value={String(periode)}
+              onChange={(v) => setPeriode(periodeDepuis(v))}
+              options={PERIODES_MOIS.map((m) => ({
+                value: String(m),
+                label: `${libellePeriode(m)}${m === PERIODE_PAR_DEFAUT ? ' (par défaut)' : ''}`,
+              }))}
+            />
+          </Field>
+          <Field id="rapports-responsable" label="Responsable" size="md">
+            <Select
               value={responsable}
-              onChange={(e) => setResponsable(e.target.value)}
-            >
-              <option value="">Toute l’organisation</option>
-              <option value="me">Les miennes</option>
-              {membres.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+              onChange={setResponsable}
+              options={[
+                { value: '', label: 'Toute l’organisation' },
+                { value: 'me', label: 'Les miennes' },
+                ...membres.map((m) => ({ value: m.userId, label: m.name, group: 'Membres' })),
+              ]}
+            />
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           {vue?.label ?? CRM_REPORT_ESTIMATE_LABEL} Montants par devise, sans conversion.
         </p>

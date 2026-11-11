@@ -5,12 +5,11 @@
 // Icônes Lucide (ADR-0038 § 4, révision du 29 oct. 2026), décoratives :
 // le sens est toujours porté par un texte.
 
+import { EntityPicker, correspondRecherche, type EntityCreateFormProps } from '@lalanda/ui';
 import type { LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { crmApi, type CrmAccountListItem } from '@/lib/api-crm';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import type { MembreCrm } from './crm-access';
 import { libelleNature } from './comptes-model';
@@ -143,7 +142,11 @@ export function PhraseSection({ children }: { children: React.ReactNode }): Reac
   return <p className="text-sm text-[var(--foreground-muted)]">{children}</p>;
 }
 
-/** Choix d'un membre (responsable, assigné) ; l'API refuse un membre non éligible. */
+/**
+ * Choix d'un membre (responsable, assigné) ; l'API refuse un membre non éligible.
+ * ADR-0074 § 4 : `EntityPicker` sur la liste déjà chargée (même API qu'avant :
+ * `id`, `valeur`, `onChange`, `membres`, `vide`). Vide : « Moi (par défaut) ».
+ */
 export function ChoixMembre({
   id,
   valeur,
@@ -157,21 +160,34 @@ export function ChoixMembre({
   membres: readonly MembreCrm[];
   vide?: string;
 }): React.ReactElement {
+  const choisi = membres.find((m) => m.userId === valeur) ?? null;
   return (
-    <select id={id} className={CHAMP} value={valeur} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{vide}</option>
-      {membres.map((m) => (
-        <option key={m.userId} value={m.userId}>
-          {m.name}
-        </option>
-      ))}
-    </select>
+    <EntityPicker<MembreCrm>
+      id={id}
+      value={choisi}
+      onChange={(m) => onChange(m?.userId ?? '')}
+      search={async (q) => membres.filter((m) => correspondRecherche([m.name], q))}
+      refreshKey={membres.length}
+      getKey={(m) => m.userId}
+      getLabel={(m) => m.name}
+      placeholder={vide}
+      debounceMs={0}
+      emptyText="Aucun membre ne correspond."
+    />
   );
+}
+
+export interface CompteChoisi {
+  id: string;
+  name: string;
+  kind: CrmAccountListItem['kind'] | null;
 }
 
 /**
  * Choix d'un compte (prospect ou client) par recherche (`GET /crm/accounts?q=`) :
  * lecture `crm.read`, sans passer par la liste des clients de Ventes.
+ * ADR-0074 § 4 : un seul champ « tapez pour chercher » (`EntityPicker`) remplace
+ * l'ancien couple « Rechercher » + liste ; même appel, même identifiant envoyé.
  */
 export function ChoixCompte({
   id,
@@ -179,63 +195,57 @@ export function ChoixCompte({
   nomInitial,
   onChange,
   aria,
+  creer,
 }: {
   id: string;
   valeur: string;
   nomInitial?: string | null;
   onChange: (id: string, nom: string | null) => void;
   aria?: Record<string, unknown>;
+  /** Création rapide (fiche prospect complète), passée seulement sous `crm.manage`. */
+  creer?: ((p: EntityCreateFormProps<CompteChoisi>) => React.ReactNode) | undefined;
 }): React.ReactElement {
-  const [q, setQ] = useState('');
-  const [comptes, setComptes] = useState<CrmAccountListItem[]>([]);
+  const [choisi, setChoisi] = useState<CompteChoisi | null>(null);
+  const valeurAffichee: CompteChoisi | null =
+    valeur === ''
+      ? null
+      : choisi?.id === valeur
+        ? choisi
+        : { id: valeur, name: nomInitial ?? 'Compte actuel', kind: null };
+  const ariaInvalide = aria?.['aria-invalid'] === true || aria?.['aria-invalid'] === 'true';
+  const ariaDecrit =
+    typeof aria?.['aria-describedby'] === 'string' ? aria['aria-describedby'] : undefined;
 
-  useEffect(() => {
-    let annule = false;
-    const t = setTimeout(() => {
-      crmApi
-        .listAccounts({ active: 'true', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => {
-          if (!annule) setComptes(p.items);
-        })
-        .catch(() => undefined);
-    }, 200);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q]);
-
-  const connu = comptes.some((c) => c.id === valeur);
   return (
-    <div className="flex flex-col gap-1.5">
-      <input
-        type="search"
-        aria-label="Rechercher un compte"
-        placeholder="Rechercher un compte…"
-        className={CHAMP}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <select
-        id={id}
-        className={CHAMP}
-        value={valeur}
-        onChange={(e) => {
-          const c = comptes.find((x) => x.id === e.target.value);
-          onChange(e.target.value, c?.name ?? null);
-        }}
-        {...aria}
-      >
-        <option value="">Choisir un compte…</option>
-        {valeur !== '' && !connu ? (
-          <option value={valeur}>{nomInitial ?? 'Compte actuel'}</option>
-        ) : null}
-        {comptes.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name} — {libelleNature(c.kind)}
-          </option>
-        ))}
-      </select>
-    </div>
+    <EntityPicker<CompteChoisi>
+      id={id}
+      value={valeurAffichee}
+      onChange={(c) => {
+        setChoisi(c);
+        onChange(c?.id ?? '', c?.name ?? null);
+      }}
+      search={(q) =>
+        crmApi
+          .listAccounts({ active: 'true', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
+          .then((p) => p.items.map((c) => ({ id: c.id, name: c.name, kind: c.kind })))
+      }
+      getKey={(c) => c.id}
+      getLabel={(c) => c.name}
+      getDescription={(c) => (c.kind ? libelleNature(c.kind) : null)}
+      placeholder="Choisir un compte…"
+      emptyText="Aucun compte ne correspond."
+      debounceMs={200}
+      recentKey="crm-comptes"
+      {...(creer
+        ? {
+            createForm: creer,
+            createTitle: 'Nouveau prospect',
+            createButtonLabel: 'Créer un prospect',
+            createSize: 'lg' as const,
+          }
+        : {})}
+      {...(ariaInvalide ? { 'aria-invalid': true } : {})}
+      {...(ariaDecrit ? { 'aria-describedby': ariaDecrit } : {})}
+    />
   );
 }

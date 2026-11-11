@@ -8,9 +8,27 @@
 //
 // Une section `hidden` affiche une phrase, jamais un zéro. Tous les montants
 // sont ceux de l'API (moteur) : rien n'est additionné, converti ni arrondi ici.
+//
+// ADR-0074 : conversion (type DGI en cartes, fiche existante en
+// `EntityPicker`), fusion (compte cible en `EntityPicker`) et modification en
+// grille sémantique ; `preparerClient` et `preparerCompte` inchangés.
 
 import type { CrmOverview, CrmTimelineEvent } from '@lalanda/shared/crm';
-import { Badge, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  ChoiceCards,
+  EntityPicker,
+  Field,
+  FormGrid,
+  PhoneInput,
+  SegmentedControl,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  buttonClasses,
+  type FieldSize,
+} from '@lalanda/ui';
 import {
   Building2,
   CalendarClock,
@@ -29,7 +47,7 @@ import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { api, type CustomerType, type CustomerView } from '@/lib/api';
 import { crmApi, type CrmAccountListItem } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   CUSTOMER_TYPES,
   formatMontant,
@@ -100,21 +118,17 @@ function Conversion({
     address: a.address ?? '',
   });
   const [champs, setChamps] = useState<Partial<Record<keyof FormulaireClient, string>>>({});
-  const [q, setQ] = useState('');
-  const [clients, setClients] = useState<CustomerView[]>([]);
+  const [client, setClient] = useState<CustomerView | null>(null);
   const [customerId, setCustomerId] = useState('');
+  const [erreurLien, setErreurLien] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (mode !== 'link') return;
-    const t = setTimeout(() => {
-      api
-        .listCustomers({ status: 'active', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => setClients(p.items))
-        .catch(() => undefined);
-    }, 200);
-    return () => clearTimeout(t);
-  }, [mode, q]);
+  // Fiche posée par l'écran (même NIF) sans être dans la liste : libellé d'attente.
+  const clientAffiche: Pick<CustomerView, 'id' | 'name' | 'nif'> | null =
+    customerId === ''
+      ? null
+      : client?.id === customerId
+        ? client
+        : { id: customerId, name: 'Fiche au même NIF', nif: null };
 
   async function convertir(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -133,7 +147,12 @@ function Conversion({
           expectedRevision: a.revision,
         });
       } else {
-        if (customerId === '') return;
+        // Le choix n'est plus un `<select>` natif : contrôle équivalent à l'envoi.
+        if (customerId === '') {
+          setErreurLien('Choisissez la fiche client à rattacher.');
+          return;
+        }
+        setErreurLien(null);
         await crmApi.convertAccount(a.id, {
           mode: 'link',
           customerId,
@@ -162,126 +181,105 @@ function Conversion({
       className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--accent)] bg-[var(--surface)] p-4 sm:p-5"
     >
       <h3 className="text-sm font-semibold">Convertir « {a.name} » en client</h3>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Mode de conversion">
-        <button
-          type="button"
-          className={BOUTON_PETIT}
-          aria-pressed={mode === 'create'}
-          onClick={() => setMode('create')}
-        >
-          Créer la fiche client
-        </button>
-        <button
-          type="button"
-          className={BOUTON_PETIT}
-          aria-pressed={mode === 'link'}
-          onClick={() => setMode('link')}
-        >
-          Rattacher à une fiche existante
-        </button>
-      </div>
+      <SegmentedControl<'create' | 'link'>
+        aria-label="Mode de conversion"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'create', label: 'Créer la fiche client' },
+          { value: 'link', label: 'Rattacher à une fiche existante' },
+        ]}
+      />
       {mode === 'create' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id="cv-type" label="Type de client (DGI)" requis erreur={champs.type}>
-            <select
-              id="cv-type"
-              className={CHAMP}
-              value={f.type}
-              onChange={(e) => setF({ ...f, type: e.target.value as FormulaireClient['type'] })}
-              {...aria('cv-type', champs.type)}
-            >
-              <option value="">Choisir…</option>
-              {CUSTOMER_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id="cv-nom" label="Nom ou dénomination" requis erreur={champs.name}>
-            <input
-              id="cv-nom"
-              className={CHAMP}
-              value={f.name}
-              onChange={(e) => setF({ ...f, name: e.target.value })}
-              {...aria('cv-nom', champs.name)}
-            />
-          </Champ>
-          <Champ
-            id="cv-nif"
-            label="NIF"
-            erreur={champs.nif}
-            aide={CUSTOMER_TYPES.find((t) => t.value === f.type)?.aide}
+        <FormGrid>
+          <Field
+            id="cv-type"
+            label="Type de client (DGI)"
+            required
+            size="full"
+            group
+            error={champs.type}
           >
-            <input
-              id="cv-nif"
-              className={CHAMP}
-              value={f.nif}
-              onChange={(e) => setF({ ...f, nif: e.target.value })}
-              {...aria('cv-nif', champs.nif, true)}
+            <ChoiceCards
+              value={f.type}
+              onChange={(type) => setF({ ...f, type })}
+              options={CUSTOMER_TYPES.map((t) => ({
+                value: t.value,
+                label: t.label,
+                description: t.aide,
+              }))}
             />
-          </Champ>
+          </Field>
+          <Field id="cv-nom" label="Nom ou dénomination" required size="lg" error={champs.name}>
+            <TextInput value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          </Field>
+          <Field id="cv-nif" label="NIF" size="sm" error={champs.nif}>
+            <TextInput value={f.nif} onChange={(e) => setF({ ...f, nif: e.target.value })} />
+          </Field>
           {f.type === 'AO' ? (
-            <Champ
+            <Field
               id="cv-exo"
               label="Référence d’exonération"
-              requis
-              erreur={champs.exemptionReference}
+              required
+              size="md"
+              newRow
+              error={champs.exemptionReference}
             >
-              <input
-                id="cv-exo"
-                className={CHAMP}
+              <TextInput
                 value={f.exemptionReference}
                 onChange={(e) => setF({ ...f, exemptionReference: e.target.value })}
               />
-            </Champ>
+            </Field>
           ) : null}
-        </div>
+        </FormGrid>
       ) : (
-        <div className="flex flex-col gap-2">
-          <input
-            type="search"
-            aria-label="Rechercher une fiche client"
-            placeholder="Rechercher une fiche client…"
-            className={CHAMP}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <select
-            aria-label="Fiche client"
-            className={CHAMP}
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
+        <FormGrid>
+          <Field
+            id="cv-fiche"
+            label="Fiche client"
+            required
+            size="lg"
+            error={erreurLien ?? undefined}
+            hint="Si cette fiche a déjà son compte, le prospect y est fusionné (contacts, opportunités et activités compris)."
           >
-            <option value="">Choisir une fiche…</option>
-            {customerId !== '' && !clients.some((c) => c.id === customerId) ? (
-              <option value={customerId}>Fiche au même NIF</option>
-            ) : null}
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.nif ? ` — NIF ${c.nif}` : ''}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-[var(--foreground-muted)]">
-            Si cette fiche a déjà son compte, le prospect y est fusionné (contacts, opportunités et
-            activités compris).
-          </p>
-        </div>
+            <EntityPicker<Pick<CustomerView, 'id' | 'name' | 'nif'>>
+              value={clientAffiche}
+              onChange={(c) => {
+                setClient(c as CustomerView | null);
+                setCustomerId(c?.id ?? '');
+                if (c) setErreurLien(null);
+              }}
+              search={(q) =>
+                api
+                  .listCustomers({
+                    status: 'active',
+                    limit: 50,
+                    ...(q.trim() ? { q: q.trim() } : {}),
+                  })
+                  .then((p) => p.items)
+              }
+              getKey={(c) => c.id}
+              getLabel={(c) => c.name}
+              getDescription={(c) => (c.nif ? `NIF ${c.nif}` : null)}
+              placeholder="Rechercher une fiche client…"
+              emptyText="Aucune fiche client ne correspond."
+              debounceMs={200}
+            />
+          </Field>
+        </FormGrid>
       )}
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <button type="submit" className={buttonClasses('primary', 'md')}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <SubmitButton showShortcut={false} className="max-sm:h-11">
           Convertir en client
-        </button>
-        <button type="button" className={buttonClasses('secondary', 'md')} onClick={onFermer}>
+        </SubmitButton>
+        <Button onClick={onFermer} className="max-sm:h-11">
           Annuler
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -297,27 +295,16 @@ function Fusion({
   onFermer: () => void;
 }): React.ReactElement {
   const a = overview.account;
-  const [q, setQ] = useState('');
-  const [comptes, setComptes] = useState<CrmAccountListItem[]>([]);
-  const [cible, setCible] = useState('');
+  const [choisi, setChoisi] = useState<CrmAccountListItem | null>(null);
+  const cible = choisi?.id ?? '';
   const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      crmApi
-        .listAccounts({ active: 'true', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => setComptes(ciblesFusion(a, p.items)))
-        .catch(() => undefined);
-    }, 200);
-    return () => clearTimeout(t);
-  }, [q, a]);
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         if (cible === '') return;
-        const nom = comptes.find((c) => c.id === cible)?.name ?? 'ce compte';
+        const nom = choisi?.name ?? 'ce compte';
         if (
           !window.confirm(
             `Fusionner « ${a.name} » dans « ${nom} » ? Ses contacts, opportunités et activités y seront déplacés.`,
@@ -336,39 +323,37 @@ function Fusion({
         Pour réunir deux fiches de la même entreprise. Le prospect fusionné est conservé pour la
         trace et disparaît des listes.
       </p>
-      <input
-        type="search"
-        aria-label="Rechercher le compte qui reste"
-        placeholder="Rechercher le compte qui reste…"
-        className={CHAMP}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <select
-        aria-label="Compte qui reste"
-        className={CHAMP}
-        value={cible}
-        onChange={(e) => setCible(e.target.value)}
-      >
-        <option value="">Choisir…</option>
-        {comptes.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name} — {libelleNature(c.kind)}
-          </option>
-        ))}
-      </select>
+      <FormGrid>
+        <Field id="fu-cible" label="Compte qui reste" size="lg">
+          <EntityPicker<CrmAccountListItem>
+            value={choisi}
+            onChange={setChoisi}
+            search={(q) =>
+              crmApi
+                .listAccounts({ active: 'true', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
+                .then((p) => ciblesFusion(a, p.items))
+            }
+            getKey={(c) => c.id}
+            getLabel={(c) => c.name}
+            getDescription={(c) => libelleNature(c.kind)}
+            placeholder="Rechercher le compte qui reste…"
+            emptyText="Aucun compte ne correspond."
+            debounceMs={200}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <button type="submit" className={buttonClasses('primary', 'md')} disabled={cible === ''}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <SubmitButton showShortcut={false} disabled={cible === ''} className="max-sm:h-11">
           Fusionner
-        </button>
-        <button type="button" className={buttonClasses('secondary', 'md')} onClick={onFermer}>
+        </SubmitButton>
+        <Button onClick={onFermer} className="max-sm:h-11">
           Annuler
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -388,16 +373,21 @@ function Edition({
   const [f, setF] = useState<FormulaireCompte>({ ...formulaireCompte(a), ownerId: '' });
   const [champs, setChamps] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
-  const champ = (id: keyof FormulaireCompte, label: string, max: number) => (
-    <Champ id={`ed-${id}`} label={label} erreur={champs[id]}>
-      <input
-        id={`ed-${id}`}
-        className={CHAMP}
+  const champ = (
+    id: keyof FormulaireCompte,
+    label: string,
+    max: number,
+    size: FieldSize = 'md',
+    type = 'text',
+  ) => (
+    <Field id={`ed-${id}`} label={label} size={size} error={champs[id]}>
+      <TextInput
+        type={type}
         value={f[id]}
         maxLength={max}
         onChange={(e) => setF({ ...f, [id]: e.target.value })}
       />
-    </Champ>
+    </Field>
   );
   return (
     <form
@@ -414,55 +404,55 @@ function Edition({
           .then(onFait)
           .catch((err) => setErreur(messageCrm(err, 'Enregistrement impossible.')));
       }}
-      className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--accent)] bg-[var(--surface)] p-4 sm:grid-cols-2 sm:p-5"
+      className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--accent)] bg-[var(--surface)] p-4 sm:p-5"
     >
-      <h3 className="text-sm font-semibold sm:col-span-2">Modifier le compte</h3>
-      {a.kind === 'prospect' ? champ('name', 'Nom', 200) : null}
-      {champ('industry', 'Secteur', 80)}
-      {champ('origin', 'Origine', 80)}
-      {champ('website', 'Site web', 200)}
-      {champ('phone', 'Téléphone', 30)}
-      {champ('email', 'E-mail', 200)}
-      {champ('address', 'Adresse', 300)}
-      <Champ id="ed-owner" label="Responsable">
-        <ChoixMembre
-          id="ed-owner"
-          valeur={f.ownerId}
-          membres={membres}
-          vide={a.ownerId ? `${nomMembre(membres, a.ownerId)} (inchangé)` : 'Sans responsable'}
-          onChange={(ownerId) => setF({ ...f, ownerId })}
-        />
-      </Champ>
-      <Champ id="ed-notes" label="Notes">
-        <textarea
-          id="ed-notes"
-          rows={3}
-          className={CHAMP}
-          value={f.notes}
-          maxLength={5000}
-          onChange={(e) => setF({ ...f, notes: e.target.value })}
-        />
-      </Champ>
+      <h3 className="text-sm font-semibold">Modifier le compte</h3>
+      <FormGrid>
+        {a.kind === 'prospect' ? champ('name', 'Nom', 200, 'lg') : null}
+        {champ('industry', 'Secteur', 80)}
+        {champ('origin', 'Origine', 80)}
+        {champ('website', 'Site web', 200, 'lg', 'url')}
+        <Field id="ed-phone" label="Téléphone" size="md" newRow error={champs['phone']}>
+          <PhoneInput value={f.phone} onChange={(phone) => setF({ ...f, phone })} />
+        </Field>
+        {champ('email', 'E-mail', 200, 'md', 'email')}
+        {champ('address', 'Adresse', 300, 'full')}
+        <Field id="ed-owner" label="Responsable" size="md">
+          <ChoixMembre
+            id="ed-owner"
+            valeur={f.ownerId}
+            membres={membres}
+            vide={a.ownerId ? `${nomMembre(membres, a.ownerId)} (inchangé)` : 'Sans responsable'}
+            onChange={(ownerId) => setF({ ...f, ownerId })}
+          />
+        </Field>
+        <Field id="ed-notes" label="Notes" size="full">
+          <TextArea
+            rows={3}
+            value={f.notes}
+            maxLength={5000}
+            onChange={(e) => setF({ ...f, notes: e.target.value })}
+          />
+        </Field>
+      </FormGrid>
       {a.kind === 'customer' ? (
-        <p className="text-xs text-[var(--foreground-muted)] sm:col-span-2">
+        <p className="text-xs text-[var(--foreground-muted)]">
           Coordonnées commerciales. Le nom, le NIF et l’adresse imprimés sur les factures restent
           ceux de la fiche client (Ventes).
         </p>
       ) : null}
       {erreur ? (
-        <div className="sm:col-span-2">
-          <Alerte>
-            <p>{erreur}</p>
-          </Alerte>
-        </div>
+        <Alerte>
+          <p>{erreur}</p>
+        </Alerte>
       ) : null}
-      <div className="flex flex-wrap gap-2 sm:col-span-2">
-        <button type="submit" className={buttonClasses('primary', 'md')}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <SubmitButton showShortcut={false} className="max-sm:h-11">
           Enregistrer
-        </button>
-        <button type="button" className={buttonClasses('secondary', 'md')} onClick={onFermer}>
+        </SubmitButton>
+        <Button onClick={onFermer} className="max-sm:h-11">
           Annuler
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -3,15 +3,32 @@
 // Comptes — ADR-0040 § 3.1 et § 8.1 : liste triée par nom, recherche, filtre
 // prospect / client, archivés ; création d'un PROSPECT (un compte client naît de
 // la fiche client de Ventes). Compteurs rendus par l'API.
+//
+// ADR-0074 : grille sémantique, téléphone en `PhoneInput`, responsable en
+// `EntityPicker` (`ChoixMembre`) ; filtres : recherche, nature en segments,
+// archivés en interrupteur. `preparerCompte` inchangé.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
-import { Building2, Plus } from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Field,
+  FormGrid,
+  Modal,
+  PhoneInput,
+  SegmentedControl,
+  SubmitButton,
+  Switch,
+  TextInput,
+  buttonClasses,
+  type EntityCreateFormProps,
+} from '@lalanda/ui';
+import { Building2, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type CrmAccountListItem } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_COMPTES_INITIAUX,
@@ -25,12 +42,27 @@ import {
 } from './comptes-model';
 import { useAccesCrm } from './crm-access';
 import { formatEcheance, lienCompte, messageCrm, peutGererCrm } from './crm-model';
-import { Bandeau, ChoixMembre } from './crm-ui';
+import { Bandeau, ChoixMembre, type CompteChoisi } from './crm-ui';
 import { nomMembre } from './pipeline-model';
 
-function NouveauProspect({ onCree }: { onCree: (id: string) => void }): React.ReactElement {
+/**
+ * Fiche complète de création d'un prospect (`POST /crm/accounts`, `crm.manage`).
+ * Sert aussi de création rapide depuis un choix de compte (`nomInitial`).
+ */
+export function NouveauProspect({
+  onCree,
+  nomInitial = '',
+  onAnnuler,
+}: {
+  onCree: (compte: CompteChoisi) => void;
+  nomInitial?: string;
+  onAnnuler?: () => void;
+}): React.ReactElement {
   const { membres } = useAccesCrm();
-  const [f, setF] = useState<FormulaireCompte>(formulaireCompte());
+  const [f, setF] = useState<FormulaireCompte>(() => ({
+    ...formulaireCompte(),
+    name: nomInitial,
+  }));
   const [champs, setChamps] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -48,82 +80,84 @@ function NouveauProspect({ onCree }: { onCree: (id: string) => void }): React.Re
           'Un compte au nom proche existe déjà : vérifiez qu’il ne s’agit pas de la même entreprise (vous pourrez fusionner les deux).',
         );
       }
-      onCree(r.account.id);
+      onCree({ id: r.account.id, name: r.account.name, kind: r.account.kind });
     } catch (err) {
       setErreur(messageCrm(err, 'Création impossible.'));
     }
   }
 
   return (
-    <form noValidate onSubmit={(e) => void creer(e)} className="grid gap-3 sm:grid-cols-2">
-      <Champ id="cp-nom" label="Nom de l’entreprise" requis erreur={champs['name']}>
-        <input
-          id="cp-nom"
-          className={CHAMP}
-          value={f.name}
-          maxLength={200}
-          onChange={(e) => setF({ ...f, name: e.target.value })}
-          {...aria('cp-nom', champs['name'])}
-        />
-      </Champ>
-      <Champ id="cp-secteur" label="Secteur">
-        <input
-          id="cp-secteur"
-          className={CHAMP}
-          value={f.industry}
-          maxLength={80}
-          onChange={(e) => setF({ ...f, industry: e.target.value })}
-        />
-      </Champ>
-      <Champ id="cp-origine" label="Origine" aide="Salon, recommandation, site…">
-        <input
-          id="cp-origine"
-          className={CHAMP}
-          value={f.origin}
-          maxLength={80}
-          onChange={(e) => setF({ ...f, origin: e.target.value })}
-        />
-      </Champ>
-      <Champ id="cp-tel" label="Téléphone">
-        <input
-          id="cp-tel"
-          className={CHAMP}
-          value={f.phone}
-          onChange={(e) => setF({ ...f, phone: e.target.value })}
-        />
-      </Champ>
-      <Champ id="cp-email" label="E-mail">
-        <input
-          id="cp-email"
-          type="email"
-          className={CHAMP}
-          value={f.email}
-          onChange={(e) => setF({ ...f, email: e.target.value })}
-        />
-      </Champ>
-      <Champ id="cp-responsable" label="Responsable">
-        <ChoixMembre
-          id="cp-responsable"
-          valeur={f.ownerId}
-          membres={membres}
-          onChange={(ownerId) => setF({ ...f, ownerId })}
-        />
-      </Champ>
+    <form noValidate onSubmit={(e) => void creer(e)} className="flex flex-col gap-4">
+      <FormGrid>
+        <Field id="cp-nom" label="Nom de l’entreprise" required size="lg" error={champs['name']}>
+          <TextInput
+            value={f.name}
+            maxLength={200}
+            autoFocus
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+          />
+        </Field>
+        <Field id="cp-secteur" label="Secteur" size="md" newRow>
+          <TextInput
+            value={f.industry}
+            maxLength={80}
+            onChange={(e) => setF({ ...f, industry: e.target.value })}
+          />
+        </Field>
+        <Field id="cp-origine" label="Origine" size="md" hint="Salon, recommandation, site…">
+          <TextInput
+            value={f.origin}
+            maxLength={80}
+            onChange={(e) => setF({ ...f, origin: e.target.value })}
+          />
+        </Field>
+        <Field id="cp-tel" label="Téléphone" size="md" newRow>
+          <PhoneInput value={f.phone} onChange={(phone) => setF({ ...f, phone })} />
+        </Field>
+        <Field id="cp-email" label="E-mail" size="md">
+          <TextInput
+            type="email"
+            autoComplete="off"
+            value={f.email}
+            onChange={(e) => setF({ ...f, email: e.target.value })}
+          />
+        </Field>
+        <Field id="cp-responsable" label="Responsable" size="md" newRow>
+          <ChoixMembre
+            id="cp-responsable"
+            valeur={f.ownerId}
+            membres={membres}
+            onChange={(ownerId) => setF({ ...f, ownerId })}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
-        <div className="sm:col-span-2 lg:col-span-3">
-          <Alerte>
-            <p>{erreur}</p>
-          </Alerte>
-        </div>
+        <Alerte>
+          <p>{erreur}</p>
+        </Alerte>
       ) : null}
-      <button
-        type="submit"
-        className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
-      >
-        Créer le prospect
-      </button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        {onAnnuler ? (
+          <Button onClick={onAnnuler} className="max-sm:h-11">
+            Annuler
+          </Button>
+        ) : null}
+        <SubmitButton showShortcut={false} className="max-sm:h-11">
+          Créer le prospect
+        </SubmitButton>
+      </div>
     </form>
   );
+}
+
+/** Création rapide d'un prospect depuis un `ChoixCompte` (réservée à `crm.manage`). */
+export function creationProspect(
+  gerer: boolean,
+): ((p: EntityCreateFormProps<CompteChoisi>) => React.ReactNode) | undefined {
+  if (!gerer) return undefined;
+  return function CreationProspect({ initialText, onCreated, onCancel }) {
+    return <NouveauProspect nomInitial={initialText} onCree={onCreated} onAnnuler={onCancel} />;
+  };
 }
 
 export function ComptesListe(): React.ReactElement {
@@ -170,37 +204,31 @@ export function ComptesListe(): React.ReactElement {
           ) : null
         }
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="search"
-            aria-label="Rechercher un compte"
-            placeholder="Rechercher par nom…"
-            className={`${CHAMP} sm:max-w-sm`}
-            value={filtres.q}
-            onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
-          />
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Nature du compte">
-            {FILTRES_NATURE.map((n) => (
-              <button
-                key={n.valeur}
-                type="button"
-                className={BOUTON_PETIT}
-                aria-pressed={filtres.nature === n.valeur}
-                onClick={() => setFiltres({ ...filtres, nature: n.valeur })}
-              >
-                {n.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={BOUTON_PETIT}
-              aria-pressed={filtres.archives}
-              onClick={() => setFiltres({ ...filtres, archives: !filtres.archives })}
-            >
-              Archivés
-            </button>
-          </div>
-        </div>
+        <FormGrid>
+          <Field id="cp-liste-q" label="Rechercher" size="md">
+            <TextInput
+              type="search"
+              placeholder="Rechercher par nom…"
+              value={filtres.q}
+              onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
+            />
+          </Field>
+          <Field id="cp-liste-nature" label="Nature du compte" size="md" group>
+            <SegmentedControl
+              value={filtres.nature}
+              onChange={(nature) => setFiltres({ ...filtres, nature })}
+              options={FILTRES_NATURE.map((n) => ({ value: n.valeur, label: n.label }))}
+            />
+          </Field>
+          <Field id="cp-liste-archives" label="Archivés" size="sm">
+            <Switch
+              checked={filtres.archives}
+              onChange={(archives) => setFiltres({ ...filtres, archives })}
+              label="Afficher"
+            />
+          </Field>
+        </FormGrid>
       </Bandeau>
       {erreur ? (
         <Alerte>

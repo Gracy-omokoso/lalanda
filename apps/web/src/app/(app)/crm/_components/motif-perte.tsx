@@ -4,13 +4,16 @@
 // « perdu » (glisser, clavier, menu) demande le motif, obligatoire si
 // `lostReasonRequired`. Boîte modale native (`<dialog>`) : focus piégé et
 // `Échap` qui annule, sans dépendance.
+//
+// ADR-0074 : motif en `Select` (même valeur, `preparerMotif` inchangé : il
+// refuse toujours un motif manquant quand il est obligatoire), détail relié.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Button, Field, FormGrid, Select, SubmitButton, TextArea } from '@lalanda/ui';
 import { useEffect, useRef, useState } from 'react';
 
 import type { CrmSettingsView } from '@/lib/api-crm';
 
-import { Alerte, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import { motifsActifs, preparerMotif } from './pipeline-model';
 
@@ -74,53 +77,46 @@ export function BoiteMotifPerte({
         <h2 id="motif-titre" className="font-display text-lg font-semibold">
           Pourquoi « {demande?.titre} » est-elle perdue ?
         </h2>
-        <Champ
-          id="motif-cle"
-          label="Motif"
-          requis={settings.lostReasonRequired}
-          erreur={erreur ?? undefined}
-        >
-          <select
+        <FormGrid>
+          <Field
             id="motif-cle"
-            className={CHAMP}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            aria-invalid={erreur ? true : undefined}
+            label="Motif"
+            size="full"
+            required={settings.lostReasonRequired}
+            error={erreur ?? undefined}
           >
-            <option value="">{settings.lostReasonRequired ? 'Choisir…' : 'Sans motif'}</option>
-            {motifs.map((m) => (
-              <option key={m.key} value={m.key}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id="motif-detail" label="Détail (facultatif)">
-          <textarea
-            id="motif-detail"
-            className={CHAMP}
-            rows={3}
-            maxLength={500}
-            value={detail}
-            onChange={(e) => setDetail(e.target.value)}
-          />
-        </Champ>
+            <Select
+              value={key}
+              onChange={setKey}
+              placeholder={settings.lostReasonRequired ? 'Choisir…' : 'Sans motif'}
+              options={[
+                ...(settings.lostReasonRequired ? [] : [{ value: '', label: 'Sans motif' }]),
+                ...motifs.map((m) => ({ value: m.key, label: m.label })),
+              ]}
+              emptyText="Aucun motif actif."
+            />
+          </Field>
+          <Field id="motif-detail" label="Détail" optional size="full">
+            <TextArea
+              rows={3}
+              maxLength={500}
+              value={detail}
+              onChange={(e) => setDetail(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         {motifs.length === 0 && settings.lostReasonRequired ? (
           <Alerte>
             <p>Aucun motif actif : ajoutez-en dans les réglages du CRM.</p>
           </Alerte>
         ) : null}
-        <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            className={buttonClasses('secondary', 'md')}
-            onClick={() => demande?.annuler()}
-          >
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button variant="secondary" onClick={() => demande?.annuler()} className="max-sm:h-11">
             Annuler
-          </button>
-          <button type="submit" className={buttonClasses('primary', 'md')}>
+          </Button>
+          <SubmitButton showShortcut={false} className="max-sm:h-11">
             Passer en perdu
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </dialog>

@@ -6,14 +6,17 @@
 // ADR-0040 § 2.5 et § 6.3 : motifs de perte paramétrables (ajout, libellé,
 // activation) et motif obligatoire ; un motif déjà utilisé ne se retire pas
 // (`CRM_LOST_REASON_IN_USE`) : on le désactive.
+//
+// ADR-0074 : libellés en `TextInput`, nature en `Select`, motif proposé en case
+// stylée, règles en interrupteurs, seuil en champ court ; même corps envoyé.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Button, Checkbox, Field, FormGrid, Select, Switch, TextInput } from '@lalanda/ui';
 import { Settings2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { crmApi, type CrmSettingsView, type PipelineStage } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { useAccesCrm } from './crm-access';
 
 import { messageCrm, peutGererCrm } from './crm-model';
@@ -125,9 +128,9 @@ export function CrmSettingsPanel(): React.ReactElement {
           <ol className="flex flex-col gap-2">
             {s.stages.map((st, i) => (
               <li key={st.key} className="flex flex-wrap items-center gap-2 text-sm">
-                <input
+                <TextInput
                   aria-label={`Libellé de l’étape ${i + 1}`}
-                  className={`${CHAMP} max-w-xs`}
+                  className="max-w-xs"
                   value={st.label}
                   maxLength={40}
                   onChange={(e) =>
@@ -142,21 +145,18 @@ export function CrmSettingsPanel(): React.ReactElement {
                 {existantes.has(st.key) ? (
                   <span className="text-xs text-[var(--foreground-muted)]">{NATURES[st.kind]}</span>
                 ) : (
-                  <select
+                  <Select<PipelineStage['kind']>
                     aria-label={`Nature de l’étape ${i + 1}`}
-                    className={`${CHAMP} max-w-[10rem]`}
+                    className="w-40"
                     value={st.kind}
-                    onChange={(e) =>
+                    onChange={(kind) =>
                       setS({
                         ...s,
-                        stages: s.stages.map((x, n) =>
-                          n === i ? { ...x, kind: e.target.value as PipelineStage['kind'] } : x,
-                        ),
+                        stages: s.stages.map((x, n) => (n === i ? { ...x, kind } : x)),
                       })
                     }
-                  >
-                    <option value="open">En cours</option>
-                  </select>
+                    options={[{ value: 'open', label: 'En cours' }]}
+                  />
                 )}
                 <button
                   type="button"
@@ -187,10 +187,10 @@ export function CrmSettingsPanel(): React.ReactElement {
             ))}
           </ol>
           <div className="flex flex-wrap items-center gap-2">
-            <input
+            <TextInput
               aria-label="Nouvelle étape"
               placeholder="Nouvelle étape (ex. Démonstration)"
-              className={`${CHAMP} max-w-xs`}
+              className="max-w-xs"
               value={nouvelle}
               maxLength={40}
               onChange={(e) => setNouvelle(e.target.value)}
@@ -225,9 +225,9 @@ export function CrmSettingsPanel(): React.ReactElement {
           <ul className="flex flex-col gap-2">
             {s.lostReasons.map((r, i) => (
               <li key={r.key} className="flex flex-wrap items-center gap-2 text-sm">
-                <input
+                <TextInput
                   aria-label={`Libellé du motif ${i + 1}`}
-                  className={`${CHAMP} max-w-xs`}
+                  className="max-w-xs"
                   value={r.label}
                   maxLength={60}
                   onChange={(e) =>
@@ -239,21 +239,16 @@ export function CrmSettingsPanel(): React.ReactElement {
                     })
                   }
                 />
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={r.active}
-                    onChange={(e) =>
-                      setS({
-                        ...s,
-                        lostReasons: s.lostReasons.map((x, n) =>
-                          n === i ? { ...x, active: e.target.checked } : x,
-                        ),
-                      })
-                    }
-                  />
-                  Proposé
-                </label>
+                <Checkbox
+                  checked={r.active}
+                  label="Proposé"
+                  onChange={(active) =>
+                    setS({
+                      ...s,
+                      lostReasons: s.lostReasons.map((x, n) => (n === i ? { ...x, active } : x)),
+                    })
+                  }
+                />
                 {!motifsExistants.has(r.key) ? (
                   <button
                     type="button"
@@ -270,10 +265,10 @@ export function CrmSettingsPanel(): React.ReactElement {
             {s.lostReasons.length === 0 ? <li className="text-sm">Aucun motif.</li> : null}
           </ul>
           <div className="flex flex-wrap items-center gap-2">
-            <input
+            <TextInput
               aria-label="Nouveau motif de perte"
               placeholder="Nouveau motif (ex. Délai trop long)"
-              className={`${CHAMP} max-w-xs`}
+              className="max-w-xs"
               value={nouveauMotif}
               maxLength={60}
               onChange={(e) => setNouveauMotif(e.target.value)}
@@ -292,38 +287,37 @@ export function CrmSettingsPanel(): React.ReactElement {
               Ajouter le motif
             </button>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={s.lostReasonRequired}
-              onChange={(e) => setS({ ...s, lostReasonRequired: e.target.checked })}
-            />
-            Motif obligatoire pour passer une opportunité en « perdu »
-          </label>
+          <Switch
+            checked={s.lostReasonRequired}
+            onChange={(lostReasonRequired) => setS({ ...s, lostReasonRequired })}
+            label="Motif obligatoire pour passer une opportunité en « perdu »"
+          />
         </Panneau>
         <Panneau titre="Règles du pipeline" id="reglages-regles">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={s.autoWinOnQuoteAccepted}
-              onChange={(e) => setS({ ...s, autoWinOnQuoteAccepted: e.target.checked })}
-            />
-            Passer l’opportunité à « gagnée » quand son devis est accepté
-          </label>
-          <label className="flex flex-wrap items-center gap-2 text-sm">
-            Opportunité inactive après
-            <input
-              type="number"
-              min={1}
-              max={365}
-              className={`${CHAMP} w-24`}
-              value={s.staleAfterDays}
-              onChange={(e) =>
-                setS({ ...s, staleAfterDays: Math.trunc(e.target.valueAsNumber || 1) })
-              }
-            />
-            jours sans activité
-          </label>
+          <Switch
+            checked={s.autoWinOnQuoteAccepted}
+            onChange={(autoWinOnQuoteAccepted) => setS({ ...s, autoWinOnQuoteAccepted })}
+            label="Passer l’opportunité à « gagnée » quand son devis est accepté"
+          />
+          <FormGrid>
+            <Field
+              id="reglages-inactivite"
+              label="Opportunité inactive après"
+              size="xs"
+              hint="Jours sans activité, de 1 à 365."
+            >
+              <TextInput
+                type="number"
+                min={1}
+                max={365}
+                trailing={<span className="pr-2">jours</span>}
+                value={s.staleAfterDays}
+                onChange={(e) =>
+                  setS({ ...s, staleAfterDays: Math.trunc(e.target.valueAsNumber || 1) })
+                }
+              />
+            </Field>
+          </FormGrid>
           <p className="text-xs text-[var(--foreground-muted)]">
             Prévision pondérée : probabilités{' '}
             {s.forecastProbability === 'historical'
@@ -333,13 +327,13 @@ export function CrmSettingsPanel(): React.ReactElement {
           </p>
         </Panneau>
         {gerer ? (
-          <button
-            type="button"
-            className={buttonClasses('primary', 'md', 'self-start')}
+          <Button
+            variant="primary"
+            className="self-start max-sm:h-11 max-sm:w-full"
             onClick={() => void enregistrer()}
           >
             Enregistrer les réglages
-          </button>
+          </Button>
         ) : null}
       </fieldset>
     </section>

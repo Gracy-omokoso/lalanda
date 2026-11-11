@@ -6,7 +6,7 @@
 // « Mes tâches » (`/projets/mes-taches`, lot C4) mène ici par
 // `?activite=<id>` : l'activité visée est mise en évidence.
 
-import { Badge } from '@lalanda/ui';
+import { Badge, Checkbox } from '@lalanda/ui';
 import { CalendarCheck2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -148,9 +148,8 @@ export function ActivitesListe(): React.ReactElement {
                 className={`flex min-w-0 flex-wrap items-start gap-3 rounded-[var(--radius-md)] border border-l-4 border-[var(--border)] bg-[var(--surface)] p-3 text-sm ${TONS[ton]} ${visee === a.id ? 'ring-2 ring-[var(--accent)]' : ''}`}
               >
                 {coche ? (
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4"
+                  <Checkbox
+                    className="mt-0.5"
                     checked={a.done}
                     aria-label={`${a.done ? 'Rouvrir' : 'Marquer faite'} : ${a.subject}`}
                     onChange={() => void basculer(a)}

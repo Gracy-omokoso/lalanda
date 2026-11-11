@@ -3,16 +3,30 @@
 // Contacts — ADR-0035 § 5, ADR-0040 § 2.2 : liste, création, rattachement à un
 // compte (prospect ou client) ou « sans entreprise », détacher, import et
 // export CSV. Le compte remplace le choix « client / entreprise saisie ».
+//
+// ADR-0074 : grille sémantique, téléphone en `PhoneInput`, compte en
+// `EntityPicker` (`ChoixCompte`) avec « + » prospect sous `crm.manage` (droit de
+// `POST /crm/accounts`). `preparerContact` inchangé.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
-import { Contact, Plus } from 'lucide-react';
+import {
+  Button,
+  Field,
+  FormGrid,
+  Modal,
+  PhoneInput,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
+import { Contact, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type ContactView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
+import { creationProspect } from './comptes-liste';
 import { useAccesCrm } from './crm-access';
 import {
   formulaireContact,
@@ -159,14 +173,17 @@ export function ContactsPanel(): React.ReactElement {
           ) : null
         }
       >
-        <input
-          type="search"
-          aria-label="Rechercher un contact"
-          placeholder="Nom, e-mail, entreprise…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className={CHAMP}
-        />
+        <FormGrid>
+          <Field id="ct-liste-q" label="Rechercher un contact" size="lg">
+            <TextInput
+              type="search"
+              placeholder="Nom, e-mail, entreprise…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
+            />
+          </Field>
+        </FormGrid>
       </Bandeau>
       {erreur ? (
         <Alerte>
@@ -178,69 +195,63 @@ export function ContactsPanel(): React.ReactElement {
         <form
           onSubmit={(e) => void creer(e)}
           aria-label="Nouveau contact"
-          className="grid gap-3 sm:grid-cols-2"
+          className="flex flex-col gap-4"
           noValidate
         >
-          <Champ id="ct-nom" label="Nom" requis erreur={champs['name']}>
-            <input
-              id="ct-nom"
-              className={CHAMP}
-              value={f.name}
-              maxLength={200}
-              onChange={(e) => setF({ ...f, name: e.target.value })}
-              {...aria('ct-nom', champs['name'])}
-            />
-          </Champ>
-          <Champ id="ct-fonction" label="Fonction">
-            <input
-              id="ct-fonction"
-              className={CHAMP}
-              value={f.jobTitle}
-              maxLength={100}
-              onChange={(e) => setF({ ...f, jobTitle: e.target.value })}
-            />
-          </Champ>
-          <Champ id="ct-email" label="E-mail">
-            <input
-              id="ct-email"
-              type="email"
-              className={CHAMP}
-              value={f.email}
-              onChange={(e) => setF({ ...f, email: e.target.value })}
-            />
-          </Champ>
-          <Champ id="ct-tel" label="Téléphone">
-            <input
-              id="ct-tel"
-              className={CHAMP}
-              value={f.phone}
-              onChange={(e) => setF({ ...f, phone: e.target.value })}
-            />
-          </Champ>
-          <Champ
-            id="ct-compte"
-            label="Compte"
-            aide="Laissez vide pour une personne sans entreprise."
-          >
-            <ChoixCompte
+          <FormGrid>
+            <Field id="ct-nom" label="Nom" required size="md" error={champs['name']}>
+              <TextInput
+                value={f.name}
+                maxLength={200}
+                autoFocus
+                onChange={(e) => setF({ ...f, name: e.target.value })}
+              />
+            </Field>
+            <Field id="ct-fonction" label="Fonction" size="md">
+              <TextInput
+                value={f.jobTitle}
+                maxLength={100}
+                onChange={(e) => setF({ ...f, jobTitle: e.target.value })}
+              />
+            </Field>
+            <Field id="ct-email" label="E-mail" size="md" newRow>
+              <TextInput
+                type="email"
+                autoComplete="off"
+                value={f.email}
+                onChange={(e) => setF({ ...f, email: e.target.value })}
+              />
+            </Field>
+            <Field id="ct-tel" label="Téléphone" size="md">
+              <PhoneInput value={f.phone} onChange={(phone) => setF({ ...f, phone })} />
+            </Field>
+            <Field
               id="ct-compte"
-              valeur={f.accountId}
-              onChange={(accountId) => setF({ ...f, accountId })}
-            />
-          </Champ>
+              label="Compte"
+              size="full"
+              hint="Tapez pour chercher. Vide : personne sans entreprise."
+            >
+              <ChoixCompte
+                id="ct-compte"
+                valeur={f.accountId}
+                onChange={(accountId) => setF({ ...f, accountId })}
+                creer={creationProspect(gerer)}
+              />
+            </Field>
+          </FormGrid>
           {erreurCreation ? (
-            <div className="sm:col-span-2">
-              <Alerte>
-                <p>{erreurCreation}</p>
-              </Alerte>
-            </div>
+            <Alerte>
+              <p>{erreurCreation}</p>
+            </Alerte>
           ) : null}
-          <button
-            type="submit"
-            className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
-          >
-            Ajouter le contact
-          </button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Button onClick={fermerCreation} className="max-sm:h-11">
+              Annuler
+            </Button>
+            <SubmitButton showShortcut={false} className="max-sm:h-11">
+              Ajouter le contact
+            </SubmitButton>
+          </div>
         </form>
       </Modal>
 

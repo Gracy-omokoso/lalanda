@@ -8,15 +8,33 @@
 // responsable, opportunité automatique, identité visuelle, interrupteur, et
 // « Générer un nouveau lien » (l'ancien cesse aussitôt de répondre).
 // Lecture seule sans `crm.manage` ; le serveur reste seul juge.
+//
+// ADR-0074 : grille sémantique, responsable en `EntityPicker`, cases
+// « Affiché / Obligatoire » stylées, réglages en interrupteurs, devise en
+// segments. Aucune protection retirée : la case de consentement du formulaire
+// public reste non cochée (`/f/…`), `corpsReglages` inchangé.
 
-import { buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  EntityPicker,
+  Field,
+  FormGrid,
+  SegmentedControl,
+  SubmitButton,
+  Switch,
+  TextArea,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { Globe } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 import { leadFormsApi, type CrmLeadFormView } from '@/lib/api-lead-forms';
 import { LEAD_FORM_DEFAULT_CONSENT, type LeadFormFieldKey } from '@lalanda/shared/crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { Dialogue } from '../../ventes/factures/_components/dialog-ui';
 
 import { useAccesCrm, type MembreCrm } from './crm-access';
@@ -44,22 +62,24 @@ function ChoixResponsable({
   membres: readonly MembreCrm[];
   onChange: (v: string | null) => void;
 }): React.ReactElement {
-  const connu = valeur === null || membres.some((m) => m.userId === valeur);
+  // Membre absent de la liste (ancien membre) : gardé tel quel, libellé neutre.
+  const choisi: MembreCrm | null =
+    valeur === null
+      ? null
+      : (membres.find((m) => m.userId === valeur) ?? { userId: valeur, name: 'Un membre' });
   return (
-    <select
+    <EntityPicker<MembreCrm>
       id={id}
-      className={`${CHAMP} max-w-sm`}
-      value={valeur ?? ''}
-      onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-    >
-      <option value="">— Choisir —</option>
-      {!connu ? <option value={valeur!}>Un membre</option> : null}
-      {membres.map((m) => (
-        <option key={m.userId} value={m.userId}>
-          {m.name}
-        </option>
-      ))}
-    </select>
+      value={choisi}
+      onChange={(m) => onChange(m?.userId ?? null)}
+      search={async (q) => membres.filter((m) => correspondRecherche([m.name], q))}
+      refreshKey={membres.length}
+      getKey={(m) => m.userId}
+      getLabel={(m) => m.name}
+      placeholder="Choisir un membre…"
+      debounceMs={0}
+      emptyText="Aucun membre ne correspond."
+    />
   );
 }
 
@@ -113,60 +133,60 @@ function FenetreCreation({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-titre`}>
-          Titre affiché
-          <input
-            id={`${id}-titre`}
-            className={CHAMP}
-            value={title}
-            maxLength={120}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-resp`}>
-          Responsable des demandes
-          <ChoixResponsable
-            id={`${id}-resp`}
-            valeur={assignee}
-            membres={membres}
-            onChange={setAssignee}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-accord`}>
-          Texte de consentement
-          <textarea
-            id={`${id}-accord`}
-            className={CHAMP}
-            rows={3}
-            value={consent}
-            maxLength={1000}
-            onChange={(e) => setConsent(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-politique`}>
-          Lien de votre politique de confidentialité (https://)
-          <input
+        <FormGrid>
+          <Field id={`${id}-titre`} label="Titre affiché" required size="lg">
+            <TextInput
+              value={title}
+              maxLength={120}
+              autoFocus
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Field>
+          <Field id={`${id}-resp`} label="Responsable des demandes" size="md" newRow>
+            <ChoixResponsable
+              id={`${id}-resp`}
+              valeur={assignee}
+              membres={membres}
+              onChange={setAssignee}
+            />
+          </Field>
+          <Field id={`${id}-accord`} label="Texte de consentement" size="full">
+            <TextArea
+              rows={3}
+              value={consent}
+              maxLength={1000}
+              onChange={(e) => setConsent(e.target.value)}
+            />
+          </Field>
+          <Field
             id={`${id}-politique`}
-            className={CHAMP}
-            type="url"
-            inputMode="url"
-            placeholder="https://votre-site.cd/confidentialite"
-            value={policy}
-            maxLength={500}
-            onChange={(e) => setPolicy(e.target.value)}
-          />
-        </label>
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={buttonClasses('secondary', 'md')} onClick={onFermer}>
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={envoi || title.trim() === ''}
-            className={buttonClasses('primary', 'md')}
+            label="Lien de votre politique de confidentialité"
+            size="lg"
+            hint="Adresse en https://"
           >
-            {envoi ? 'Création…' : 'Créer (désactivé)'}
-          </button>
+            <TextInput
+              type="url"
+              inputMode="url"
+              placeholder="https://votre-site.cd/confidentialite"
+              value={policy}
+              maxLength={500}
+              onChange={(e) => setPolicy(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} className="max-sm:h-11">
+            Annuler
+          </Button>
+          <SubmitButton
+            showShortcut={false}
+            busy={envoi}
+            busyLabel="Création…"
+            disabled={title.trim() === ''}
+            className="max-sm:h-11"
+          >
+            Créer (désactivé)
+          </SubmitButton>
         </div>
       </form>
     </Dialogue>
@@ -333,7 +353,7 @@ export function FormulairePublicReglages(): React.ReactElement {
           Lien public {f.enabled ? '' : '(inactif tant que le formulaire est désactivé)'}
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <input id={`${id}-url`} readOnly className={`${CHAMP} max-w-xl`} value={url} />
+          <TextInput id={`${id}-url`} readOnly className="max-w-xl font-mono text-xs" value={url} />
           <button type="button" className={BOUTON_PETIT} onClick={() => void copier(url, 'Lien')}>
             Copier le lien
           </button>
@@ -358,69 +378,53 @@ export function FormulairePublicReglages(): React.ReactElement {
 
       <fieldset disabled={!gerer} className="flex min-w-0 flex-col gap-4">
         <legend className="sr-only">Réglages du formulaire public</legend>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-titre`}>
-          Titre affiché
-          <input
-            id={`${id}-titre`}
-            className={`${CHAMP} max-w-xl`}
-            value={f.title}
-            maxLength={120}
-            onChange={(e) => setF({ ...f, title: e.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-intro`}>
-          Introduction (facultative)
-          <textarea
-            id={`${id}-intro`}
-            className={`${CHAMP} max-w-xl`}
-            rows={2}
-            value={f.intro ?? ''}
-            maxLength={500}
-            onChange={(e) => setF({ ...f, intro: e.target.value })}
-          />
-        </label>
+        <FormGrid>
+          <Field id={`${id}-titre`} label="Titre affiché" size="lg">
+            <TextInput
+              value={f.title}
+              maxLength={120}
+              onChange={(e) => setF({ ...f, title: e.target.value })}
+            />
+          </Field>
+          <Field id={`${id}-intro`} label="Introduction" optional size="full">
+            <TextArea
+              rows={2}
+              value={f.intro ?? ''}
+              maxLength={500}
+              onChange={(e) => setF({ ...f, intro: e.target.value })}
+            />
+          </Field>
+        </FormGrid>
 
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Champs</span>
           <ul className="flex flex-col gap-2">
             {f.fields.map((c) => (
               <li key={c.key} className="flex flex-wrap items-center gap-3 text-sm">
-                <input
+                <TextInput
                   aria-label={`Libellé du champ ${LEAD_FORM_DEFAULT_LABELS[c.key]}`}
-                  className={`${CHAMP} max-w-xs`}
+                  className="max-w-xs"
                   placeholder={LEAD_FORM_DEFAULT_LABELS[c.key]}
                   value={c.label ?? ''}
                   maxLength={80}
                   onChange={(e) => majChamp(c.key, e.target.value)}
                 />
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={c.enabled}
-                    disabled={c.key === 'name'}
-                    onChange={(e) =>
-                      setF({
-                        ...f,
-                        fields: changerChamp(f.fields, c.key, 'enabled', e.target.checked),
-                      })
-                    }
-                  />
-                  Affiché
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={c.required}
-                    disabled={c.key === 'name'}
-                    onChange={(e) =>
-                      setF({
-                        ...f,
-                        fields: changerChamp(f.fields, c.key, 'required', e.target.checked),
-                      })
-                    }
-                  />
-                  Obligatoire
-                </label>
+                <Checkbox
+                  label="Affiché"
+                  checked={c.enabled}
+                  disabled={c.key === 'name'}
+                  onChange={(v) =>
+                    setF({ ...f, fields: changerChamp(f.fields, c.key, 'enabled', v) })
+                  }
+                />
+                <Checkbox
+                  label="Obligatoire"
+                  checked={c.required}
+                  disabled={c.key === 'name'}
+                  onChange={(v) =>
+                    setF({ ...f, fields: changerChamp(f.fields, c.key, 'required', v) })
+                  }
+                />
               </li>
             ))}
           </ul>
@@ -431,79 +435,77 @@ export function FormulairePublicReglages(): React.ReactElement {
           ))}
         </div>
 
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-accord`}>
-          Texte de consentement (affiché à côté d’une case à cocher, non cochée)
-          <textarea
+        <FormGrid>
+          <Field
             id={`${id}-accord`}
-            className={`${CHAMP} max-w-xl`}
-            rows={3}
-            value={f.consentText}
-            maxLength={1000}
-            onChange={(e) => setF({ ...f, consentText: e.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-politique`}>
-          Lien de votre politique de confidentialité (https://)
-          <input
+            label="Texte de consentement"
+            size="full"
+            hint="Affiché à côté d’une case à cocher, jamais cochée d’avance."
+          >
+            <TextArea
+              rows={3}
+              value={f.consentText}
+              maxLength={1000}
+              onChange={(e) => setF({ ...f, consentText: e.target.value })}
+            />
+          </Field>
+          <Field
             id={`${id}-politique`}
-            className={`${CHAMP} max-w-xl`}
-            type="url"
-            inputMode="url"
-            value={f.privacyPolicyUrl ?? ''}
-            maxLength={500}
-            onChange={(e) => setF({ ...f, privacyPolicyUrl: e.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-merci`}>
-          Message affiché après l’envoi
-          <input
-            id={`${id}-merci`}
-            className={`${CHAMP} max-w-xl`}
-            value={f.successMessage}
-            maxLength={300}
-            onChange={(e) => setF({ ...f, successMessage: e.target.value })}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-resp`}>
-          Responsable des demandes (reçoit la relance et la notification)
-          <ChoixResponsable
+            label="Lien de votre politique de confidentialité"
+            size="lg"
+            hint="Adresse en https://"
+          >
+            <TextInput
+              type="url"
+              inputMode="url"
+              value={f.privacyPolicyUrl ?? ''}
+              maxLength={500}
+              onChange={(e) => setF({ ...f, privacyPolicyUrl: e.target.value })}
+            />
+          </Field>
+          <Field id={`${id}-merci`} label="Message affiché après l’envoi" size="full">
+            <TextInput
+              value={f.successMessage}
+              maxLength={300}
+              onChange={(e) => setF({ ...f, successMessage: e.target.value })}
+            />
+          </Field>
+          <Field
             id={`${id}-resp`}
-            valeur={f.assigneeUserId}
-            membres={membres}
-            onChange={(v) => setF({ ...f, assigneeUserId: v })}
-          />
-        </label>
-        <label className="flex flex-wrap items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+            label="Responsable des demandes"
+            size="md"
+            hint="Reçoit la relance et la notification."
+          >
+            <ChoixResponsable
+              id={`${id}-resp`}
+              valeur={f.assigneeUserId}
+              membres={membres}
+              onChange={(v) => setF({ ...f, assigneeUserId: v })}
+            />
+          </Field>
+        </FormGrid>
+        <div className="flex flex-wrap items-center gap-3">
+          <Switch
             checked={f.createOpportunity}
-            onChange={(e) => setF({ ...f, createOpportunity: e.target.checked })}
+            onChange={(createOpportunity) => setF({ ...f, createOpportunity })}
+            label="Créer aussi une opportunité (sans montant) pour chaque demande, en"
           />
-          Créer aussi une opportunité (sans montant) pour chaque demande, en
-          <select
+          <SegmentedControl<CrmLeadFormView['opportunityCurrency']>
             aria-label="Devise de l’opportunité"
-            className={`${CHAMP} w-24`}
             value={f.opportunityCurrency}
             disabled={!f.createOpportunity}
-            onChange={(e) =>
-              setF({
-                ...f,
-                opportunityCurrency: e.target.value as CrmLeadFormView['opportunityCurrency'],
-              })
-            }
-          >
-            <option value="USD">USD</option>
-            <option value="CDF">CDF</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={f.showBranding}
-            onChange={(e) => setF({ ...f, showBranding: e.target.checked })}
+            onChange={(opportunityCurrency) => setF({ ...f, opportunityCurrency })}
+            options={[
+              { value: 'USD', label: 'USD' },
+              { value: 'CDF', label: 'CDF' },
+            ]}
           />
-          Afficher le logo et la couleur de l’organisation (si un logo est enregistré)
-        </label>
+        </div>
+        <Switch
+          checked={f.showBranding}
+          onChange={(showBranding) => setF({ ...f, showBranding })}
+          label="Afficher le logo et la couleur de l’organisation (si un logo est enregistré)"
+        />
 
         {!f.enabled && manques.length > 0 ? (
           <p className="text-xs text-[var(--foreground-muted)]">
