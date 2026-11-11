@@ -16,7 +16,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { NAV_TOKENS, THEME_TOKENS, type Combinaison } from '@lalanda/ui';
+import {
+  Checkbox,
+  ChoiceCards,
+  Field,
+  FormGrid,
+  NAV_TOKENS,
+  Select,
+  SubmitButton,
+  THEME_TOKENS,
+  type Combinaison,
+} from '@lalanda/ui';
 
 import { api, type AccountPreferencesView, type NotificationPreferences } from '@/lib/api';
 import {
@@ -217,101 +227,52 @@ export function PreferencesPanel(): React.ReactElement {
           Le thème est enregistré sur votre compte : vous le retrouvez sur tous vos appareils.
         </p>
 
-        <p id="ui-theme-label" className="text-sm font-medium">
-          Thème
-        </p>
-        <div
-          role="radiogroup"
-          aria-labelledby="ui-theme-label"
-          aria-describedby="theme-help"
-          className="grid gap-2 sm:grid-cols-3"
-        >
-          {uiThemes.map((value) => {
-            const checked = form.uiTheme === value;
-            const meta = UI_THEME_LABELS[value];
-            return (
-              <label
-                key={value}
-                className={[
-                  'flex cursor-pointer flex-col gap-2 rounded-lg border p-3 text-sm transition',
-                  checked
-                    ? 'border-[var(--accent)] bg-[var(--surface-muted)]'
-                    : 'border-[var(--border)] hover:bg-[var(--surface-muted)]',
-                ].join(' ')}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="uiTheme"
-                      value={value}
-                      checked={checked}
-                      onChange={() => chooseUiTheme(value)}
-                      className="accent-[var(--accent)]"
-                    />
-                    <span className="font-medium">{meta?.label ?? value}</span>
+        {/* Cartes de choix (`radiogroup`) : un seul arrêt de tabulation, les flèches
+            déplacent et choisissent ; le choix actif est porté par l'état coché et
+            le libellé, jamais par la seule bordure colorée (docs/04 § Accessibilité). */}
+        <FormGrid>
+          <Field label="Thème" group size="full">
+            <ChoiceCards<UiTheme>
+              value={form.uiTheme}
+              onChange={chooseUiTheme}
+              aria-describedby="theme-help"
+              columns={3}
+              options={uiThemes.map((value) => ({
+                value,
+                label: (
+                  <span className="flex items-center justify-between gap-2">
+                    <span>{UI_THEME_LABELS[value]?.label ?? value}</span>
+                    <ThemeSwatches uiTheme={value} />
                   </span>
-                  <ThemeSwatches uiTheme={value} />
-                </span>
-                <span className="text-xs text-[var(--foreground-muted)]">
-                  {meta?.description ?? ''}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-
-        <p id="mode-label" className="mt-2 text-sm font-medium">
-          Clair ou sombre
-        </p>
-        {modeForce ? (
-          <p id="mode-force" className="-mt-1 text-xs text-[var(--foreground-muted)]">
-            Ébène est toujours sombre : ce réglage ne s’applique pas. Il est conservé et reprend
-            effet si vous choisissez Lalanda ou Lagune.
-          </p>
-        ) : null}
-        {/* Groupe de radios : le clavier y navigue avec les flèches, et le choix
-            actif est porté par le libellé et l'état coché, jamais par la seule
-            bordure colorée (docs/04 § Accessibilité). */}
-        <div
-          role="radiogroup"
-          aria-labelledby="mode-label"
-          aria-describedby={modeForce ? 'mode-force' : 'theme-help'}
-          aria-disabled={modeForce || undefined}
-          className="grid gap-2 sm:grid-cols-3"
-        >
-          {themes.map((value) => {
-            const checked = form.theme === value;
-            return (
-              <label
-                key={value}
-                className={[
-                  'flex flex-col gap-1 rounded-lg border p-3 text-sm transition',
-                  modeForce ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-                  checked
-                    ? 'border-[var(--accent)] bg-[var(--surface-muted)]'
-                    : `border-[var(--border)] ${modeForce ? '' : 'hover:bg-[var(--surface-muted)]'}`,
-                ].join(' ')}
-              >
-                <span className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="theme"
-                    value={value}
-                    checked={checked}
-                    disabled={modeForce}
-                    onChange={() => chooseTheme(value as ThemePreference)}
-                    className="accent-[var(--accent)]"
-                  />
-                  <span className="font-medium">{THEME_LABELS[value] ?? value}</span>
-                </span>
-                <span className="text-xs text-[var(--foreground-muted)]">
-                  {THEME_DESCRIPTIONS[value] ?? ''}
-                </span>
-              </label>
-            );
-          })}
-        </div>
+                ),
+                description: UI_THEME_LABELS[value]?.description ?? '',
+              }))}
+            />
+          </Field>
+          <Field
+            label="Clair ou sombre"
+            group
+            size="full"
+            disabled={modeForce}
+            hint={
+              modeForce
+                ? 'Ébène est toujours sombre : ce réglage ne s’applique pas. Il est conservé et reprend effet si vous choisissez Lalanda ou Lagune.'
+                : undefined
+            }
+          >
+            <ChoiceCards<ThemePreference>
+              value={form.theme}
+              onChange={chooseTheme}
+              aria-describedby={modeForce ? undefined : 'theme-help'}
+              columns={3}
+              options={themes.map((value) => ({
+                value: value as ThemePreference,
+                label: THEME_LABELS[value] ?? value,
+                description: THEME_DESCRIPTIONS[value] ?? '',
+              }))}
+            />
+          </Field>
+        </FormGrid>
       </fieldset>
 
       {/* ─── Devise ────────────────────────────────────────────────────────── */}
@@ -320,31 +281,25 @@ export function PreferencesPanel(): React.ReactElement {
           Devise
         </legend>
 
-        <label htmlFor="display-currency" className="text-sm font-medium">
-          Devise d’affichage par défaut
-        </label>
-        <select
-          id="display-currency"
-          name="displayCurrency"
-          value={form.displayCurrency}
-          onChange={(e) => setForm((f) => (f ? { ...f, displayCurrency: e.target.value } : f))}
-          aria-describedby="display-currency-help"
-          className="-mt-1 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-        >
-          {saved.options.currencies.map((code) => (
-            <option key={code} value={code}>
-              {CURRENCY_LABELS[code] ?? code}
-            </option>
-          ))}
-        </select>
-        <p
-          id="display-currency-help"
-          className="-mt-1 text-xs italic text-[var(--foreground-muted)]"
-        >
-          Devise proposée par défaut à la création d’une initiative. Elle ne convertit RIEN et ne
-          modifie aucune initiative existante : chaque initiative garde la devise dans laquelle elle
-          a été saisie.
-        </p>
+        <FormGrid>
+          <Field
+            id="display-currency"
+            label="Devise d’affichage par défaut"
+            size="md"
+            hint="Devise proposée par défaut à la création d’une initiative. Elle ne convertit RIEN et ne modifie aucune initiative existante : chaque initiative garde la devise dans laquelle elle a été saisie."
+          >
+            <Select
+              name="displayCurrency"
+              value={form.displayCurrency}
+              onChange={(displayCurrency) => setForm((f) => (f ? { ...f, displayCurrency } : f))}
+              options={saved.options.currencies.map((code) => ({
+                value: code,
+                label: CURRENCY_LABELS[code] ?? code,
+                keywords: code,
+              }))}
+            />
+          </Field>
+        </FormGrid>
       </fieldset>
 
       {/* ─── Notifications ─────────────────────────────────────────────────── */}
@@ -363,35 +318,23 @@ export function PreferencesPanel(): React.ReactElement {
         <ul className="flex flex-col gap-1">
           {Object.entries(form.notifications).map(([key, value]) => {
             const meta = NOTIFICATION_LABELS[key];
-            const id = `notif-${key}`;
             return (
-              <li key={key}>
-                <label
-                  htmlFor={id}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-[var(--surface-muted)]"
-                >
-                  <input
-                    id={id}
-                    type="checkbox"
-                    name={key}
-                    checked={value}
-                    onChange={(e) =>
-                      setForm((f) =>
-                        f
-                          ? { ...f, notifications: { ...f.notifications, [key]: e.target.checked } }
-                          : f,
-                      )
-                    }
-                    aria-describedby={`${id}-help`}
-                    className="mt-0.5 accent-[var(--accent)]"
-                  />
-                  <span className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium">{meta?.label ?? key}</span>
-                    <span id={`${id}-help`} className="text-xs text-[var(--foreground-muted)]">
-                      {meta?.description ?? ''}
-                    </span>
-                  </span>
-                </label>
+              <li
+                key={key}
+                className="rounded-lg px-2 py-2 transition hover:bg-[var(--surface-muted)]"
+              >
+                <Checkbox
+                  id={`notif-${key}`}
+                  name={key}
+                  checked={value}
+                  onChange={(coche) =>
+                    setForm((f) =>
+                      f ? { ...f, notifications: { ...f.notifications, [key]: coche } } : f,
+                    )
+                  }
+                  label={<span className="font-medium">{meta?.label ?? key}</span>}
+                  description={meta?.description || undefined}
+                />
               </li>
             );
           })}
@@ -399,13 +342,9 @@ export function PreferencesPanel(): React.ReactElement {
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={saving || !dirty}
-          className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        <SubmitButton busy={saving} busyLabel="Enregistrement…" disabled={!dirty}>
+          Enregistrer
+        </SubmitButton>
         {/* `aria-live` : le succès est annoncé, pas seulement affiché. */}
         <span aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
           {notice ?? (dirty ? 'Modifications non enregistrées' : '')}

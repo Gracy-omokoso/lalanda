@@ -5,6 +5,7 @@
 // États couverts (docs/04 § États obligatoires) : chargement, vide (aucune autre
 // session), erreur récupérable, succès.
 
+import { Checkbox, Field, FormGrid, PasswordInput, SubmitButton, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -92,108 +93,67 @@ function PasswordSection(): React.ReactElement {
       ) : null}
 
       <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
-        <label htmlFor="current-password" className="text-sm font-medium">
-          Mot de passe actuel
-        </label>
-        <input
-          id="current-password"
-          name="currentPassword"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={current}
-          onChange={(e) => setCurrent(e.target.value)}
-          className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-        />
+        <FormGrid>
+          <Field id="current-password" label="Mot de passe actuel" required size="md">
+            <PasswordInput
+              name="currentPassword"
+              autoComplete="current-password"
+              required
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+          </Field>
 
-        <label htmlFor="new-password" className="text-sm font-medium">
-          Nouveau mot de passe
-        </label>
-        <input
-          id="new-password"
-          name="newPassword"
-          type="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={next}
-          onChange={(e) => setNext(e.target.value)}
-          aria-invalid={tooShort}
-          aria-describedby={tooShort ? 'new-password-error' : 'new-password-help'}
-          {...(tooShort ? { 'aria-errormessage': 'new-password-error' } : {})}
-          className={[
-            '-mt-2 rounded-md border bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition',
-            tooShort
-              ? 'border-[var(--danger)] bg-[var(--danger-bg)]'
-              : 'border-[var(--border)] focus:border-[var(--accent)]',
-          ].join(' ')}
-        />
-        {tooShort ? (
-          <p
-            id="new-password-error"
-            role="alert"
-            className="-mt-2 text-xs font-medium text-[var(--danger)]"
+          <Field
+            id="new-password"
+            label="Nouveau mot de passe"
+            required
+            size="md"
+            newRow
+            hint={tooShort ? undefined : '8 caractères minimum.'}
+            error={tooShort ? '8 caractères minimum.' : undefined}
           >
-            <span className="font-semibold">Erreur : </span>8 caractères minimum.
-          </p>
-        ) : (
-          <p id="new-password-help" className="-mt-2 text-xs italic text-[var(--foreground-muted)]">
-            8 caractères minimum.
-          </p>
-        )}
+            <PasswordInput
+              name="newPassword"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+          </Field>
 
-        <label htmlFor="confirm-password" className="text-sm font-medium">
-          Confirmer le nouveau mot de passe
-        </label>
-        <input
-          id="confirm-password"
-          name="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          aria-invalid={mismatch}
-          {...(mismatch ? { 'aria-describedby': 'confirm-password-error' } : {})}
-          {...(mismatch ? { 'aria-errormessage': 'confirm-password-error' } : {})}
-          className={[
-            '-mt-2 rounded-md border bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition',
-            mismatch
-              ? 'border-[var(--danger)] bg-[var(--danger-bg)]'
-              : 'border-[var(--border)] focus:border-[var(--accent)]',
-          ].join(' ')}
-        />
-        {mismatch ? (
-          <p
-            id="confirm-password-error"
-            role="alert"
-            className="-mt-2 text-xs font-medium text-[var(--danger)]"
+          <Field
+            id="confirm-password"
+            label="Confirmer le nouveau mot de passe"
+            required
+            size="md"
+            error={mismatch ? 'Les deux mots de passe ne correspondent pas.' : undefined}
           >
-            <span className="font-semibold">Erreur : </span>
-            Les deux mots de passe ne correspondent pas.
-          </p>
-        ) : null}
+            <PasswordInput
+              name="confirmPassword"
+              autoComplete="new-password"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={revokeOthers}
-            onChange={(e) => setRevokeOthers(e.target.checked)}
-            className="accent-[var(--accent)]"
-          />
-          <span>Déconnecter mes autres appareils</span>
-        </label>
+        <Checkbox
+          checked={revokeOthers}
+          onChange={setRevokeOthers}
+          label="Déconnecter mes autres appareils"
+        />
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={
-              submitting || mismatch || tooShort || current.length === 0 || next.length === 0
-            }
-            className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
+          <SubmitButton
+            busy={submitting}
+            busyLabel="Modification…"
+            disabled={mismatch || tooShort || current.length === 0 || next.length === 0}
           >
-            {submitting ? 'Modification…' : 'Changer le mot de passe'}
-          </button>
+            Changer le mot de passe
+          </SubmitButton>
           <span aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
             {success ? 'Mot de passe modifié.' : ''}
           </span>
@@ -493,40 +453,35 @@ function DeleteAccountSection(): React.ReactElement {
                 </div>
               ) : null}
 
-              <label htmlFor="delete-confirm-email" className="text-sm font-medium">
-                Saisissez votre adresse email pour confirmer
-              </label>
-              <input
-                id="delete-confirm-email"
-                name="confirmEmail"
-                type="email"
-                autoComplete="off"
-                required
-                value={confirmEmail}
-                onChange={(e) => setConfirmEmail(e.target.value)}
-                aria-describedby="delete-confirm-email-help"
-                className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
-              <p
-                id="delete-confirm-email-help"
-                className="-mt-2 text-xs italic text-[var(--foreground-muted)]"
-              >
-                Exactement l’adresse de votre compte.
-              </p>
+              <FormGrid>
+                <Field
+                  id="delete-confirm-email"
+                  label="Saisissez votre adresse email pour confirmer"
+                  required
+                  size="lg"
+                  hint="Exactement l’adresse de votre compte."
+                >
+                  <TextInput
+                    name="confirmEmail"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="off"
+                    required
+                    value={confirmEmail}
+                    onChange={(e) => setConfirmEmail(e.target.value)}
+                  />
+                </Field>
 
-              <label htmlFor="delete-password" className="text-sm font-medium">
-                Mot de passe actuel
-              </label>
-              <input
-                id="delete-password"
-                name="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
+                <Field id="delete-password" label="Mot de passe actuel" required size="md" newRow>
+                  <PasswordInput
+                    name="currentPassword"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
+              </FormGrid>
 
               <button
                 type="submit"

@@ -7,13 +7,13 @@
 // facture : raison sociale obligatoire, NIF et adresse facultatifs ; à défaut, la fiche
 // fiscale de l'organisation. Aucun montant n'est calculé ici : tout vient de l'API.
 
+import { Field, FormGrid, SubmitButton, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type SubscriptionBillingProfileView, type SubscriptionInvoiceView } from '@/lib/api';
 
 import { estRefusAutorisation, formatCents, formatDate, messageRefus } from './subscription-model';
 
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const BOUTON =
   'inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-50';
 
@@ -174,39 +174,36 @@ function FicheFacturation({
         {SOURCES[fiche.effective.source]}. Raison sociale obligatoire ; NIF et adresse facultatifs.
         Sans NIF, la facture est établie au type « personne physique » (règle DGI).
       </p>
-      <form onSubmit={(e) => void enregistrer(e)} className="flex max-w-xl flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span>Raison sociale</span>
-          <input
-            required
-            maxLength={200}
-            value={raison}
-            onChange={(e) => setRaison(e.target.value)}
-            className={CHAMP}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span>NIF (facultatif)</span>
-          <input
-            maxLength={40}
-            value={nif}
-            onChange={(e) => setNif(e.target.value)}
-            className={CHAMP}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span>Adresse (facultative)</span>
-          <input
-            maxLength={255}
-            value={adresse}
-            onChange={(e) => setAdresse(e.target.value)}
-            className={CHAMP}
-          />
-        </label>
+      <form onSubmit={(e) => void enregistrer(e)} className="flex max-w-2xl flex-col gap-3">
+        <FormGrid>
+          <Field label="Raison sociale" required size="lg">
+            <TextInput
+              required
+              maxLength={200}
+              value={raison}
+              onChange={(e) => setRaison(e.target.value)}
+            />
+          </Field>
+          <Field label="NIF" optional size="sm" newRow>
+            <TextInput maxLength={40} value={nif} onChange={(e) => setNif(e.target.value)} />
+          </Field>
+          <Field label="Adresse" optional size="full" newRow>
+            <TextInput
+              maxLength={255}
+              value={adresse}
+              onChange={(e) => setAdresse(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         <div>
-          <button type="submit" disabled={envoi || raison.trim() === ''} className={BOUTON}>
-            {envoi ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
+          <SubmitButton
+            size="sm"
+            busy={envoi}
+            busyLabel="Enregistrement…"
+            disabled={raison.trim() === ''}
+          >
+            Enregistrer
+          </SubmitButton>
         </div>
         {message ? (
           <p className={`text-sm ${message.ok ? '' : 'text-[var(--danger)]'}`}>{message.texte}</p>

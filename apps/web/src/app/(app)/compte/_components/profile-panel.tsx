@@ -7,6 +7,7 @@
 // toujours un profil, et l'absence de préférences enregistrées se traduit par
 // des valeurs par défaut servies par l'API, pas par un écran vide.
 
+import { Field, FormGrid, PasswordInput, Select, SubmitButton, TextInput } from '@lalanda/ui';
 import { useEffect, useRef, useState } from 'react';
 
 import { api, type AccountProfileView, type AvatarLimitsView } from '@/lib/api';
@@ -153,101 +154,63 @@ export function ProfilePanel(): React.ReactElement {
             Informations
           </legend>
 
-          <label htmlFor="account-name" className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Nom affiché</span>
-          </label>
-          <input
-            id="account-name"
-            name="name"
-            type="text"
-            autoComplete="name"
-            value={form.name}
-            onChange={(e) => {
-              setForm((f) => (f === null ? f : { ...f, name: e.target.value }));
-              if (nameError) setNameError(validateName(e.target.value));
-            }}
-            aria-invalid={nameError !== null}
-            {...(nameError ? { 'aria-describedby': 'account-name-error' } : {})}
-            {...(nameError ? { 'aria-errormessage': 'account-name-error' } : {})}
-            className={[
-              '-mt-2 rounded-md border bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition',
-              nameError
-                ? 'border-[var(--danger)] bg-[var(--danger-bg)]'
-                : 'border-[var(--border)] focus:border-[var(--accent)]',
-            ].join(' ')}
-          />
-          {nameError ? (
-            <p
-              id="account-name-error"
-              role="alert"
-              className="-mt-2 text-xs font-medium text-[var(--danger)]"
+          <FormGrid>
+            <Field id="account-name" label="Nom affiché" size="lg" error={nameError ?? undefined}>
+              <TextInput
+                name="name"
+                type="text"
+                autoComplete="name"
+                value={form.name}
+                onChange={(e) => {
+                  setForm((f) => (f === null ? f : { ...f, name: e.target.value }));
+                  if (nameError) setNameError(validateName(e.target.value));
+                }}
+              />
+            </Field>
+
+            <Field
+              id="account-locale"
+              label="Langue"
+              size="md"
+              newRow
+              hint="Le français est pour l’instant la seule langue traduite. D’autres langues seront proposées ici dès que les libellés le seront aussi."
             >
-              <span className="font-semibold">Erreur : </span>
-              {nameError}
-            </p>
-          ) : null}
+              <Select
+                name="locale"
+                value={form.locale}
+                onChange={(locale) => setForm((f) => (f === null ? f : { ...f, locale }))}
+                options={locales.map((code) => ({
+                  value: code,
+                  label: LOCALE_LABELS[code] ?? code,
+                }))}
+              />
+            </Field>
 
-          <label htmlFor="account-locale" className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Langue</span>
-          </label>
-          <select
-            id="account-locale"
-            name="locale"
-            value={form.locale}
-            onChange={(e) => setForm((f) => (f === null ? f : { ...f, locale: e.target.value }))}
-            aria-describedby="account-locale-help"
-            className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-          >
-            {locales.map((code) => (
-              <option key={code} value={code}>
-                {LOCALE_LABELS[code] ?? code}
-              </option>
-            ))}
-          </select>
-          <p
-            id="account-locale-help"
-            className="-mt-2 text-xs italic text-[var(--foreground-muted)]"
-          >
-            Le français est pour l’instant la seule langue traduite. D’autres langues seront
-            proposées ici dès que les libellés le seront aussi.
-          </p>
-
-          <label htmlFor="account-timezone" className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Fuseau horaire</span>
-          </label>
-          <select
-            id="account-timezone"
-            name="timezone"
-            value={form.timezone}
-            onChange={(e) => setForm((f) => (f === null ? f : { ...f, timezone: e.target.value }))}
-            aria-describedby="account-timezone-help"
-            className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-          >
-            {timezones.map((tz) => {
-              const offset = timezoneOffsetLabel(tz);
-              return (
-                <option key={tz} value={tz}>
-                  {offset ? `${tz} (${offset})` : tz}
-                </option>
-              );
-            })}
-          </select>
-          <p
-            id="account-timezone-help"
-            className="-mt-2 text-xs italic text-[var(--foreground-muted)]"
-          >
-            Utilisé pour afficher les dates et heures, notamment vos sessions actives.
-          </p>
+            <Field
+              id="account-timezone"
+              label="Fuseau horaire"
+              size="lg"
+              newRow
+              hint="Utilisé pour afficher les dates et heures, notamment vos sessions actives."
+            >
+              <Select
+                name="timezone"
+                value={form.timezone}
+                onChange={(timezone) => setForm((f) => (f === null ? f : { ...f, timezone }))}
+                searchPlaceholder="Ville ou région…"
+                options={timezones.map((tz) => {
+                  const offset = timezoneOffsetLabel(tz);
+                  return { value: tz, label: offset ? `${tz} (${offset})` : tz };
+                })}
+              />
+            </Field>
+          </FormGrid>
         </fieldset>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving || !dirty}
-            className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
+          <SubmitButton busy={saving} busyLabel="Enregistrement…" disabled={!dirty}>
+            Enregistrer
+          </SubmitButton>
           <span aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
             {savedAt
               ? `Enregistré à ${new Date(savedAt).toLocaleTimeString('fr-FR')}`
@@ -390,69 +353,54 @@ function EmailChangeSection({
                 </span>
               </p>
 
-              <label htmlFor="new-email" className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Nouvelle adresse email</span>
-              </label>
-              <input
-                id="new-email"
-                name="newEmail"
-                type="email"
-                autoComplete="email"
-                required
-                value={newEmail}
-                onChange={(e) => {
-                  setNewEmail(e.target.value);
-                  if (emailError) setEmailError(validateEmail(e.target.value));
-                }}
-                aria-invalid={emailError !== null}
-                {...(emailError ? { 'aria-describedby': 'new-email-error' } : {})}
-                {...(emailError ? { 'aria-errormessage': 'new-email-error' } : {})}
-                className={[
-                  '-mt-2 rounded-md border bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition',
-                  emailError
-                    ? 'border-[var(--danger)] bg-[var(--danger-bg)]'
-                    : 'border-[var(--border)] focus:border-[var(--accent)]',
-                ].join(' ')}
-              />
-              {emailError ? (
-                <p
-                  id="new-email-error"
-                  role="alert"
-                  className="-mt-2 text-xs font-medium text-[var(--danger)]"
+              <FormGrid>
+                <Field
+                  id="new-email"
+                  label="Nouvelle adresse email"
+                  required
+                  size="lg"
+                  error={emailError ?? undefined}
                 >
-                  <span className="font-semibold">Erreur : </span>
-                  {emailError}
-                </p>
-              ) : null}
+                  <TextInput
+                    name="newEmail"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    required
+                    value={newEmail}
+                    onChange={(e) => {
+                      setNewEmail(e.target.value);
+                      if (emailError) setEmailError(validateEmail(e.target.value));
+                    }}
+                  />
+                </Field>
 
-              <label htmlFor="email-change-password" className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Mot de passe actuel</span>
-              </label>
-              <input
-                id="email-change-password"
-                name="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                aria-describedby="email-change-password-help"
-                className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
-              <p
-                id="email-change-password-help"
-                className="-mt-2 text-xs italic text-[var(--foreground-muted)]"
-              >
-                Exigé pour qu’une session laissée ouverte ne suffise pas à déplacer votre compte.
-              </p>
+                <Field
+                  id="email-change-password"
+                  label="Mot de passe actuel"
+                  required
+                  size="md"
+                  newRow
+                  hint="Exigé pour qu’une session laissée ouverte ne suffise pas à déplacer votre compte."
+                >
+                  <PasswordInput
+                    name="currentPassword"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
+              </FormGrid>
 
-              <button
-                type="submit"
-                disabled={submitting || newEmail.trim().length === 0 || password.length === 0}
-                className="self-start rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
+              <SubmitButton
+                busy={submitting}
+                busyLabel="Envoi…"
+                disabled={newEmail.trim().length === 0 || password.length === 0}
+                className="self-start"
               >
-                {submitting ? 'Envoi…' : 'Demander le changement'}
-              </button>
+                Demander le changement
+              </SubmitButton>
             </form>
           ) : null}
         </>

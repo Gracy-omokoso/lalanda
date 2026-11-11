@@ -8,7 +8,7 @@
 // clavier (`aria-hidden`, `tabIndex={-1}`). Logo et couleur de l'organisation
 // seulement si l'API les rend ; sinon la charte Lalanda sobre.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Checkbox, Field, FormGrid, SubmitButton, TextArea, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { PublicFormError, publicLeadFormApi, type PublicLeadFormView } from '@/lib/api-lead-forms';
@@ -24,9 +24,6 @@ import {
   valeursInitiales,
   type Valeurs,
 } from './formulaire-public-model';
-
-const CHAMP =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-base outline-none transition focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)]';
 
 type Phase = 'chargement' | 'introuvable' | 'pret' | 'envoye';
 
@@ -171,51 +168,42 @@ export function FormulairePublic({ token }: { token: string }): React.ReactEleme
                   {alerte}
                 </p>
               ) : null}
-              {vue.fields.map((c) => {
-                const champId = `${id}-${c.key}`;
-                const erreur = erreurs[c.key];
-                const saisie = SAISIE[c.key];
-                const commun = {
-                  id: champId,
-                  name: c.key,
-                  value: valeurs[c.key] ?? '',
-                  maxLength: c.maxLength,
-                  required: c.required,
-                  autoComplete: saisie.autoComplete,
-                  'aria-invalid': erreur ? true : undefined,
-                  'aria-describedby': erreur ? `${champId}-erreur` : undefined,
-                  className: CHAMP,
-                };
-                const changer = (v: string) => setValeurs((p) => ({ ...p, [c.key]: v }));
-                return (
-                  <div key={c.key} className="flex flex-col gap-1.5">
-                    <label htmlFor={champId} className="text-sm font-medium">
-                      {c.label}
-                      {c.required ? (
-                        <>
-                          <span aria-hidden="true"> *</span>
-                          <span className="sr-only"> (obligatoire)</span>
-                        </>
-                      ) : null}
-                    </label>
-                    {saisie.multiligne ? (
-                      <textarea {...commun} rows={5} onChange={(e) => changer(e.target.value)} />
-                    ) : (
-                      <input
-                        {...commun}
-                        type={saisie.type}
-                        inputMode={saisie.type === 'tel' ? 'tel' : undefined}
-                        onChange={(e) => changer(e.target.value)}
-                      />
-                    )}
-                    {erreur ? (
-                      <p id={`${champId}-erreur`} className="text-xs text-[var(--danger)]">
-                        {erreur}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
+              <FormGrid>
+                {vue.fields.map((c) => {
+                  const saisie = SAISIE[c.key];
+                  // Mêmes attributs qu'avant : `name`, longueur maximale, obligatoire,
+                  // saisie automatique ; le texte part tel quel (`corpsSoumission`).
+                  const commun = {
+                    name: c.key,
+                    value: valeurs[c.key] ?? '',
+                    maxLength: c.maxLength,
+                    required: c.required,
+                    autoComplete: saisie.autoComplete,
+                  };
+                  const changer = (v: string) => setValeurs((p) => ({ ...p, [c.key]: v }));
+                  return (
+                    <Field
+                      key={c.key}
+                      id={`${id}-${c.key}`}
+                      label={c.label}
+                      required={c.required}
+                      size="full"
+                      error={erreurs[c.key]}
+                    >
+                      {saisie.multiligne ? (
+                        <TextArea {...commun} rows={5} onChange={(e) => changer(e.target.value)} />
+                      ) : (
+                        <TextInput
+                          {...commun}
+                          type={saisie.type}
+                          inputMode={saisie.type === 'tel' ? 'tel' : undefined}
+                          onChange={(e) => changer(e.target.value)}
+                        />
+                      )}
+                    </Field>
+                  );
+                })}
+              </FormGrid>
 
               {/* Champ piège (ADR-0048 O4) : invisible, hors du parcours clavier. */}
               <div
@@ -235,20 +223,16 @@ export function FormulairePublic({ token }: { token: string }): React.ReactEleme
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-start gap-2.5">
-                  <input
-                    id={`${id}-accord`}
-                    type="checkbox"
-                    checked={accord}
-                    onChange={(e) => setAccord(e.target.checked)}
-                    aria-invalid={erreurs['consent'] ? true : undefined}
-                    aria-describedby={erreurs['consent'] ? `${id}-accord-erreur` : undefined}
-                    className="mt-1 h-4 w-4 shrink-0"
-                  />
-                  <label htmlFor={`${id}-accord`} className="text-sm">
-                    {vue.consent.text}
-                  </label>
-                </div>
+                {/* Accord : jamais coché d'office (`accord` part de `false`) ; refusé
+                    par `erreursLocales` puis par l'API s'il manque. */}
+                <Checkbox
+                  id={`${id}-accord`}
+                  checked={accord}
+                  onChange={setAccord}
+                  aria-invalid={erreurs['consent'] ? true : undefined}
+                  aria-describedby={erreurs['consent'] ? `${id}-accord-erreur` : undefined}
+                  label={vue.consent.text}
+                />
                 {vue.consent.policyUrl ? (
                   <a
                     href={vue.consent.policyUrl}
@@ -266,13 +250,14 @@ export function FormulairePublic({ token }: { token: string }): React.ReactEleme
                 ) : null}
               </div>
 
-              <button
-                type="submit"
-                disabled={envoi}
-                className={buttonClasses('primary', 'lg', 'w-full sm:w-auto sm:self-start')}
+              <SubmitButton
+                busy={envoi}
+                busyLabel="Envoi…"
+                size="lg"
+                className="w-full sm:w-auto sm:self-start"
               >
-                {envoi ? 'Envoi…' : 'Envoyer ma demande'}
-              </button>
+                Envoyer ma demande
+              </SubmitButton>
             </form>
           ) : null}
 

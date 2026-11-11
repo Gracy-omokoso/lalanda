@@ -13,7 +13,7 @@
 // active — lue par la coquille, jamais déduite ici. Une organisation créée ici
 // ouvre directement sa mise en route.
 
-import { Modal } from '@lalanda/ui';
+import { Button, Field, FormGrid, Modal, Select, SubmitButton, TextInput } from '@lalanda/ui';
 import { useEffect, useRef, useState } from 'react';
 
 import { IconeNav } from '@/components/icones-navigation';
@@ -279,9 +279,6 @@ function CreateOrgModal({
     }
   }
 
-  const champ =
-    'rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]';
-
   return (
     <Modal
       open
@@ -296,55 +293,41 @@ function CreateOrgModal({
         aria-label="Nouvelle organisation"
         className="flex flex-col gap-4"
       >
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium">Nom</span>
-          <input
-            type="text"
-            required
-            maxLength={100}
-            autoFocus
-            placeholder="Ex : Ma PME SARL"
-            value={form.nom}
-            onChange={(e) => setForm({ ...form, nom: e.target.value })}
-            className={champ}
-          />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium">Pays</span>
-          <select
-            value={form.pays}
-            onChange={(e) => setForm({ ...form, pays: e.target.value })}
-            aria-describedby={avertissement ? 'org-creation-pays-aide' : undefined}
-            className={champ}
-          >
-            {PAYS_CREATION.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.libelle}
-              </option>
-            ))}
-          </select>
-          {avertissement ? (
-            <span id="org-creation-pays-aide" className="text-xs text-[var(--warn)]">
-              {avertissement}
-            </span>
-          ) : null}
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium">Type d’organisation</span>
-          <select
-            value={form.type}
-            onChange={(e) =>
-              setForm({ ...form, type: e.target.value as FormulaireCreation['type'] })
+        <FormGrid>
+          <Field label="Nom" required size="full">
+            <TextInput
+              type="text"
+              required
+              maxLength={100}
+              autoFocus
+              placeholder="Ex : Ma PME SARL"
+              value={form.nom}
+              onChange={(e) => setForm({ ...form, nom: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Pays"
+            size="full"
+            hint={
+              avertissement ? (
+                <span className="text-[var(--warn)]">{avertissement}</span>
+              ) : undefined
             }
-            className={champ}
           >
-            {TYPES_ORGANISATION.map((t) => (
-              <option key={t.code} value={t.code}>
-                {t.libelle}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Select
+              value={form.pays}
+              onChange={(pays) => setForm({ ...form, pays })}
+              options={PAYS_CREATION.map((p) => ({ value: p.code, label: p.libelle }))}
+            />
+          </Field>
+          <Field label="Type d’organisation" size="full">
+            <Select<FormulaireCreation['type']>
+              value={form.type}
+              onChange={(type) => setForm({ ...form, type })}
+              options={TYPES_ORGANISATION.map((t) => ({ value: t.code, label: t.libelle }))}
+            />
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           Vous en devenez Propriétaire. Sa mise en route vous attend ensuite ; rien n’est copié
           depuis votre organisation actuelle.
@@ -358,20 +341,12 @@ function CreateOrgModal({
           </div>
         ) : null}
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-[var(--border)] px-4 py-2 text-sm transition hover:bg-[var(--surface-muted)]"
-          >
+          <Button onClick={onClose} disabled={creating}>
             Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={creating || !form.nom.trim()}
-            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-          >
-            {creating ? 'Création…' : 'Créer'}
-          </button>
+          </Button>
+          <SubmitButton busy={creating} busyLabel="Création…" disabled={!form.nom.trim()}>
+            Créer
+          </SubmitButton>
         </div>
       </form>
     </Modal>

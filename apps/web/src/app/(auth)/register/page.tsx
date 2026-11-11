@@ -28,6 +28,7 @@
 // (vérification exigée) → écran « confirmez votre adresse » : le lien est déjà
 // parti (`sendOnSignUp`).
 
+import { Checkbox, Field, Form, PasswordInput, SubmitButton, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -117,7 +118,9 @@ export default function RegisterPage(): React.ReactElement {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    // `noValidate={false}` : la validation native (nom ≥ 2, adresse, mot de passe ≥ 8,
+    // case obligatoire) reste active, comme avant la migration (ADR-0074).
+    <Form onSubmit={(e) => void handleSubmit(e)} noValidate={false} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-semibold tracking-tight">Créer un compte</h2>
         <p className="text-sm text-[var(--foreground-muted)]">
@@ -132,9 +135,8 @@ export default function RegisterPage(): React.ReactElement {
           croire à deux comptes distincts selon la porte empruntée. */}
       <GoogleButton label="Continuer avec Google" />
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Nom</span>
-        <input
+      <Field label="Nom" required size="full">
+        <TextInput
           type="text"
           required
           minLength={2}
@@ -142,78 +144,73 @@ export default function RegisterPage(): React.ReactElement {
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Email</span>
-        <input
+      <Field label="Email" required size="full">
+        <TextInput
           type="email"
           required
           autoComplete="email"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Mot de passe</span>
-        <input
-          type="password"
+      <Field label="Mot de passe" required size="full" hint="Minimum 8 caractères.">
+        <PasswordInput
           required
           minLength={8}
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-        <span className="text-xs text-[var(--foreground-muted)]">Minimum 8 caractères.</span>
-      </label>
+      </Field>
 
-      <label className="flex items-start gap-3 text-sm leading-6">
-        <input
-          type="checkbox"
-          required
-          checked={termsAccepted}
-          onChange={(e) => setTermsAccepted(e.target.checked)}
-          className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
-        />
-        <span>
-          J&apos;ai lu et j&apos;accepte les{' '}
-          <Link href="/cgu" target="_blank" className="underline underline-offset-4">
-            conditions générales d&apos;utilisation
-          </Link>
-          , les{' '}
-          <Link href="/cgv" target="_blank" className="underline underline-offset-4">
-            conditions générales de vente
-          </Link>{' '}
-          et la{' '}
-          <Link href="/confidentialite" target="_blank" className="underline underline-offset-4">
-            politique de confidentialité
-          </Link>
-          .
-          <span className="mt-1 block text-xs text-[var(--foreground-muted)]">
+      {/* Case JAMAIS pré-cochée (`termsAccepted` part de `false`, voir l'en-tête) ;
+          `required` natif gardé, doublé du contrôle de `handleSubmit`. */}
+      <Checkbox
+        required
+        checked={termsAccepted}
+        onChange={setTermsAccepted}
+        label={
+          <>
+            J&apos;ai lu et j&apos;accepte les{' '}
+            <Link href="/cgu" target="_blank" className="underline underline-offset-4">
+              conditions générales d&apos;utilisation
+            </Link>
+            , les{' '}
+            <Link href="/cgv" target="_blank" className="underline underline-offset-4">
+              conditions générales de vente
+            </Link>{' '}
+            et la{' '}
+            <Link href="/confidentialite" target="_blank" className="underline underline-offset-4">
+              politique de confidentialité
+            </Link>
+            .
+          </>
+        }
+        description={
+          <>
             Version du corpus&nbsp;: {LEGAL_VERSION}. Les liens s&apos;ouvrent dans un nouvel
             onglet&nbsp;: votre saisie n&apos;est pas perdue.
-          </span>
-        </span>
-      </label>
+          </>
+        }
+      />
 
       {error ? (
-        <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
+        <div
+          role="alert"
+          className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
+        >
           {error}
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-2 rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-      >
-        {loading ? 'Création…' : 'Créer mon compte'}
-      </button>
+      <SubmitButton busy={loading} busyLabel="Création…" size="lg" className="mt-2 w-full">
+        Créer mon compte
+      </SubmitButton>
 
       <p className="text-center text-sm text-[var(--foreground-muted)]">
         Déjà un compte ?{' '}
@@ -224,6 +221,6 @@ export default function RegisterPage(): React.ReactElement {
           Se connecter
         </Link>
       </p>
-    </form>
+    </Form>
   );
 }

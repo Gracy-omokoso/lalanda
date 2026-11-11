@@ -16,6 +16,7 @@
 // existe précisément parce que l'échec serait irréversible — le lien ne sert
 // qu'une fois.
 
+import { Field, PasswordInput, SubmitButton } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
@@ -107,34 +108,30 @@ function ResetForm(): React.ReactElement {
         </p>
       </div>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Nouveau mot de passe</span>
-        <input
-          type="password"
+      <Field
+        label="Nouveau mot de passe"
+        required
+        size="full"
+        hint={`Minimum ${MIN_PASSWORD_LENGTH} caractères.`}
+      >
+        <PasswordInput
           required
           minLength={MIN_PASSWORD_LENGTH}
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-        <span className="text-xs text-[var(--foreground-muted)]">
-          Minimum {MIN_PASSWORD_LENGTH} caractères.
-        </span>
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Confirmation</span>
-        <input
-          type="password"
+      <Field label="Confirmation" required size="full">
+        <PasswordInput
           required
           minLength={MIN_PASSWORD_LENGTH}
           autoComplete="new-password"
           value={confirmation}
           onChange={(e) => setConfirmation(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-      </label>
+      </Field>
 
       {error ? (
         <div
@@ -145,13 +142,9 @@ function ResetForm(): React.ReactElement {
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-2 rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-      >
-        {loading ? 'Enregistrement…' : 'Enregistrer le mot de passe'}
-      </button>
+      <SubmitButton busy={loading} busyLabel="Enregistrement…" size="lg" className="mt-2 w-full">
+        Enregistrer le mot de passe
+      </SubmitButton>
     </form>
   );
 }

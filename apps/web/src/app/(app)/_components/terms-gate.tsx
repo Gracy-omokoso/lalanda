@@ -12,7 +12,7 @@
 //   et ces pages vivent hors de l'application (route group `(marketing)`).
 // - La case n'est jamais pré-cochée ; la version envoyée est celle affichée.
 
-import { Button, Modal } from '@lalanda/ui';
+import { Button, Checkbox, Modal } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useState } from 'react';
@@ -176,19 +176,19 @@ export function TermsGate(): React.ReactElement | null {
             </li>
           ))}
         </ul>
-        <label htmlFor={caseId} className="flex items-start gap-3 py-1">
-          <input
-            id={caseId}
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => setChecked(e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0 accent-[var(--accent)]"
-          />
-          <span>
-            J&apos;ai lu et j&apos;accepte les conditions générales d&apos;utilisation, les
-            conditions générales de vente et la politique de confidentialité.
-          </span>
-        </label>
+        {/* Jamais cochée d'office : `checked` part de `false`. */}
+        <Checkbox
+          id={caseId}
+          checked={checked}
+          onChange={setChecked}
+          className="py-1"
+          label={
+            <>
+              J&apos;ai lu et j&apos;accepte les conditions générales d&apos;utilisation, les
+              conditions générales de vente et la politique de confidentialité.
+            </>
+          }
+        />
         {error ? (
           <p
             role="alert"

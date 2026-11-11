@@ -33,6 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { SELF_SERVE_PLANS } from '@lalanda/shared/pricing';
+import { ChoiceCards, SegmentedControl } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -282,64 +283,38 @@ export function SubscriptionFunnel(): React.ReactElement {
       <section className="flex flex-col gap-4">
         <h2 className="font-display text-lg font-bold tracking-tight">Choisir une offre</h2>
 
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="sr-only">Offre</legend>
-          {OFFRES_PAYANTES.map((slug) => {
+        <ChoiceCards
+          aria-label="Offre"
+          value={plan}
+          onChange={setPlan}
+          options={OFFRES_PAYANTES.map((slug) => {
             const tier = TIERS.find((t) => t.slug === slug)!;
-            const actif = plan === slug;
-            return (
-              <label
-                key={slug}
-                className={`flex cursor-pointer flex-col rounded-lg border p-5 transition ${
-                  actif
-                    ? 'border-[var(--accent)] bg-[var(--surface)]'
-                    : 'border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)]'
-                }`}
-              >
+            return {
+              value: slug,
+              label: (
                 <span className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="offre"
-                    value={slug}
-                    checked={actif}
-                    onChange={() => setPlan(slug)}
-                    className="accent-[var(--accent)]"
-                  />
                   <span className="font-display font-bold">{tier.name}</span>
-                  <span className="fig ml-auto text-sm text-[var(--foreground-muted)]">
+                  <span className="fig ml-auto text-sm font-normal text-[var(--foreground-muted)]">
                     {tier.priceMonthUsd} USD / mois
                   </span>
                 </span>
-                <span className="mt-2 text-sm text-[var(--foreground-muted)]">{tier.tagline}</span>
-              </label>
-            );
+              ),
+              description: tier.tagline,
+            };
           })}
-        </fieldset>
+        />
 
         {annuelPossible ? (
-          <fieldset className="flex flex-wrap items-center gap-3">
-            <legend className="sr-only">Périodicité</legend>
-            {(['month', 'year'] as BillingInterval[]).map((valeur) => (
-              <label
-                key={valeur}
-                className={`inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition ${
-                  interval === valeur
-                    ? 'border-[var(--accent)]'
-                    : 'border-[var(--border)] hover:bg-[var(--surface-muted)]'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="periodicite"
-                  value={valeur}
-                  checked={interval === valeur}
-                  onChange={() => setIntervalChoisi(valeur)}
-                  className="accent-[var(--accent)]"
-                />
-                {INTERVAL_LABELS[valeur]}
-              </label>
-            ))}
-          </fieldset>
+          <SegmentedControl<BillingInterval>
+            aria-label="Périodicité"
+            value={interval}
+            onChange={setIntervalChoisi}
+            options={(['month', 'year'] as BillingInterval[]).map((valeur) => ({
+              value: valeur,
+              label: INTERVAL_LABELS[valeur],
+            }))}
+            className="self-start"
+          />
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]">
             L’offre {PLAN_LABELS[plan]} est proposée en facturation mensuelle uniquement.

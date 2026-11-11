@@ -19,6 +19,7 @@
 // demande » ne dit rien sur l'existence du compte, et taire une panne laisserait
 // quelqu'un attendre indéfiniment un email qui n'a jamais été demandé.
 
+import { Field, SubmitButton, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -88,17 +89,16 @@ export default function ForgotPasswordPage(): React.ReactElement {
         </p>
       </div>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Email</span>
-        <input
+      <Field label="Email" required size="full">
+        <TextInput
           type="email"
           required
           autoComplete="email"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-      </label>
+      </Field>
 
       {error ? (
         <div
@@ -109,13 +109,9 @@ export default function ForgotPasswordPage(): React.ReactElement {
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-2 rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-      >
-        {loading ? 'Envoi…' : 'Envoyer le lien'}
-      </button>
+      <SubmitButton busy={loading} busyLabel="Envoi…" size="lg" className="mt-2 w-full">
+        Envoyer le lien
+      </SubmitButton>
 
       <p className="text-center text-sm text-[var(--foreground-muted)]">
         <Link

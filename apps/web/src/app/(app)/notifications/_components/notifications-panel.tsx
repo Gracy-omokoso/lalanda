@@ -6,6 +6,7 @@
 // Ce qui décide vit dans `../notifications-model.ts`.
 
 import type { NotificationKind, NotificationView } from '@lalanda/shared/notifications';
+import { Checkbox } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -260,21 +261,15 @@ function Preferences({ organizationId }: { organizationId: string | null }): Rea
           {TYPES_AFFICHES.map((kind) => {
             const id = `notif-pref-${kind.replace(/\W/g, '-')}`;
             return (
-              <li key={kind} className="flex items-start gap-2">
-                <input
+              <li key={kind}>
+                <Checkbox
                   id={id}
-                  type="checkbox"
                   checked={!coupes.includes(kind)}
                   disabled={enCours}
                   onChange={() => void basculer(kind)}
-                  className="mt-0.5 h-4 w-4"
+                  label={LIBELLES_TYPES[kind].label}
+                  description={LIBELLES_TYPES[kind].aide}
                 />
-                <label htmlFor={id} className="flex flex-col text-sm">
-                  <span>{LIBELLES_TYPES[kind].label}</span>
-                  <span className="text-xs text-[var(--foreground-muted)]">
-                    {LIBELLES_TYPES[kind].aide}
-                  </span>
-                </label>
               </li>
             );
           })}
