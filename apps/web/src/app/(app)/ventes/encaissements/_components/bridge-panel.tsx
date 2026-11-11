@@ -7,7 +7,7 @@
 // ADR-0074 : initiative et ligne en `Select` ; le mois reste un champ mois natif
 // (pas de sélecteur de mois dans `@lalanda/ui`), au style commun.
 
-import { Field, FormGrid, Select, TextInput } from '@lalanda/ui';
+import { Field, FormGrid, MonthPicker, Select } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -168,14 +168,13 @@ export function BridgePanel(): React.ReactElement {
               newRow
               hint="Le mois civil où commence le premier exercice du plan. Initiative et début d’exercice sont communs au report des dépenses (Trésorerie)."
             >
-              {/* Aucun sélecteur de mois dans @lalanda/ui : champ mois natif, style commun. */}
-              <TextInput
-                type="month"
+              {/* ADR-0074, décision n° 6 : même valeur AAAA-MM que l'ancien champ natif. */}
+              <MonthPicker
                 value={reglage.exerciseStart ?? ''}
-                onChange={(e) =>
+                onChange={(ym) =>
                   setReglage((r) => ({
                     ...r,
-                    exerciseStart: e.target.value === '' ? null : e.target.value,
+                    exerciseStart: ym === '' ? null : ym,
                   }))
                 }
               />

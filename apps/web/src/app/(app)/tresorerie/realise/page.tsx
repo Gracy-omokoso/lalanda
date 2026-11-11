@@ -11,7 +11,7 @@
 // d'ouverture reste un champ « mois » du navigateur : `@lalanda/ui` n'a pas de
 // sélecteur de mois (décision ouverte).
 
-import { Button, Field, FormGrid, Select, SubmitButton, Switch, TextInput } from '@lalanda/ui';
+import { Button, Field, FormGrid, MonthPicker, Select, SubmitButton, Switch } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type ProjectView } from '@/lib/api';
@@ -155,10 +155,9 @@ export default function RealisePage(): React.ReactElement {
               size="sm"
               disabled={!relier}
             >
-              <TextInput
-                type="month"
+              <MonthPicker
                 value={form.firstMonth}
-                onChange={(e) => setForm({ ...form, firstMonth: e.target.value })}
+                onChange={(ym) => setForm({ ...form, firstMonth: ym })}
               />
             </Field>
             <Field id="rea-actif" label="Report" group size="md" newRow disabled={!relier}>

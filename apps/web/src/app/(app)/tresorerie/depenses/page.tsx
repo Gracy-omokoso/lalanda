@@ -16,6 +16,7 @@ import {
   FormGrid,
   Modal,
   MoneyInput,
+  MonthPicker,
   SegmentedControl,
   Select,
   StatusPill,
@@ -43,7 +44,6 @@ import {
 import {
   BOUTON_LIGNE,
   BOUTON_PRINCIPAL,
-  CHAMP_COMPACT,
   EnTeteEcran,
   IconePlus,
   OngletsStatut,
@@ -644,12 +644,12 @@ export default function DepensesPage(): React.ReactElement {
               onChange={setQ}
               placeholder="Libellé, fournisseur ou référence"
             />
-            <input
-              type="month"
+            <MonthPicker
               aria-label="Mois"
-              className={`${CHAMP_COMPACT} w-[9.5rem] shrink-0`}
+              className="w-[10.5rem] shrink-0"
+              required
               value={mois}
-              onChange={(e) => setMois(e.target.value || moisCourant())}
+              onChange={(ym) => setMois(ym || moisCourant())}
             />
             <Select<string>
               aria-label="Catégorie"

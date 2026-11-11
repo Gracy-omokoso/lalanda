@@ -7,6 +7,7 @@
 // comptés sans montant ; revenu récurrent déclaré ; file des demandes manuelles.
 // L'export CSV (finance et super-administrateur) est journalisé par l'API.
 
+import { Field, MonthPicker } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAccesPlateforme } from './admin-access';
@@ -28,7 +29,6 @@ import {
   type MontantDevise,
 } from './finances-model';
 
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const BOUTON =
   'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
 
@@ -85,24 +85,13 @@ export function FinancesPanel(): React.ReactElement {
           if (!periodeInvalide) void charger(from, to);
         }}
       >
-        <label className="flex flex-col gap-1 text-sm">
-          Du mois
-          <input
-            type="month"
-            className={CHAMP}
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          au mois
-          <input
-            type="month"
-            className={CHAMP}
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </label>
+        {/* ADR-0074, décision n° 6 : mêmes valeurs AAAA-MM que les anciens champs natifs. */}
+        <Field id="finances-du" label="Du mois" size="sm" className="w-44">
+          <MonthPicker value={from} onChange={setFrom} />
+        </Field>
+        <Field id="finances-au" label="au mois" size="sm" className="w-44">
+          <MonthPicker value={to} onChange={setTo} />
+        </Field>
         <button type="submit" className={BOUTON} disabled={Boolean(periodeInvalide)}>
           Afficher
         </button>

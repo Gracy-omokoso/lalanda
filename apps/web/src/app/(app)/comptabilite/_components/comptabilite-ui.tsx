@@ -6,7 +6,7 @@
 // encore livrée (404 : « bientôt disponible », jamais de donnée inventée) et les termes
 // comptables avec leur infobulle (glossaire).
 
-import { Badge } from '@lalanda/ui';
+import { Badge, Field, MonthPicker } from '@lalanda/ui';
 import { FlaskConical, ShieldAlert } from 'lucide-react';
 import { useId } from 'react';
 
@@ -14,7 +14,7 @@ import { Infobulle } from '@/components/infobulle';
 import type { AccountingReserveView } from '@/lib/api-accounting';
 
 import { CarteVide } from '../../stocks/_components/stocks-ui';
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   GLOSSAIRE,
@@ -158,15 +158,9 @@ export function ChoixMois({
   onChange: (mois: string) => void;
 }): React.ReactElement {
   return (
-    <label htmlFor={id} className="flex flex-col gap-1 text-sm font-medium">
-      {libelle}
-      <input
-        id={id}
-        type="month"
-        className={`${CHAMP} sm:w-48`}
-        value={valeur}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
+    <Field id={id} label={libelle} size="sm" className="sm:w-48">
+      {/* ADR-0074, décision n° 6 : même valeur AAAA-MM que l'ancien champ natif. */}
+      <MonthPicker value={valeur} onChange={onChange} />
+    </Field>
   );
 }
