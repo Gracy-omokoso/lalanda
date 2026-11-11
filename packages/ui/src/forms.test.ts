@@ -47,6 +47,7 @@ import {
   idSur,
   indexerMarques,
   indexParLettre,
+  joursMarquesDuMois,
   jourSemaine,
   lireDateSaisie,
   lireMoisIso,
@@ -656,6 +657,19 @@ describe('jours marqués (fériés, décision n° 1)', () => {
     expect(nom('2026-03-01')).toBeUndefined();
     expect(nom('2026-11-11')).toBeUndefined();
     expect(indexerMarques(null)('2026-01-01')).toBeUndefined();
+  });
+
+  it('légende du mois : jours marqués dans l’ordre, récurrents compris', () => {
+    const nom = indexerMarques([
+      { date: '2026-11-17', label: 'Fermeture de l’atelier' },
+      { date: '2020-11-01', label: 'Toussaint', recurring: true },
+      { date: '2026-12-25', label: 'Noël' },
+    ]);
+    expect(joursMarquesDuMois(2026, 11, nom)).toEqual([
+      { iso: '2026-11-01', jour: 1, nom: 'Toussaint' },
+      { iso: '2026-11-17', jour: 17, nom: 'Fermeture de l’atelier' },
+    ]);
+    expect(joursMarquesDuMois(2026, 10, nom)).toEqual([]);
   });
 
   it('DateMarksProvider : transmis aux sélecteurs, sans rien changer au champ', () => {

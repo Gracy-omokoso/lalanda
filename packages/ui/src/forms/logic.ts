@@ -628,6 +628,21 @@ export function indexerMarques(
   return (iso) => exacts.get(iso) ?? annuels.get(iso.slice(5));
 }
 
+/** Jours marqués d'un mois, dans l'ordre (légende sous le calendrier). */
+export function joursMarquesDuMois(
+  annee: number,
+  mois1: number,
+  nomDuJour: (iso: string) => string | undefined,
+): { iso: string; jour: number; nom: string }[] {
+  const liste: { iso: string; jour: number; nom: string }[] = [];
+  for (let j = 1; j <= joursDansMois(annee, mois1); j += 1) {
+    const iso = isoDe(annee, mois1, j);
+    const nom = nomDuJour(iso);
+    if (nom) liste.push({ iso, jour: j, nom });
+  }
+  return liste;
+}
+
 // ─── Mois (`AAAA-MM`, la valeur des champs natifs `type="month"`) ─────────────
 
 const AAAA_MM = /^(\d{4})-(\d{2})$/;

@@ -44,6 +44,7 @@ import {
   idSur,
   indexerMarques,
   isoDe,
+  joursMarquesDuMois,
   JOURS_COURTS_FR,
   JOURS_FR,
   LIBELLES_RACCOURCIS,
@@ -138,6 +139,9 @@ function Calendrier({
   }
 
   const titre = `${MOIS_FR[d.mois - 1]} ${d.annee}`;
+  // Légende des jours marqués du mois affiché : lisible au toucher, où l'infobulle
+  // (`title`) n'existe pas.
+  const legende = joursMarquesDuMois(d.annee, d.mois, nomDuJour);
   const debutPlage = selection.start;
   const finPlage = selection.end;
 
@@ -291,6 +295,28 @@ function Calendrier({
           </tbody>
         </table>
       )}
+
+      {vue === 'jours' && legende.length > 0 ? (
+        <ul
+          aria-label="Jours fériés du mois"
+          className="flex flex-col gap-0.5 px-1 text-xs text-[var(--foreground-muted)]"
+        >
+          {legende.map((m) => (
+            <li key={m.iso} className="flex items-baseline gap-1.5">
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-[var(--warn)]"
+              />
+              <span>
+                <span className="font-medium tabular-nums text-[var(--foreground)]">
+                  {m.jour} {MOIS_COURTS_FR[d.mois - 1]}
+                </span>{' '}
+                — {m.nom}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-1.5 border-t border-[var(--border)] pt-2">
         {shortcuts.map((r) => {
