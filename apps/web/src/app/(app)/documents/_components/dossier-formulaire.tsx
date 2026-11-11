@@ -6,12 +6,24 @@
 // Écriture : gestionnaires, plus des personnes désignées. Un sous-dossier hérite
 // et ne peut qu'ajouter des restrictions : l'API en juge.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  ChoiceCards,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextInput,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { documentsApi, type DocumentFolderView } from '@/lib/api-documents';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   ACTIONS_DOSSIER,
@@ -40,7 +52,7 @@ function ChoixPersonnes({
 }): React.ReactElement {
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="text-sm font-medium">{legende}</legend>
+      <legend className="mb-1 text-sm font-medium">{legende}</legend>
       {membres.length === 0 ? (
         <p className="text-xs text-[var(--foreground-muted)]">
           La liste des membres n’est pas lisible.
@@ -49,25 +61,22 @@ function ChoixPersonnes({
         <ul className="grid max-h-48 gap-1 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border)] p-2 sm:grid-cols-2">
           {membres.map((m) => (
             <li key={m.userId}>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={valeur.includes(m.userId)}
-                  onChange={(e) =>
-                    onChange(
-                      e.target.checked
-                        ? [...valeur, m.userId]
-                        : valeur.filter((u) => u !== m.userId),
-                    )
-                  }
-                />
-                <span className="break-words">{m.name}</span>
-              </label>
+              <Checkbox
+                checked={valeur.includes(m.userId)}
+                onChange={(coche) =>
+                  onChange(coche ? [...valeur, m.userId] : valeur.filter((u) => u !== m.userId))
+                }
+                label={<span className="break-words">{m.name}</span>}
+              />
             </li>
           ))}
         </ul>
       )}
-      {erreur ? <p className="text-xs text-[var(--danger)]">{erreur}</p> : null}
+      {erreur ? (
+        <p aria-live="polite" className="text-xs font-medium text-[var(--danger)]">
+          {erreur}
+        </p>
+      ) : null}
     </fieldset>
   );
 }
@@ -94,6 +103,7 @@ export function DossierFormulaire({
   const [envoi, setEnvoi] = useState(false);
   const exclus = dossier ? descendants(dossiers, dossier.id) : new Set<string>();
   const parents = optionsDossiers(dossiers, false).filter((o) => !exclus.has(o.id));
+  const parentChoisi = parents.find((o) => o.id === f.parentId) ?? null;
 
   async function valider(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -128,84 +138,70 @@ export function DossierFormulaire({
       size="md"
     >
       <form noValidate onSubmit={(e) => void valider(e)} className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id={`${id}-nom`} label="Nom" requis erreur={champs['name']}>
-            <input
-              id={`${id}-nom`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-nom`} label="Nom" required size="lg" error={champs['name']}>
+            <TextInput
               value={f.name}
               maxLength={120}
+              autoFocus={dossier === null}
               onChange={(e) => setF({ ...f, name: e.target.value })}
-              {...aria(`${id}-nom`, champs['name'])}
             />
-          </Champ>
-          <Champ id={`${id}-parent`} label="Dans" aide="Cinq niveaux au plus.">
-            <select
-              id={`${id}-parent`}
-              className={CHAMP}
-              value={f.parentId}
-              onChange={(e) => setF({ ...f, parentId: e.target.value })}
-              aria-describedby={`${id}-parent-aide`}
-            >
-              <option value="">La racine de la bibliothèque</option>
-              {parents.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Champ>
-        </div>
-
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-semibold">Qui peut le consulter ?</legend>
-          {(
-            [
-              ['all', 'Tous ceux qui consultent la bibliothèque'],
-              ['action', 'Seulement ceux qui ont une autorisation'],
-              ['users', 'Seulement des personnes désignées (dossier restreint)'],
-            ] as [TypeLecture, string][]
-          ).map(([v, l]) => (
-            <label key={v} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name={`${id}-lecture`}
-                checked={f.lecture === v}
-                onChange={() => setF({ ...f, lecture: v })}
-              />
-              {l}
-            </label>
-          ))}
+          </Field>
+          <Field
+            id={`${id}-parent`}
+            label="Dans"
+            size="lg"
+            newRow
+            hint="Tapez pour chercher. Cinq niveaux au plus."
+          >
+            <EntityPicker<{ id: string; label: string }>
+              value={parentChoisi}
+              onChange={(o) => setF({ ...f, parentId: o?.id ?? '' })}
+              search={async (q) => parents.filter((o) => correspondRecherche([o.label], q))}
+              refreshKey={parents.length}
+              getKey={(o) => o.id}
+              getLabel={(o) => o.label}
+              placeholder="La racine de la bibliothèque"
+              debounceMs={0}
+              emptyText="Aucun dossier ne correspond."
+            />
+          </Field>
+          <Field label="Qui peut le consulter ?" size="full" group newRow>
+            <ChoiceCards<TypeLecture>
+              value={f.lecture}
+              onChange={(lecture) => setF({ ...f, lecture })}
+              columns={1}
+              options={[
+                { value: 'all', label: 'Tous ceux qui consultent la bibliothèque' },
+                { value: 'action', label: 'Seulement ceux qui ont une autorisation' },
+                {
+                  value: 'users',
+                  label: 'Seulement des personnes désignées (dossier restreint)',
+                  description:
+                    'Visible, nom compris, de ces personnes et du Propriétaire seulement — même pas des autres gestionnaires des documents.',
+                },
+              ]}
+            />
+          </Field>
           {f.lecture === 'action' ? (
-            <select
-              aria-label="Autorisation exigée"
-              className={CHAMP}
-              value={f.action}
-              onChange={(e) => setF({ ...f, action: e.target.value })}
-            >
-              {ACTIONS_DOSSIER.map((x) => (
-                <option key={x.action} value={x.action}>
-                  {x.label}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {f.lecture === 'users' ? (
-            <>
-              <p className="text-xs text-[var(--foreground-muted)]">
-                Un dossier restreint n’est visible, nom compris, que de ces personnes et du
-                Propriétaire — même pas des autres gestionnaires des documents.
-              </p>
-              <ChoixPersonnes
-                legende="Personnes autorisées"
-                membres={membres}
-                valeur={f.lecteurs}
-                onChange={(lecteurs) => setF({ ...f, lecteurs })}
-                erreur={champs['lecteurs']}
+            <Field label="Autorisation exigée" size="lg" newRow>
+              <Select<string>
+                value={f.action}
+                onChange={(action) => setF({ ...f, action })}
+                options={ACTIONS_DOSSIER.map((x) => ({ value: x.action, label: x.label }))}
               />
-            </>
+            </Field>
           ) : null}
-        </fieldset>
+        </FormGrid>
+        {f.lecture === 'users' ? (
+          <ChoixPersonnes
+            legende="Personnes autorisées"
+            membres={membres}
+            valeur={f.lecteurs}
+            onChange={(lecteurs) => setF({ ...f, lecteurs })}
+            erreur={champs['lecteurs']}
+          />
+        ) : null}
 
         <ChoixPersonnes
           legende="Peuvent aussi y déposer (en plus des gestionnaires)"
@@ -213,33 +209,25 @@ export function DossierFormulaire({
           valeur={f.ecrivains}
           onChange={(ecrivains) => setF({ ...f, ecrivains })}
         />
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={f.inherit}
-            onChange={(e) => setF({ ...f, inherit: e.target.checked })}
-          />
-          <span>
-            Hériter des droits du dossier parent
-            <span className="block text-xs text-[var(--foreground-muted)]">
-              Un sous-dossier ne peut qu’ajouter des restrictions, jamais élargir.
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={f.inherit}
+          onChange={(inherit) => setF({ ...f, inherit })}
+          label="Hériter des droits du dossier parent"
+          description="Un sous-dossier ne peut qu’ajouter des restrictions, jamais élargir."
+        />
 
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Annuler
-          </button>
-          <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-            {envoi ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
+          </Button>
+          <SubmitButton size="sm" busy={envoi} busyLabel="Enregistrement…" className="max-sm:h-11">
+            Enregistrer
+          </SubmitButton>
         </div>
       </form>
     </Modal>

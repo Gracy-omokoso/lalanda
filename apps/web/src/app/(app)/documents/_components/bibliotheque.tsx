@@ -5,7 +5,7 @@
 // dans le CORPS de `POST /documents/search`, jamais dans l'URL), dépôt en fenêtre
 // modale (multipart). Seul l'identifiant du dossier ouvert figure dans l'adresse.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Select, TextInput, buttonClasses } from '@lalanda/ui';
 import { Folder, FolderOpen, FolderPlus, Library, Lock, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -19,7 +19,7 @@ import {
 } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { arbreDossiers, cheminDossier, resumeAcces, type NoeudDossier } from './arbre-model';
 import { DepotDocument } from './depot-document';
@@ -212,37 +212,35 @@ export function Bibliotheque(): React.ReactElement {
         }
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <input
+          <TextInput
             type="search"
             aria-label="Rechercher par titre"
             placeholder="Rechercher par titre…"
-            className={`${CHAMP} lg:max-w-xs`}
+            className="lg:max-w-xs"
             value={filtres.texte}
             onChange={(e) => setFiltres({ ...filtres, texte: e.target.value })}
           />
-          <input
+          <TextInput
             type="search"
             aria-label="Étiquette"
             placeholder="Étiquette"
-            className={`${CHAMP} lg:max-w-[10rem]`}
+            className="lg:max-w-[10rem]"
             value={filtres.etiquette}
             onChange={(e) => setFiltres({ ...filtres, etiquette: e.target.value })}
           />
-          <select
+          <Select<DocumentNature | ''>
             aria-label="Nature"
-            className={`${CHAMP} lg:max-w-[14rem]`}
+            className="w-full lg:max-w-[14rem]"
             value={filtres.nature}
-            onChange={(e) =>
-              setFiltres({ ...filtres, nature: e.target.value as DocumentNature | '' })
-            }
-          >
-            <option value="">Toutes les natures</option>
-            {Object.entries(LIBELLES_NATURE).map(([k, l]) => (
-              <option key={k} value={k}>
-                {l}
-              </option>
-            ))}
-          </select>
+            onChange={(nature) => setFiltres({ ...filtres, nature })}
+            options={[
+              { value: '', label: 'Toutes les natures' },
+              ...(Object.entries(LIBELLES_NATURE) as [DocumentNature, string][]).map(([k, l]) => ({
+                value: k,
+                label: l,
+              })),
+            ]}
+          />
         </div>
         <p className="text-xs text-[var(--foreground-muted)]">
           La recherche porte sur les titres, étiquettes et natures, jamais sur le contenu des

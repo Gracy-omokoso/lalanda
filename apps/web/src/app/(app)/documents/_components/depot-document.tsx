@@ -6,7 +6,17 @@
 // acceptés ; un autre type est refusé avant l'envoi, avec un message clair.
 // Réutilisé par la bibliothèque et par les panneaux « Documents » des fiches.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextInput,
+} from '@lalanda/ui';
 import { Link2, X } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -19,7 +29,7 @@ import {
 } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, CHAMP, aria } from '../../ventes/_components/form-ui';
 
 import { optionsDossiers } from './arbre-model';
 import {
@@ -87,44 +97,43 @@ export function EditeurLiens({
         </ul>
       )}
       {types.length > 0 && liens.length < 10 ? (
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,12rem)_1fr_auto] sm:items-end">
-          <select
-            aria-label="Type d’élément"
-            className={CHAMP}
-            value={type}
-            onChange={(e) => {
-              setType(e.target.value as EntiteLiable);
-              setChoix(null);
-            }}
-          >
-            {types.map((t) => (
-              <option key={t} value={t}>
-                {LIBELLES_ENTITE[t]}
-              </option>
-            ))}
-          </select>
-          <ChoixEntite
-            key={type}
-            id={`${id}-entite`}
-            type={type}
-            organizationId={organizationId}
-            valeur={choix?.id ?? ''}
-            onChange={setChoix}
-          />
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            disabled={choix === null}
-            onClick={() => {
-              if (choix === null) return;
-              const l = { entityType: type, entityId: choix.id, label: choix.label };
-              if (!liens.some((x) => cle(x) === cle(l))) onChange([...liens, l]);
-              setChoix(null);
-            }}
-          >
-            Lier
-          </button>
-        </div>
+        <FormGrid>
+          <Field label="Type d’élément" size="sm">
+            <Select<EntiteLiable>
+              value={type}
+              onChange={(t) => {
+                setType(t);
+                setChoix(null);
+              }}
+              options={types.map((t) => ({ value: t, label: LIBELLES_ENTITE[t] }))}
+            />
+          </Field>
+          <Field id={`${id}-entite`} label="Élément" size="lg">
+            <ChoixEntite
+              key={type}
+              id={`${id}-entite`}
+              type={type}
+              organizationId={organizationId}
+              valeur={choix?.id ?? ''}
+              onChange={setChoix}
+            />
+          </Field>
+          <div className="flex items-end @lg:col-span-12">
+            <Button
+              size="sm"
+              disabled={choix === null}
+              className="max-sm:h-11"
+              onClick={() => {
+                if (choix === null) return;
+                const l = { entityType: type, entityId: choix.id, label: choix.label };
+                if (!liens.some((x) => cle(x) === cle(l))) onChange([...liens, l]);
+                setChoix(null);
+              }}
+            >
+              Lier
+            </Button>
+          </div>
+        </FormGrid>
       ) : null}
     </fieldset>
   );
@@ -224,137 +233,114 @@ function ModalDepot({
       size="lg"
     >
       <form noValidate onSubmit={(e) => void envoyer(e)} className="flex flex-col gap-4">
-        <Champ id={`${id}-fichier`} label="Fichier" requis erreur={champs['fichier'] || undefined}>
-          <input
+        <FormGrid>
+          <Field
             id={`${id}-fichier`}
-            type="file"
-            accept={ACCEPT_DOCUMENT}
-            className={CHAMP}
-            onChange={(e) => choisirFichier(e.target.files?.[0] ?? null)}
-            {...aria(`${id}-fichier`, champs['fichier'] || undefined)}
-          />
-        </Champ>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Champ id={`${id}-titre`} label="Titre" requis erreur={champs['title']}>
-              <input
-                id={`${id}-titre`}
-                className={CHAMP}
-                value={f.title}
-                maxLength={200}
-                autoComplete="off"
-                onChange={(e) => setF({ ...f, title: e.target.value })}
-                {...aria(`${id}-titre`, champs['title'])}
-              />
-            </Champ>
-          </div>
-          <Champ id={`${id}-dossier`} label="Dossier" erreur={champs['folderId']}>
-            <select
-              id={`${id}-dossier`}
-              className={CHAMP}
+            label="Fichier"
+            required
+            size="full"
+            error={champs['fichier'] || undefined}
+          >
+            <input
+              id={`${id}-fichier`}
+              type="file"
+              accept={ACCEPT_DOCUMENT}
+              className={`${CHAMP} max-sm:text-base`}
+              onChange={(e) => choisirFichier(e.target.files?.[0] ?? null)}
+              aria-required="true"
+              {...aria(`${id}-fichier`, champs['fichier'] || undefined)}
+            />
+          </Field>
+          <Field id={`${id}-titre`} label="Titre" required size="full" error={champs['title']}>
+            <TextInput
+              value={f.title}
+              maxLength={200}
+              autoComplete="off"
+              onChange={(e) => setF({ ...f, title: e.target.value })}
+            />
+          </Field>
+          <Field
+            id={`${id}-dossier`}
+            label="Dossier"
+            size="lg"
+            required={!gerer}
+            error={champs['folderId']}
+          >
+            <Select<string>
               value={f.folderId}
-              onChange={(e) => setF({ ...f, folderId: e.target.value })}
-              {...aria(`${id}-dossier`, champs['folderId'])}
-            >
-              {gerer ? (
-                <option value="">Sans dossier (seulement lié)</option>
-              ) : (
-                <option value="">Choisir un dossier</option>
-              )}
-              {options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-nature`} label="Nature">
-            <select
-              id={`${id}-nature`}
-              className={CHAMP}
+              onChange={(folderId) => setF({ ...f, folderId })}
+              options={[
+                {
+                  value: '',
+                  label: gerer ? 'Sans dossier (seulement lié)' : 'Choisir un dossier',
+                },
+                ...options.map((o) => ({ value: o.id, label: o.label })),
+              ]}
+            />
+          </Field>
+          <Field id={`${id}-nature`} label="Nature" size="md">
+            <Select<DocumentNature>
               value={f.nature}
-              onChange={(e) => setF({ ...f, nature: e.target.value as DocumentNature })}
-            >
-              {Object.entries(LIBELLES_NATURE).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-emis`} label="Délivré le">
-            <input
-              id={`${id}-emis`}
-              type="date"
-              className={CHAMP}
-              value={f.issuedOn}
-              onChange={(e) => setF({ ...f, issuedOn: e.target.value })}
+              onChange={(nature) => setF({ ...f, nature })}
+              options={(Object.entries(LIBELLES_NATURE) as [DocumentNature, string][]).map(
+                ([k, l]) => ({ value: k, label: l }),
+              )}
             />
-          </Champ>
-          <Champ id={`${id}-expire`} label="Expire le" erreur={champs['expiresOn']}>
-            <input
-              id={`${id}-expire`}
-              type="date"
-              className={CHAMP}
+          </Field>
+          <Field id={`${id}-emis`} label="Délivré le" size="sm" newRow>
+            <DatePicker value={f.issuedOn} onChange={(issuedOn) => setF({ ...f, issuedOn })} />
+          </Field>
+          <Field id={`${id}-expire`} label="Expire le" size="sm" error={champs['expiresOn']}>
+            <DatePicker
               value={f.expiresOn}
-              onChange={(e) => setF({ ...f, expiresOn: e.target.value })}
-              {...aria(`${id}-expire`, champs['expiresOn'])}
+              shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+              onChange={(expiresOn) => setF({ ...f, expiresOn })}
             />
-          </Champ>
+          </Field>
           {f.expiresOn ? (
-            <Champ
+            <Field
               id={`${id}-rappel`}
               label="Rappel (jours avant l’expiration)"
-              aide="Vide : 30 jours."
-              erreur={champs['reminderDays']}
+              hint="Vide : 30 jours."
+              size="sm"
+              error={champs['reminderDays']}
             >
               <ChampNombre
-                id={`${id}-rappel`}
                 entier
                 value={f.reminderDays}
                 onChange={(e) => setF({ ...f, reminderDays: e.target.value })}
-                {...aria(`${id}-rappel`, champs['reminderDays'], true)}
               />
-            </Champ>
+            </Field>
           ) : null}
-          <Champ
+          <Field
             id={`${id}-tags`}
             label="Étiquettes"
-            aide="Séparées par des virgules, 10 au plus."
-            erreur={champs['tags']}
+            hint="Séparées par des virgules, 10 au plus."
+            size="lg"
+            newRow
+            error={champs['tags']}
           >
-            <input
-              id={`${id}-tags`}
-              className={CHAMP}
+            <TextInput
               value={f.tags}
               autoComplete="off"
               placeholder="fiscal, 2026"
               onChange={(e) => setF({ ...f, tags: e.target.value })}
-              {...aria(`${id}-tags`, champs['tags'], true)}
             />
-          </Champ>
-        </div>
+          </Field>
+        </FormGrid>
         <EditeurLiens
           liens={f.links}
           verrouilles={verrouilles}
           onChange={(links) => setF({ ...f, links })}
         />
         {gerer ? (
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={f.sensitive}
-              onChange={(e) => setF({ ...f, sensitive: e.target.checked })}
-            />
-            <span>
-              <span className="font-medium">Document sensible</span>
-              <span className="block text-xs text-[var(--foreground-muted)]">
-                Chiffré par Lalanda ; chaque téléchargement est journalisé. Ne change plus après le
-                dépôt.
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={f.sensitive}
+            onChange={(sensitive) => setF({ ...f, sensitive })}
+            aria-invalid={champs['sensitive'] ? true : undefined}
+            label={<span className="font-medium">Document sensible</span>}
+            description="Chiffré par Lalanda ; chaque téléchargement est journalisé. Ne change plus après le dépôt."
+          />
         ) : null}
         {champs['sensitive'] ? (
           <p className="text-xs text-[var(--danger)]">{champs['sensitive']}</p>
@@ -364,13 +350,13 @@ function ModalDepot({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Annuler
-          </button>
-          <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-            {envoi ? 'Envoi…' : 'Déposer'}
-          </button>
+          </Button>
+          <SubmitButton size="sm" busy={envoi} busyLabel="Envoi…" className="max-sm:h-11">
+            Déposer
+          </SubmitButton>
         </div>
       </form>
     </Modal>

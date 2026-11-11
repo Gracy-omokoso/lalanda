@@ -6,7 +6,18 @@
 // métadonnées et des liens, mise à la corbeille et restauration. Document invisible
 // ou d'une autre organisation : l'API répond 404, l'écran le dit.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import {
   ArrowLeft,
   Download,
@@ -29,7 +40,7 @@ import {
 } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT, CHAMP, aria } from '../../ventes/_components/form-ui';
 
 import { optionsDossiers } from './arbre-model';
 import { EditeurLiens } from './depot-document';
@@ -411,30 +422,31 @@ function DialogueVersion({
       size="md"
     >
       <form noValidate onSubmit={(e) => void envoyer(e)} className="flex flex-col gap-3">
-        <Champ id={`${id}-fichier`} label="Fichier" requis erreur={champ}>
-          <input
-            id={`${id}-fichier`}
-            type="file"
-            accept={ACCEPT_DOCUMENT}
-            className={CHAMP}
-            onChange={(e) => {
-              const f = e.target.files?.[0] ?? null;
-              setFichier(f);
-              setChamp(f ? (validerFichier(f) ?? undefined) : undefined);
-            }}
-            {...aria(`${id}-fichier`, champ)}
-          />
-        </Champ>
-        <Champ id={`${id}-note`} label="Ce qui change">
-          <textarea
-            id={`${id}-note`}
-            rows={2}
-            className={CHAMP}
-            value={note}
-            maxLength={500}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-fichier`} label="Fichier" required size="full" error={champ}>
+            <input
+              id={`${id}-fichier`}
+              type="file"
+              accept={ACCEPT_DOCUMENT}
+              className={`${CHAMP} max-sm:text-base`}
+              aria-required="true"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setFichier(f);
+                setChamp(f ? (validerFichier(f) ?? undefined) : undefined);
+              }}
+              {...aria(`${id}-fichier`, champ)}
+            />
+          </Field>
+          <Field id={`${id}-note`} label="Ce qui change" optional size="full">
+            <TextArea
+              rows={2}
+              value={note}
+              maxLength={500}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         {d.sensitive ? (
           <p className="text-xs text-[var(--foreground-muted)]">{PHRASE_SENSIBLE}</p>
         ) : null}
@@ -443,13 +455,9 @@ function DialogueVersion({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'sm', 'self-start')}
-          disabled={envoi}
-        >
-          {envoi ? 'Envoi…' : 'Déposer la version'}
-        </button>
+        <SubmitButton size="sm" busy={envoi} busyLabel="Envoi…" className="self-start max-sm:h-11">
+          Déposer la version
+        </SubmitButton>
       </form>
     </Modal>
   );
@@ -581,90 +589,54 @@ function DialogueMetadonnees({
   return (
     <Modal open onClose={onFermer} busy={envoi} title="Modifier le document" size="lg">
       <form noValidate onSubmit={(e) => void valider(e)} className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Champ id={`${id}-titre`} label="Titre" requis erreur={champs['title']}>
-              <input
-                id={`${id}-titre`}
-                className={CHAMP}
-                value={titre}
-                maxLength={200}
-                onChange={(e) => setTitre(e.target.value)}
-                {...aria(`${id}-titre`, champs['title'])}
-              />
-            </Champ>
-          </div>
-          <Champ id={`${id}-dossier`} label="Dossier" erreur={champs['folderId']}>
-            <select
-              id={`${id}-dossier`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-titre`} label="Titre" required size="full" error={champs['title']}>
+            <TextInput value={titre} maxLength={200} onChange={(e) => setTitre(e.target.value)} />
+          </Field>
+          <Field id={`${id}-dossier`} label="Dossier" size="lg" error={champs['folderId']}>
+            <Select<string>
               value={dossier}
-              onChange={(e) => setDossier(e.target.value)}
-              {...aria(`${id}-dossier`, champs['folderId'])}
-            >
-              <option value="">Sans dossier (seulement lié)</option>
-              {d.folderId && !options.some((o) => o.id === d.folderId) ? (
-                <option value={d.folderId}>Dossier actuel</option>
-              ) : null}
-              {options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-nature`} label="Nature">
-            <select
-              id={`${id}-nature`}
-              className={CHAMP}
+              onChange={setDossier}
+              options={[
+                { value: '', label: 'Sans dossier (seulement lié)' },
+                ...(d.folderId && !options.some((o) => o.id === d.folderId)
+                  ? [{ value: d.folderId, label: 'Dossier actuel' }]
+                  : []),
+                ...options.map((o) => ({ value: o.id, label: o.label })),
+              ]}
+            />
+          </Field>
+          <Field id={`${id}-nature`} label="Nature" size="md">
+            <Select<DocumentNature>
               value={nature}
-              onChange={(e) => setNature(e.target.value as DocumentNature)}
-            >
-              {Object.entries(LIBELLES_NATURE).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-emis`} label="Délivré le">
-            <input
-              id={`${id}-emis`}
-              type="date"
-              className={CHAMP}
-              value={emis}
-              onChange={(e) => setEmis(e.target.value)}
+              onChange={setNature}
+              options={(Object.entries(LIBELLES_NATURE) as [DocumentNature, string][]).map(
+                ([k, l]) => ({ value: k, label: l }),
+              )}
             />
-          </Champ>
-          <Champ id={`${id}-expire`} label="Expire le" erreur={champs['expiresOn']}>
-            <input
-              id={`${id}-expire`}
-              type="date"
-              className={CHAMP}
+          </Field>
+          <Field id={`${id}-emis`} label="Délivré le" size="sm" newRow>
+            <DatePicker value={emis} onChange={setEmis} />
+          </Field>
+          <Field id={`${id}-expire`} label="Expire le" size="sm" error={champs['expiresOn']}>
+            <DatePicker
               value={expire}
-              onChange={(e) => setExpire(e.target.value)}
-              {...aria(`${id}-expire`, champs['expiresOn'])}
+              shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+              onChange={setExpire}
             />
-          </Champ>
-          <Champ id={`${id}-rappel`} label="Rappel (jours avant)" erreur={champs['reminderDays']}>
-            <ChampNombre
-              id={`${id}-rappel`}
-              entier
-              value={rappel}
-              onChange={(e) => setRappel(e.target.value)}
-              {...aria(`${id}-rappel`, champs['reminderDays'])}
-            />
-          </Champ>
-          <Champ id={`${id}-tags`} label="Étiquettes" erreur={champs['tags']}>
-            <input
-              id={`${id}-tags`}
-              className={CHAMP}
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              {...aria(`${id}-tags`, champs['tags'])}
-            />
-          </Champ>
-        </div>
+          </Field>
+          <Field
+            id={`${id}-rappel`}
+            label="Rappel (jours avant)"
+            size="sm"
+            error={champs['reminderDays']}
+          >
+            <ChampNombre entier value={rappel} onChange={(e) => setRappel(e.target.value)} />
+          </Field>
+          <Field id={`${id}-tags`} label="Étiquettes" size="lg" newRow error={champs['tags']}>
+            <TextInput value={tags} onChange={(e) => setTags(e.target.value)} />
+          </Field>
+        </FormGrid>
         <EditeurLiens liens={liens} onChange={setLiens} />
         <p className="text-xs text-[var(--foreground-muted)]">
           La sensibilité ne change pas après le dépôt : elle décide du chiffrement de chaque
@@ -675,13 +647,14 @@ function DialogueMetadonnees({
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'sm', 'self-start')}
-          disabled={envoi}
+        <SubmitButton
+          size="sm"
+          busy={envoi}
+          busyLabel="Enregistrement…"
+          className="self-start max-sm:h-11"
         >
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+          Enregistrer
+        </SubmitButton>
       </form>
     </Modal>
   );
