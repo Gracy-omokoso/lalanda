@@ -821,3 +821,20 @@ export function navigationInterne(
   if (cible.pathname === ici.pathname && cible.search === ici.search) return null;
   return cible.href;
 }
+
+/**
+ * Bouton Précédent / Suivant du navigateur : l'entrée d'historique atteinte
+ * (`arrivee`) quitte-t-elle l'écran du formulaire (`formulaire`) ? Un simple
+ * changement d'ancre (`#…`) dans la même page ne compte pas ; une autre page, ou
+ * les mêmes chemins avec d'autres paramètres (`?onglet=…`), si. Une adresse
+ * illisible est traitée comme un départ (le garde demande, il ne laisse pas filer).
+ */
+export function departHistorique(formulaire: string, arrivee: string): boolean {
+  try {
+    const a = new URL(formulaire);
+    const b = new URL(arrivee, a);
+    return a.origin !== b.origin || a.pathname !== b.pathname || a.search !== b.search;
+  } catch {
+    return true;
+  }
+}

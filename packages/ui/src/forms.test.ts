@@ -17,7 +17,13 @@ import {
 } from './forms/date-picker';
 import { EntityPicker } from './forms/entity-picker';
 import { Field, FormGrid, PasswordInput, TextInput } from './forms/field';
-import { ConfirmLeaveDialog, ErrorSummary, StickyActions, SubmitButton } from './forms/form-kit';
+import {
+  ConfirmLeaveDialog,
+  ErrorSummary,
+  StickyActions,
+  SubmitButton,
+  confirmLeave,
+} from './forms/form-kit';
 import { MoneyInput, PhoneInput } from './forms/inputs';
 import {
   afficherTelephone,
@@ -31,6 +37,7 @@ import {
   choisirDansPlage,
   correspondRecherche,
   dateRaccourci,
+  departHistorique,
   deplacerJour,
   deplacerMoisClavier,
   describedBy,
@@ -773,6 +780,36 @@ describe('garde de navigation interne (décision n° 3)', () => {
     expect(navigationInterne(clic, lien('tel:+243812345678'), ici)).toBeNull();
     expect(navigationInterne(clic, lien('#adresse'), ici)).toBeNull();
     expect(navigationInterne(clic, lien('/rh'), 'pas une adresse')).toBeNull();
+  });
+
+  it('Précédent / Suivant : départ si la page ou ses paramètres changent, pas pour une ancre', () => {
+    const f = 'https://app.lalanda.cd/ventes/factures/nouveau';
+    expect(departHistorique(f, 'https://app.lalanda.cd/ventes/factures')).toBe(true);
+    expect(departHistorique(f, `${f}?type=avoir`)).toBe(true);
+    expect(departHistorique(f, 'https://autre.example/')).toBe(true);
+    expect(departHistorique(f, `${f}#lignes`)).toBe(false);
+    expect(departHistorique(`${f}#lignes`, f)).toBe(false);
+    expect(departHistorique('pas une adresse', f)).toBe(true);
+  });
+
+  it('confirmLeave sans formulaire modifié : l’action part tout de suite', () => {
+    let partie = 0;
+    confirmLeave(() => {
+      partie += 1;
+    });
+    expect(partie).toBe(1);
+  });
+
+  it('la garde écoute Précédent/Suivant avant le routeur et rejoue history.back()', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('./forms/form-kit.tsx', import.meta.url)),
+      'utf8',
+    );
+    expect(source).toContain("window.addEventListener('popstate', surHistorique, true)");
+    expect(source).toContain('e.stopImmediatePropagation()');
+    expect(source).toContain('window.history.back()');
+    // « Rester » reste le choix par défaut : focus posé sur lui à l'ouverture.
+    expect(source).toContain('rester.current?.focus()');
   });
 
   it('fenêtre « Quitter sans enregistrer ? » : Rester et Quitter', () => {

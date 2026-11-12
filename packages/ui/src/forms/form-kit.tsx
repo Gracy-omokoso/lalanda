@@ -17,6 +17,7 @@ import { Button, type ButtonProps } from '../components/button.js';
 import { cn } from '../utils.js';
 
 import {
+  departHistorique,
   estRaccourciEnregistrer,
   navigationInterne,
   phraseResume,
@@ -45,30 +46,73 @@ export function useUnsavedChangesWarning(actif: boolean, libere?: React.RefObjec
 /** Durée après « Quitter » pendant laquelle le garde se tait (le temps de partir). */
 const DUREE_LIBERATION_MS = 1500;
 
+/** Départ retenu par le garde, rejoué si l'on choisit « Quitter ». */
+type DepartRetenu =
+  | { genre: 'lien'; lien: HTMLAnchorElement }
+  | { genre: 'historique' }
+  | { genre: 'action'; action: () => void };
+
+/**
+ * Gardes actifs (formulaires modifiés), le plus récent en dernier. Sert à
+ * `confirmLeave` : une navigation programmée passe par le garde du dessus.
+ */
+const GARDES_ACTIFS: ((action: () => void) => void)[] = [];
+
+/**
+ * Navigation programmée (`router.push`, `router.back`…) qui **abandonne** la
+ * saisie : « Annuler », « Retour à la liste » posé en bouton. Si un formulaire
+ * modifié est à l'écran, la petite fenêtre « Quitter sans enregistrer ? »
+ * s'ouvre et `action` ne part qu'après « Quitter » ; sinon `action` part tout
+ * de suite. À ne PAS utiliser après un enregistrement réussi (la saisie n'est
+ * plus à perdre, et l'état « modifié » n'est peut-être pas encore retombé).
+ */
+export function confirmLeave(action: () => void): void {
+  const garde = GARDES_ACTIFS[GARDES_ACTIFS.length - 1];
+  if (garde) garde(action);
+  else action();
+}
+
 /**
  * Garde des modifications non enregistrées (ADR-0074 § 9, décision n° 3) :
- * `beforeunload` pour le rechargement et la fermeture d'onglet, et capture des
- * clics sur les liens internes de l'application (même origine, sans touche de
- * modification, hors `target="_blank"` et téléchargements) — le routeur de
- * Next n'offre pas d'API pour cela. Le clic est retenu, une petite fenêtre
- * demande « Quitter sans enregistrer ? » ; « Quitter » rejoue le clic sur le
- * même lien (le routeur le traite comme avant), « Rester » ne fait rien.
+ * - `beforeunload` pour le rechargement et la fermeture d'onglet ;
+ * - capture des clics sur les liens internes de l'application (même origine,
+ *   sans touche de modification, hors `target="_blank"` et téléchargements) —
+ *   le routeur de Next n'offre pas d'API pour cela. « Quitter » rejoue le clic
+ *   sur le même lien (le routeur le traite comme avant) ;
+ * - boutons **Précédent / Suivant** du navigateur (`popstate`, écouté en phase
+ *   de capture, donc avant le routeur de Next) : l'événement n'atteint pas le
+ *   routeur, l'adresse du formulaire est remise au sommet de l'historique
+ *   (`history.pushState` avec l'état de Next, API publique du routeur) et la
+ *   fenêtre s'ouvre ; « Quitter » refait `history.back()`. Seules limites :
+ *   l'adresse précédente s'affiche un instant, et après un « Suivant » refusé,
+ *   la page d'où l'on venait reste derrière le formulaire ;
+ * - navigations programmées qui abandonnent la saisie : `confirmLeave`.
  *
+ * « Rester » est le choix par défaut (focus, Échap, clic sur le fond).
  * Actif seulement si `actif` (formulaire modifié) : il se tait dès que
  * l'écran remet `actif` à `false` (envoi réussi, retour à l'état enregistré).
  * Rend la fenêtre à afficher (portail vers `document.body`).
  */
 export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | null {
   const libere = useRef(false);
-  const [lien, setLien] = useState<HTMLAnchorElement | null>(null);
+  const [depart, setDepart] = useState<DepartRetenu | null>(null);
+  // Adresse et état d'historique de l'écran du formulaire, relus à chaque rendu.
+  const page = useRef<{ url: string; etat: unknown } | null>(null);
   useUnsavedChangesWarning(actif, libere);
 
   useEffect(() => {
+    if (actif && typeof window !== 'undefined') {
+      page.current = { url: window.location.href, etat: window.history.state };
+    }
+  });
+
+  useEffect(() => {
     if (!actif) {
-      setLien(null);
+      setDepart(null);
       return;
     }
     libere.current = false;
+    page.current = { url: window.location.href, etat: window.history.state };
     const surClic = (e: MouseEvent): void => {
       if (libere.current) return;
       const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
@@ -82,25 +126,50 @@ export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | nul
       // Capture sur `document` : le clic n'atteint ni le lien ni le routeur.
       e.preventDefault();
       e.stopPropagation();
-      setLien(a);
+      setDepart({ genre: 'lien', lien: a });
     };
+    const surHistorique = (e: PopStateEvent): void => {
+      const ici = page.current;
+      if (libere.current || !ici) return;
+      if (!departHistorique(ici.url, window.location.href)) {
+        // Simple ancre dans la même page : rien à garder.
+        page.current = { url: window.location.href, etat: window.history.state };
+        return;
+      }
+      // Phase de capture sur `window` : le routeur de Next (écouteur ordinaire)
+      // ne reçoit pas l'événement et n'affiche pas la page d'avant.
+      e.stopImmediatePropagation();
+      window.history.pushState(ici.etat, '', ici.url);
+      setDepart({ genre: 'historique' });
+    };
+    const ouvrir = (action: () => void): void => setDepart({ genre: 'action', action });
+    GARDES_ACTIFS.push(ouvrir);
     document.addEventListener('click', surClic, true);
-    return () => document.removeEventListener('click', surClic, true);
+    window.addEventListener('popstate', surHistorique, true);
+    return () => {
+      const i = GARDES_ACTIFS.lastIndexOf(ouvrir);
+      if (i >= 0) GARDES_ACTIFS.splice(i, 1);
+      document.removeEventListener('click', surClic, true);
+      window.removeEventListener('popstate', surHistorique, true);
+    };
   }, [actif]);
 
-  const rester = useCallback(() => setLien(null), []);
+  const rester = useCallback(() => setDepart(null), []);
   const quitter = useCallback(() => {
-    const a = lien;
-    setLien(null);
-    if (!a || !a.isConnected) return;
+    const d = depart;
+    setDepart(null);
+    if (!d) return;
+    if (d.genre === 'lien' && !d.lien.isConnected) return;
     libere.current = true;
     window.setTimeout(() => {
       libere.current = false;
     }, DUREE_LIBERATION_MS);
-    a.click();
-  }, [lien]);
+    if (d.genre === 'lien') d.lien.click();
+    else if (d.genre === 'historique') window.history.back();
+    else d.action();
+  }, [depart]);
 
-  if (!lien || typeof document === 'undefined') return null;
+  if (!depart || typeof document === 'undefined') return null;
   return createPortal(<ConfirmLeaveDialog onStay={rester} onLeave={quitter} />, document.body);
 }
 
