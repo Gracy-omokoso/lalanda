@@ -10,7 +10,15 @@
 // La suppression n'est proposée que pour un client JAMAIS facturé (§ O7) ;
 // sinon, seule la désactivation le retire des propositions.
 
-import { Field, FormGrid, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
+import {
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  TextInput,
+  afficherTelephone,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -270,7 +278,7 @@ export function CustomerList(): React.ReactElement {
                     </p>
                     {c.email || c.phone ? (
                       <p className="break-words text-xs text-[var(--foreground-muted)]">
-                        {[c.email, c.phone].filter(Boolean).join(' · ')}
+                        {[c.email, afficherTelephone(c.phone)].filter(Boolean).join(' · ')}
                       </p>
                     ) : null}
                   </div>

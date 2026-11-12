@@ -9,7 +9,7 @@
 // Tant que la fiche 360° n'est pas servie (404, lot P6), l'écran montre
 // l'identité lue dans la liste — rendue par l'API — et le dit.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Badge, Modal, afficherTelephone, buttonClasses } from '@lalanda/ui';
 import {
   ClipboardList,
   CreditCard,
@@ -189,7 +189,8 @@ function Identite({ s }: { s: SupplierView }): React.ReactElement {
                   {c.role ? ` — ${c.role}` : ''}
                 </span>
                 <span className="text-xs break-all text-[var(--foreground-muted)]">
-                  {[c.email, c.phone].filter(Boolean).join(' · ') || 'Sans coordonnées'}
+                  {[c.email, afficherTelephone(c.phone)].filter(Boolean).join(' · ') ||
+                    'Sans coordonnées'}
                 </span>
               </li>
             ))}
@@ -424,7 +425,7 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tuile libelle="NIF" valeur={s.nif ?? 'Non renseigné'} />
           <Tuile libelle="Conditions" valeur={libelleConditions(s.paymentTerms)} />
-          <Tuile libelle="Téléphone" valeur={s.phone ?? '—'} />
+          <Tuile libelle="Téléphone" valeur={afficherTelephone(s.phone) || '—'} />
           <Tuile libelle="E-mail" valeur={<span className="break-all">{s.email ?? '—'}</span>} />
         </dl>
         {s.address ? <p className="text-sm text-[var(--foreground-muted)]">{s.address}</p> : null}

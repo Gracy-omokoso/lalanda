@@ -7,7 +7,7 @@
 // n'est montré qu'à son titulaire ; l'écran ne l'envoie qu'aux routes de l'appelant.
 
 import type { WhatsAppView } from '@lalanda/shared/work';
-import { Button, Field, OtpInput, PhoneInput, StatusPill } from '@lalanda/ui';
+import { Button, Field, OtpInput, PhoneInput, StatusPill, afficherTelephone } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
@@ -221,7 +221,8 @@ export function BlocWhatsApp({
       {etape === 'verifie' && n ? (
         <div className="flex flex-col gap-2 text-sm">
           <p>
-            Numéro vérifié : <span className="font-medium tabular-nums">{n.phone}</span>
+            Numéro vérifié :{' '}
+            <span className="font-medium tabular-nums">{afficherTelephone(n.phone)}</span>
             {n.verifiedAt
               ? ` (le ${new Date(n.verifiedAt).toLocaleDateString('fr-FR', { dateStyle: 'long' })})`
               : ''}

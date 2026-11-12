@@ -26,6 +26,7 @@ import {
   SubmitButton,
   TextArea,
   TextInput,
+  afficherTelephone,
   buttonClasses,
   type FieldSize,
 } from '@lalanda/ui';
@@ -717,13 +718,13 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
           <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Tuile libelle="Type DGI" valeur={libelleTypeClient(client.type as CustomerType)} />
             <Tuile libelle="NIF" valeur={client.nif ?? 'Non renseigné'} />
-            <Tuile libelle="Téléphone" valeur={client.phone ?? a.phone ?? '—'} />
+            <Tuile libelle="Téléphone" valeur={afficherTelephone(client.phone ?? a.phone) || '—'} />
             <Tuile libelle="E-mail" valeur={client.email ?? a.email ?? '—'} />
           </dl>
         ) : (
           <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Tuile libelle="Origine" valeur={a.origin ?? '—'} />
-            <Tuile libelle="Téléphone" valeur={a.phone ?? '—'} />
+            <Tuile libelle="Téléphone" valeur={afficherTelephone(a.phone) || '—'} />
             <Tuile libelle="E-mail" valeur={a.email ?? '—'} />
             <Tuile libelle="Site web" valeur={a.website ?? '—'} />
           </dl>
@@ -787,7 +788,7 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
                   <strong>{c.name}</strong>
                   {c.jobTitle ? ` · ${c.jobTitle}` : ''}
                   <span className="block text-xs text-[var(--foreground-muted)]">
-                    {[c.email, c.phone].filter(Boolean).join(' · ')}
+                    {[c.email, afficherTelephone(c.phone)].filter(Boolean).join(' · ')}
                   </span>
                 </li>
               ))}

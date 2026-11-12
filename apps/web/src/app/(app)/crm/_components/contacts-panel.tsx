@@ -16,6 +16,7 @@ import {
   PhoneInput,
   SubmitButton,
   TextInput,
+  afficherTelephone,
   buttonClasses,
 } from '@lalanda/ui';
 import { Contact, Plus, Search } from 'lucide-react';
@@ -272,7 +273,7 @@ export function ContactsPanel(): React.ReactElement {
                   <span className="text-[var(--foreground-muted)]">{rattachementContact(c)}</span>
                 )}
                 <span className="block text-xs text-[var(--foreground-muted)]">
-                  {[c.email, c.phone].filter(Boolean).join(' · ')}
+                  {[c.email, afficherTelephone(c.phone)].filter(Boolean).join(' · ')}
                 </span>
               </span>
               {gerer ? (

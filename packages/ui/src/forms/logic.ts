@@ -592,10 +592,31 @@ export function lireTelephone(
   return { indicatif: defaut, national: v.replace(/^0+/, '') };
 }
 
-/** Valeur lisible envoyée : `+243 81 234 5678` ; vide sans numéro national. */
+/**
+ * Valeur envoyée à l'API : **E.164 sans espace** (`+243812345678`) ; vide sans
+ * numéro national. Les routes (ventes, CRM, RH, achats, fiche fiscale) stockent le
+ * texte tel quel après `trim` : un format unique évite les doublons « avec ou sans
+ * espaces » et sert tel quel aux liens `tel:`, aux vCards et à WhatsApp (qui
+ * normalise déjà en E.164). L'affichage reste groupé (`afficherTelephone`).
+ */
 export function ecrireTelephone(indicatif: string, national: string): string {
   const n = national.replace(/\D/g, '').replace(/^0+/, '');
-  return n === '' ? '' : `${indicatif} ${grouperNational(indicatif, n)}`;
+  return n === '' ? '' : `${indicatif.replace(/[^\d+]/g, '')}${n}`;
+}
+
+/**
+ * Forme lisible d'un numéro enregistré : `+243812345678` → `+243 81 234 5678`.
+ * Un texte qui n'est pas un numéro (lettres, poste « ext. 12 »…) est rendu tel
+ * quel : on n'efface jamais une saisie ancienne. Un numéro sans indicatif
+ * (`0812…`) est aussi rendu tel quel : on ne devine pas son pays à l'affichage.
+ * Affichage seulement.
+ */
+export function afficherTelephone(valeur: string | null | undefined): string {
+  const v = (valeur ?? '').trim();
+  if (!/^(\+|00)[\d\s.()/-]+$/.test(v)) return v;
+  const { indicatif, national } = lireTelephone(v);
+  if (national === '') return v;
+  return `${indicatif} ${grouperNational(indicatif, national)}`;
 }
 
 // ─── Jours marqués (fériés de l'organisation) ────────────────────────────────

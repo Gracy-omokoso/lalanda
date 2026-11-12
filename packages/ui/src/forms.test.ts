@@ -20,6 +20,7 @@ import { Field, FormGrid, PasswordInput, TextInput } from './forms/field';
 import { ConfirmLeaveDialog, ErrorSummary, StickyActions, SubmitButton } from './forms/form-kit';
 import { MoneyInput, PhoneInput } from './forms/inputs';
 import {
+  afficherTelephone,
   ajouterJours,
   ajouterMois,
   ajouterMoisCivils,
@@ -321,8 +322,31 @@ describe('téléphone', () => {
     });
     expect(lireTelephone('+33 6 12 34 56 78')).toEqual({ indicatif: '+33', national: '612345678' });
     expect(grouperNational('+243', '812345678')).toBe('81 234 5678');
-    expect(ecrireTelephone('+243', '0812345678')).toBe('+243 81 234 5678');
     expect(ecrireTelephone('+243', '')).toBe('');
+  });
+
+  it('valeur envoyée : E.164 sans espace, quel que soit le format saisi', () => {
+    expect(ecrireTelephone('+243', '0812345678')).toBe('+243812345678');
+    expect(ecrireTelephone('+243', '81 234 5678')).toBe('+243812345678');
+    expect(ecrireTelephone('+33', '6 12 34 56 78')).toBe('+33612345678');
+    expect(ecrireTelephone('+1', '(555) 010-0199')).toBe('+15550100199');
+    for (const saisi of ['0812345678', '00243 81 234 5678', '+243 81-234.5678', '812345678']) {
+      const { indicatif, national } = lireTelephone(saisi);
+      const v = ecrireTelephone(indicatif, national);
+      expect(v).toBe('+243812345678');
+      expect(v).not.toMatch(/\s/);
+    }
+  });
+
+  it('affichage groupé, saisie ancienne jamais effacée', () => {
+    expect(afficherTelephone('+243812345678')).toBe('+243 81 234 5678');
+    expect(afficherTelephone('+243 81 234 5678')).toBe('+243 81 234 5678');
+    expect(afficherTelephone('00243812345678')).toBe('+243 81 234 5678');
+    expect(afficherTelephone('+33612345678')).toBe('+33 612 345 678');
+    expect(afficherTelephone('0812345678')).toBe('0812345678');
+    expect(afficherTelephone('Standard, poste 12')).toBe('Standard, poste 12');
+    expect(afficherTelephone(null)).toBe('');
+    expect(afficherTelephone('  ')).toBe('');
   });
 });
 

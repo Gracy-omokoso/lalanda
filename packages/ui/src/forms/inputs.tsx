@@ -5,8 +5,8 @@
 // AUCUNE opération : ni arrondi, ni conversion, ni total (ADR-0025).
 //
 // `PhoneInput` : indicatif (+243 par défaut) choisi à part, numéro national
-// groupé pour la lecture (81 234 5678) ; valeur transmise lisible
-// (`+243 81 234 5678`). Aucune validation du numéro : l'API juge.
+// groupé pour la lecture (81 234 5678) ; valeur transmise en E.164 sans espace
+// (`+243812345678`). Aucune validation du numéro : l’API juge.
 
 import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
 
