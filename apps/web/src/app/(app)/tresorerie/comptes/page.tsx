@@ -917,7 +917,9 @@ function NouveauCompte({
             ]}
           />
         </Field>
-        <Field id="cpt-solde" label="Solde d’ouverture" optional size="sm" hint="Vide : zéro.">
+        {/* `md` : en `sm`, « Solde d’ouverture » + « Facultatif » passait sur deux
+            lignes et décalait le champ sous ses voisins (ADR-0074, qualité). */}
+        <Field id="cpt-solde" label="Solde d’ouverture" optional size="md" hint="Vide : zéro.">
           <MoneyInput
             value={f.openingBalance}
             currency={f.currency}

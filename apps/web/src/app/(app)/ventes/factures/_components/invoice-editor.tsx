@@ -385,7 +385,9 @@ export function InvoiceEditor({
         </p>
       ) : null}
 
-      <p aria-live="polite" className="min-h-[1.25rem] text-sm text-[var(--foreground-muted)]">
+      {/* Région annoncée toujours présente, mais sans place réservée quand elle
+          est vide : plus de trou au-dessus du formulaire (ADR-0074, qualité). */}
+      <p aria-live="polite" className="text-sm text-[var(--foreground-muted)] empty:sr-only">
         {notice ?? ''}
       </p>
       {erreur ? (

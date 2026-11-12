@@ -71,7 +71,9 @@ export function PaymentsEditor({
           const err = erreurs[`payments.${i}.amount`] ?? erreurs[`payments.${i}`];
           return (
             <li key={p.cle} className="flex min-w-0 items-start gap-2">
-              <FormGrid className="min-w-0 flex-1">
+              {/* Largeur bornée : la corbeille reste à côté du montant, pas au bout
+                  de la ligne (ADR-0074, qualité). */}
+              <FormGrid className="min-w-0 flex-1 sm:max-w-[36rem]">
                 <Field id={`${id}-mode`} label="Mode" size="md" disabled={desactive}>
                   <Select<InvoicePaymentMethod>
                     value={p.method}
