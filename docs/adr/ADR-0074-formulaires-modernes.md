@@ -159,9 +159,11 @@ remplissage automatique iOS/Android (`autocomplete="one-time-code"` sur la premi
   (`1234567.50`). Le module `money.ts` ne fait **que du texte** : ni `Number`, ni `parseFloat`,
   ni `Math`, ni arrondi — un test de source le garantit, comme les gardes d'ADR-0025.
 - `PhoneInput` : indicatif choisi à part (**+243 par défaut**), numéro national groupé
-  (`81 234 5678`), `0812…` et `00243…` relus ; valeur envoyée lisible `+243 81 234 5678`
-  (16 caractères), conforme aux motifs de l'API (`/^\+?[0-9][0-9 .-]{6,19}$/`, ventes, CRM, RH,
-  achats). Aucune validation de plus côté écran : l'API juge.
+  (`81 234 5678`), `0812…` et `00243…` relus ; depuis la passe « qualité », valeur envoyée en
+  **E.164 sans espace** (`+243812345678`), conforme aux motifs de l'API
+  (`/^\+?[0-9][0-9 .-]{6,19}$/`, ventes, CRM, RH, achats, fiche fiscale) et identique à ce que
+  WhatsApp enregistre ; l'affichage reste groupé (`afficherTelephone`). Aucune validation de plus
+  côté écran : l'API juge.
 
 ### 9. Comportements de formulaire
 
@@ -175,9 +177,11 @@ remplissage automatique iOS/Android (`autocomplete="one-time-code"` sur la premi
   vole pas le focus d'une fiche qu'on consulte).
 - **Avertissement de modifications non enregistrées** avant de quitter ou recharger la page
   (`beforeunload`) et, depuis la phase 3 (décision n° 3), avant de suivre un **lien interne** de
-  l'application (`useUnsavedChangesGuard`, posé par `Form dirty`) : petite fenêtre « Quitter sans
-  enregistrer ? » / « Rester » / « Quitter » ; les fenêtres modales gardent leur propre
-  confirmation (ADR-0030).
+  l'application (`useUnsavedChangesGuard`, posé par `Form dirty`) et, depuis la passe « qualité »,
+  avant les boutons **Précédent / Suivant** du navigateur et les navigations programmées qui
+  abandonnent la saisie (`confirmLeave`) : petite fenêtre « Quitter sans enregistrer ? » /
+  « Rester » (par défaut) / « Quitter » ; les fenêtres modales gardent leur propre confirmation
+  (ADR-0030).
 - **Bouton de soumission** avec état de chargement (`aria-busy`, indicateur, libellé
   « Enregistrement… »).
 - **Barre d'actions collante** en bas des longs formulaires (facture, fiche collaborateur), avec
@@ -446,6 +450,69 @@ modifié, aucune route ajoutée**.
   les fériés du mois affiché (« 17 nov. — Fermeture de l’atelier ») : l’infobulle n’existe pas
   au toucher.
 
+### Qualité — quatre risques traités (branche `feat/formulaires-qualite`, 12 nov. 2026)
+
+Mêmes règles : aucun fichier de `apps/api` modifié, aucune route ajoutée, aucun fichier supprimé,
+`form-ui.tsx` en place, aucun appel aux services DGI, IA, Slack, Meta/WhatsApp ou e-mail
+(application lancée en local, e-mails seulement journalisés, aucune action d'envoi déclenchée).
+
+1. **Téléphones.** Relevé de l'API (lecture seule) : ventes (`sales.dto.ts`), CRM
+   (`crm.dto.ts`, `CRM_PHONE_PATTERN`, formulaire public), RH (`HR_PHONE_PATTERN`, fiche et
+   dossier sensible), achats (`PURCHASE_PHONE_PATTERN`) et fiche fiscale valident toutes
+   `/^\+?[0-9][0-9 .-]{6,19}$/` puis **stockent le texte tel quel** (`trim` seul) ; seul WhatsApp
+   normalise en E.164 (`normalizeWhatsAppPhone`). Les espaces de `+243 81 234 5678` étaient donc
+   acceptés mais enregistrés, à côté d'anciens numéros sans espaces : deux formes pour un même
+   numéro, des liens `tel:`, des vCards et une sortie DGI moins propres. **Corrigé côté web** :
+   `PhoneInput` transmet `+243812345678` (`ecrireTelephone`), l'écran reste groupé
+   (`81 234 5678`) ; `afficherTelephone` regroupe à l'affichage (fiche et liste fournisseurs,
+   liste clients, comptes et contacts du CRM, numéro WhatsApp vérifié) et rend tel quel un texte
+   ancien qui n'est pas un numéro international. Tests : `forms.test.ts` (forme envoyée,
+   affichage) et `apps/web/src/lib/telephone-contrat.test.ts` (la valeur passe les motifs
+   partagés de l'API et vaut ce que WhatsApp enregistre). Reste : un numéro **non modifié** garde
+   sa forme d'origine ; les PDF (rendus par l'API) impriment le texte stocké — groupage à faire
+   côté API si on le souhaite (hors périmètre).
+2. **Modales empilées.** Contrôlé dans Chromium, bureau et 375 px (« Nouveau projet » → client
+   « + » → « Nouveau client ») : la fenêtre de création est au-dessus (couche supérieure du
+   navigateur, `showModal`), Échap ne ferme qu'elle, le focus revient au champ client, la page
+   reste figée, le client enregistré est choisi d'office. **Défaut trouvé et corrigé** : un choix
+   sans frappe (option de liste, fiche créée par « + », jour du calendrier, segment, carte,
+   interrupteur) ne marquait pas la fenêtre principale comme modifiée — Échap l'abandonnait sans
+   confirmation. `signalerSaisie` (`forms/popover.ts`) émet un événement `input` depuis le
+   composant ; la fenêtre de création reste isolée (portail, propagation arrêtée). Aussi corrigé :
+   le **focus initial** d'une `Modal` va au premier **champ** (« Nouveau projet » le posait sur la
+   carte « Importer un fichier ») ; le **résumé d'erreurs** (`ErrorSummary`) n'apparaît plus
+   avant la première tentative d'envoi (une fenêtre qui s'ouvrait affichait « Un champ est à
+   corriger » dès que le focus quittait le premier champ, cas du double montage de
+   développement).
+3. **Garde « Quitter sans enregistrer ? ».** Étendue aux boutons **Précédent / Suivant** par
+   l'événement `navigate` de la **Navigation API** : il part avant tout changement d'adresse ;
+   un déplacement qui quitte l'écran est annulé, la fenêtre s'ouvre (« Rester » par défaut),
+   « Quitter » rejoue le même déplacement (`navigation.traverseTo`). Première tentative écartée,
+   constat à l'appui : un écouteur `popstate`, même en capture, passe **après** celui du routeur
+   de Next (ordre d'inscription sur `window`), qui a déjà démonté l'écran. Navigations
+   programmées : `confirmLeave(action)` pour un `router.push` qui **abandonne** la saisie.
+   Relevé des écrans gardés : tous leurs `router.push`/`router.replace` suivent un enregistrement
+   ou une suppression réussis (facture, devis, fiches de stock et d'équipement) — les garder
+   ferait demander « Quitter sans enregistrer ? » après un enregistrement ; aucun n'a donc été
+   enveloppé. **Limites** : navigateurs sans Navigation API (Firefox avant 147, Safari avant
+   26.2) — Précédent/Suivant n'y sont pas retenus, seul `beforeunload` joue quand le retour
+   quitte l'application ; la règle anti-piège des navigateurs peut refuser d'annuler un second
+   retour sans geste de l'utilisateur depuis le premier (`cancelable` faux) : il part alors sans
+   fenêtre (vérifié : après « Rester », un nouveau Précédent rouvre bien la fenêtre).
+   Aucune bidouille de l'historique (entrée sentinelle, `pushState` de rattrapage) n'a été
+   retenue : fragile face au routeur.
+4. **Contrôle visuel réel.** Application lancée en local (API + web, `.env` existant, compte et
+   organisation de test créés sur la base locale) ; formulaires parcourus en 1 280 px et 375 px :
+   facture et lignes, devis, encaissement, fournisseur, demande d'achat, dépense, compte et
+   réalisé de la Trésorerie, collaborateur, absence, note de frais, projet (et client en
+   création rapide), prospect, article de stock, mon compte. Corrigé : corbeille d'un paiement
+   de facture rejetée au bout de la ligne (grille bornée à 36 rem), trou au-dessus du formulaire
+   de facture (région annoncée vide qui réservait sa hauteur, désormais `empty:sr-only`),
+   « Solde d'ouverture » d'un compte de trésorerie sur deux lignes qui décalait son champ (taille
+   `md`), plus les trois défauts du point 2. Captures avant/après hors dépôt (dossier de travail
+   de la session). Rien de bloquant vu sur les autres écrans : chevrons, espacements et largeurs
+   conformes aux § 2 et 3.
+
 ### Reste à faire
 
 - **Écrans encore sur `Champ`/`CHAMP`** : envoi d'un document par e-mail
@@ -488,9 +555,9 @@ Gracy a autorisé l'équipe à trancher ces points en proposant le meilleur ; ch
    (pas seulement le menu), petite fenêtre « Quitter sans enregistrer ? » (« Rester » par
    défaut). Justification : perdre une facture ou une fiche en cliquant dans le menu est le cas
    le plus courant ; la capture des clics ne dépend d'aucune API du routeur et laisse intacts
-   les nouveaux onglets, téléchargements et liens externes. Limite connue : une navigation
-   **programmée** (`router.push` après une action) ou les boutons Précédent/Suivant du
-   navigateur ne sont pas retenus.
+   les nouveaux onglets, téléchargements et liens externes. Limite levée par la passe
+   « qualité » : Précédent/Suivant sont retenus, et `confirmLeave` couvre une navigation
+   programmée qui abandonne la saisie (voir « Qualité »).
 6. **Sélecteur de mois — tranchée : `MonthPicker` dans `@lalanda/ui`.** Justification : même
    rendu dans tous les navigateurs (Firefox n’offre pas de sélecteur natif de mois : un
    champ texte nu), affichage français « nov. 2026 », clavier et feuille basse identiques au
