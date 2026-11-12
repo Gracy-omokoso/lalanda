@@ -25,7 +25,7 @@ import {
   prochainIndex,
 } from './logic.js';
 import { ListboxMessage, ListboxOption, Popover, Surligne, VoileTelephone } from './listbox.js';
-import { useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
+import { signalerSaisie, useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
 
 export interface SelectOption<V extends string = string> {
   value: V;
@@ -131,7 +131,10 @@ export function Select<V extends string>({
 
   function choisir(o: SelectOption<V>): void {
     if (o.disabled) return;
-    if (o.value !== value) onChange(o.value);
+    if (o.value !== value) {
+      onChange(o.value);
+      signalerSaisie(bouton.current);
+    }
     fermer(true);
   }
 

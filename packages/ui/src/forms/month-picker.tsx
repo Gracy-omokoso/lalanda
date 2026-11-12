@@ -32,7 +32,7 @@ import {
   MOIS_COURTS_FR,
 } from './logic.js';
 import { Popover, VoileTelephone } from './listbox.js';
-import { useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
+import { signalerSaisie, useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
 
 /** Message d'une saisie illisible ou hors bornes (`null` si elle est bonne). */
 export function messageMois(
@@ -275,7 +275,10 @@ export function MonthPicker({
   function choisir(ym: string): void {
     setProbleme(null);
     setTexte(formatMoisCourt(ym));
-    if (ym !== value) onChange(ym);
+    if (ym !== value) {
+      onChange(ym);
+      signalerSaisie(enveloppe.current);
+    }
     fermer();
     champ.current?.focus();
   }

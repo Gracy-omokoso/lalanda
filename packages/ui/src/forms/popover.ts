@@ -108,6 +108,20 @@ export function useAncrage(
   };
 }
 
+/**
+ * Un choix fait sans frappe (option d'une liste, jour du calendrier, segment,
+ * interrupteur, fiche créée par le « + ») est annoncé comme une saisie : un
+ * événement `input` qui remonte depuis `el`. La fenêtre modale qui entoure le
+ * champ (`Modal`, détection par `input`/`change`) le compte alors comme une
+ * modification et demande confirmation avant d'abandonner. `el` ne doit pas
+ * être un `<input>` (React y lirait un changement de valeur) : on passe
+ * l'enveloppe ou le bouton du composant.
+ */
+export function signalerSaisie(el: Element | null | undefined): void {
+  if (!el || typeof Event === 'undefined') return;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 /** Fermeture sur un appui hors des éléments donnés. */
 export function useAppuiExterieur(
   actif: boolean,

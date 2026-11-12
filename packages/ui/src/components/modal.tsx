@@ -85,6 +85,10 @@ const FOCUSABLE = [
   '[contenteditable="true"]',
 ].join(',');
 
+/** Champ de saisie (pas un lien ni un bouton d'action) : cible du focus initial. */
+export const PREMIER_CHAMP_MODAL =
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([readonly]), select, textarea:not([readonly]), [role="combobox"]';
+
 /**
  * Dialogue imbriqué (un `aria-modal` rendu dans le contenu) qui détient le
  * focus : il garde la main sur `Échap` et sur la circulation au clavier.
@@ -165,9 +169,14 @@ function ModalOuverte({
     const overflow = html.style.overflow;
     html.style.overflow = 'hidden';
     if (!d.open) d.showModal();
+    // Premier CHAMP du contenu (contrat ci-dessus), avant un lien ou un bouton
+    // placé au-dessus du formulaire : « Nouveau projet » ouvrait le focus sur
+    // la carte « Importer un fichier » (ADR-0074, qualité).
+    const liste = corpsRef.current ? focusables(corpsRef.current) : [];
     const premier =
       corpsRef.current?.querySelector<HTMLElement>('[autofocus]') ??
-      (corpsRef.current ? focusables(corpsRef.current)[0] : undefined);
+      liste.find((el) => el.matches(PREMIER_CHAMP_MODAL)) ??
+      liste[0];
     premier?.focus();
     return () => {
       if (d.open) d.close();

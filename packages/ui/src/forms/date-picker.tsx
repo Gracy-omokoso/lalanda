@@ -56,7 +56,7 @@ import {
   type RaccourciDate,
 } from './logic.js';
 import { Popover, VoileTelephone } from './listbox.js';
-import { useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
+import { signalerSaisie, useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
 
 /** Jour marqué (férié…) ; `recurring` : même jour chaque année. */
 export type DateMark = JourMarque;
@@ -454,7 +454,10 @@ export function DatePicker({
   function choisir(iso: string): void {
     setProbleme(null);
     setTexte(formatDateFr(iso));
-    if (iso !== value) onChange(iso);
+    if (iso !== value) {
+      onChange(iso);
+      signalerSaisie(cal.enveloppe.current);
+    }
     cal.fermer();
     champ.current?.focus();
   }
@@ -723,6 +726,7 @@ export function DateRangePicker({
                 if (suite.end !== '') {
                   setProbleme(null);
                   onChange(suite);
+                  signalerSaisie(cal.enveloppe.current);
                   cal.fermer();
                 }
               }}

@@ -14,6 +14,7 @@ import { cn } from '../utils.js';
 
 import { controlA11y, useField } from './field.js';
 import { idSur, prochainIndex } from './logic.js';
+import { signalerSaisie } from './popover.js';
 
 export interface ChoiceOption<V extends string = string> {
   value: V;
@@ -48,8 +49,14 @@ function useGroupeRadio<V extends string>(
   refs: React.MutableRefObject<(HTMLElement | null)[]>;
   tabulable: (i: number) => boolean;
   surTouche: (e: React.KeyboardEvent, i: number) => void;
+  changer: (v: V, el: Element | null) => void;
 } {
   const refs = useRef<(HTMLElement | null)[]>([]);
+  // Un nouveau choix est annoncé comme une saisie (fenêtre modale autour).
+  const changer = (v: V, el: Element | null): void => {
+    onChange(v);
+    if (v !== value) signalerSaisie(el);
+  };
   const actives = options.map((o) => !o.disabled && !desactive);
   const choisi = options.findIndex((o) => o.value === value);
   const premier = actives.indexOf(true);
@@ -66,16 +73,16 @@ function useGroupeRadio<V extends string>(
     } else if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
       const o = options[i];
-      if (o && !o.disabled) onChange(o.value);
+      if (o && !o.disabled) changer(o.value, e.currentTarget);
       return;
     }
     if (suivant === null || suivant < 0) return;
     e.preventDefault();
     const o = options[suivant];
-    if (o) onChange(o.value);
+    if (o) changer(o.value, e.currentTarget);
     refs.current[suivant]?.focus();
   }
-  return { refs, tabulable, surTouche };
+  return { refs, tabulable, surTouche, changer };
 }
 
 /** Bouton segmenté : 2 à 5 options courtes, toutes visibles d'un coup d'œil. */
@@ -101,7 +108,7 @@ export function SegmentedControl<V extends string>({
     required,
     disabled,
   });
-  const { refs, tabulable, surTouche } = useGroupeRadio(
+  const { refs, tabulable, surTouche, changer } = useGroupeRadio(
     options,
     value,
     onChange,
@@ -139,7 +146,7 @@ export function SegmentedControl<V extends string>({
             aria-checked={choisi}
             tabIndex={tabulable(i) ? 0 : -1}
             disabled={a11y.disabled || o.disabled}
-            onClick={() => onChange(o.value)}
+            onClick={(e) => changer(o.value, e.currentTarget)}
             onKeyDown={(e) => surTouche(e, i)}
             className={cn(
               'inline-flex min-h-[calc(var(--control-h)-6px)] min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[calc(var(--radius-md)-2px)] px-3 text-sm font-medium text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50 max-sm:min-h-10',
@@ -185,7 +192,7 @@ export function ChoiceCards<V extends string>({
     required,
     disabled,
   });
-  const { refs, tabulable, surTouche } = useGroupeRadio(
+  const { refs, tabulable, surTouche, changer } = useGroupeRadio(
     options,
     value,
     onChange,
@@ -223,8 +230,8 @@ export function ChoiceCards<V extends string>({
               aria-labelledby={`${base}-${i}-t`}
               aria-describedby={o.description ? `${base}-${i}-d` : undefined}
               tabIndex={off ? -1 : tabulable(i) ? 0 : -1}
-              onClick={() => {
-                if (!off) onChange(o.value);
+              onClick={(e) => {
+                if (!off) changer(o.value, e.currentTarget);
               }}
               onKeyDown={(e) => surTouche(e, i)}
               className={cn(
@@ -312,7 +319,10 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
       aria-labelledby={label && !ariaLabel ? `${base}-l` : undefined}
       aria-describedby={a11y['aria-describedby']}
       disabled={a11y.disabled}
-      onClick={() => onChange(!checked)}
+      onClick={(e) => {
+        onChange(!checked);
+        signalerSaisie(e.currentTarget);
+      }}
       className={cn(
         // Cible de 44 px sur téléphone par la marge, piste de 36 × 20.
         'group relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-[var(--motion-base)] ease-[var(--ease-standard)] disabled:cursor-not-allowed disabled:opacity-50 max-sm:my-3 max-sm:h-6 max-sm:w-11',

@@ -22,7 +22,7 @@ import { Modal, type ModalSize } from '../components/modal.js';
 import { CONTROL_CLASSES, controlA11y, useField } from './field.js';
 import { ajouterRecent, idSur, prochainIndex } from './logic.js';
 import { ListboxMessage, ListboxOption, Popover, Surligne } from './listbox.js';
-import { useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
+import { signalerSaisie, useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
 
 /** Récents par liste (`recentKey`), en mémoire seulement. */
 const RECENTS = new Map<string, unknown[]>();
@@ -227,6 +227,9 @@ export function EntityPicker<T>({
 
   function choisir(item: T | null): void {
     onChange(item);
+    // La fenêtre modale autour (ligne de facture, nouveau projet…) compte ce
+    // choix comme une saisie, y compris la fiche créée par le « + ».
+    signalerSaisie(enveloppe.current);
     if (item && recentKey) {
       const suite = ajouterRecent(recents, item, getKey, maxRecents);
       RECENTS.set(recentKey, suite);

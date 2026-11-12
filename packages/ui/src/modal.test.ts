@@ -2,7 +2,13 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { MODAL_WIDTHS, Modal, modalCloseDecision, trapFocusIndex } from './components/modal';
+import {
+  MODAL_WIDTHS,
+  Modal,
+  PREMIER_CHAMP_MODAL,
+  modalCloseDecision,
+  trapFocusIndex,
+} from './components/modal';
 
 function rendre(props: Partial<Parameters<typeof Modal>[0]> = {}): string {
   return renderToStaticMarkup(
@@ -110,5 +116,17 @@ describe('trapFocusIndex', () => {
   });
   it('ne fait rien sans élément focalisable', () => {
     expect(trapFocusIndex(-1, 0, false)).toBeNull();
+  });
+});
+
+describe('Modal — focus initial sur le premier champ (ADR-0074, qualité)', () => {
+  it('vise les champs de saisie, pas les liens, boutons, cases ni fichiers', () => {
+    const s = PREMIER_CHAMP_MODAL;
+    expect(s).toContain('input:not([type="hidden"])');
+    expect(s).toContain('textarea');
+    expect(s).toContain('[role="combobox"]');
+    expect(s).toContain(':not([type="checkbox"])');
+    expect(s).toContain(':not([type="file"])');
+    expect(s).not.toMatch(/(^|,\s*)(a|button)\b/);
   });
 });
