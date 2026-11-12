@@ -49,8 +49,27 @@ const DUREE_LIBERATION_MS = 1500;
 /** Départ retenu par le garde, rejoué si l'on choisit « Quitter ». */
 type DepartRetenu =
   | { genre: 'lien'; lien: HTMLAnchorElement }
-  | { genre: 'historique' }
+  | { genre: 'historique'; cle: string }
   | { genre: 'action'; action: () => void };
+
+/**
+ * Sous-ensemble de la Navigation API (`window.navigation`) utilisé par le garde :
+ * Chrome, Edge, Safari 26.2 et Firefox 147 l'exposent ; ailleurs, le garde se
+ * contente des liens et de `beforeunload`.
+ */
+interface EvenementNavigation extends Event {
+  readonly navigationType: 'push' | 'replace' | 'reload' | 'traverse';
+  readonly destination: { readonly url: string; readonly key: string | null };
+}
+interface NavigationApi extends EventTarget {
+  traverseTo(key: string): { committed: Promise<unknown>; finished: Promise<unknown> };
+}
+
+function navigationApi(): NavigationApi | null {
+  if (typeof window === 'undefined') return null;
+  const nav = (window as unknown as { navigation?: NavigationApi }).navigation;
+  return nav && typeof nav.traverseTo === 'function' ? nav : null;
+}
 
 /**
  * Gardes actifs (formulaires modifiés), le plus récent en dernier. Sert à
@@ -79,13 +98,15 @@ export function confirmLeave(action: () => void): void {
  *   sans touche de modification, hors `target="_blank"` et téléchargements) —
  *   le routeur de Next n'offre pas d'API pour cela. « Quitter » rejoue le clic
  *   sur le même lien (le routeur le traite comme avant) ;
- * - boutons **Précédent / Suivant** du navigateur (`popstate`, écouté en phase
- *   de capture, donc avant le routeur de Next) : l'événement n'atteint pas le
- *   routeur, l'adresse du formulaire est remise au sommet de l'historique
- *   (`history.pushState` avec l'état de Next, API publique du routeur) et la
- *   fenêtre s'ouvre ; « Quitter » refait `history.back()`. Seules limites :
- *   l'adresse précédente s'affiche un instant, et après un « Suivant » refusé,
- *   la page d'où l'on venait reste derrière le formulaire ;
+ * - boutons **Précédent / Suivant** du navigateur, par l'événement `navigate`
+ *   de la Navigation API : il part AVANT que l'adresse ne change et avant le
+ *   `popstate` que lit le routeur de Next ; un déplacement dans l'historique
+ *   qui quitte l'écran est annulé (`preventDefault`), la fenêtre s'ouvre et
+ *   « Quitter » refait le même déplacement (`navigation.traverseTo`). Un
+ *   écouteur `popstate`, même en capture, passe APRÈS celui de Next (ordre
+ *   d'inscription sur `window`, constaté dans Chrome) : Next a déjà démonté
+ *   l'écran. Sans Navigation API, Précédent/Suivant ne sont pas retenus
+ *   (limite écrite dans l'ADR) ;
  * - navigations programmées qui abandonnent la saisie : `confirmLeave`.
  *
  * « Rester » est le choix par défaut (focus, Échap, clic sur le fond).
@@ -96,15 +117,7 @@ export function confirmLeave(action: () => void): void {
 export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | null {
   const libere = useRef(false);
   const [depart, setDepart] = useState<DepartRetenu | null>(null);
-  // Adresse et état d'historique de l'écran du formulaire, relus à chaque rendu.
-  const page = useRef<{ url: string; etat: unknown } | null>(null);
   useUnsavedChangesWarning(actif, libere);
-
-  useEffect(() => {
-    if (actif && typeof window !== 'undefined') {
-      page.current = { url: window.location.href, etat: window.history.state };
-    }
-  });
 
   useEffect(() => {
     if (!actif) {
@@ -112,7 +125,6 @@ export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | nul
       return;
     }
     libere.current = false;
-    page.current = { url: window.location.href, etat: window.history.state };
     const surClic = (e: MouseEvent): void => {
       if (libere.current) return;
       const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
@@ -128,29 +140,26 @@ export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | nul
       e.stopPropagation();
       setDepart({ genre: 'lien', lien: a });
     };
-    const surHistorique = (e: PopStateEvent): void => {
-      const ici = page.current;
-      if (libere.current || !ici) return;
-      if (!departHistorique(ici.url, window.location.href)) {
-        // Simple ancre dans la même page : rien à garder.
-        page.current = { url: window.location.href, etat: window.history.state };
-        return;
-      }
-      // Phase de capture sur `window` : le routeur de Next (écouteur ordinaire)
-      // ne reçoit pas l'événement et n'affiche pas la page d'avant.
-      e.stopImmediatePropagation();
-      window.history.pushState(ici.etat, '', ici.url);
-      setDepart({ genre: 'historique' });
+    const nav = navigationApi();
+    const surNavigation = (ev: Event): void => {
+      const e = ev as EvenementNavigation;
+      if (libere.current || e.navigationType !== 'traverse' || !e.cancelable) return;
+      const cle = e.destination.key;
+      // Une simple ancre dans la même page ne quitte pas l'écran.
+      if (!cle || !departHistorique(window.location.href, e.destination.url)) return;
+      // Avant tout changement d'adresse : le routeur de Next ne voit rien.
+      e.preventDefault();
+      setDepart({ genre: 'historique', cle });
     };
     const ouvrir = (action: () => void): void => setDepart({ genre: 'action', action });
     GARDES_ACTIFS.push(ouvrir);
     document.addEventListener('click', surClic, true);
-    window.addEventListener('popstate', surHistorique, true);
+    nav?.addEventListener('navigate', surNavigation);
     return () => {
       const i = GARDES_ACTIFS.lastIndexOf(ouvrir);
       if (i >= 0) GARDES_ACTIFS.splice(i, 1);
       document.removeEventListener('click', surClic, true);
-      window.removeEventListener('popstate', surHistorique, true);
+      nav?.removeEventListener('navigate', surNavigation);
     };
   }, [actif]);
 
@@ -165,8 +174,12 @@ export function useUnsavedChangesGuard(actif: boolean): React.ReactElement | nul
       libere.current = false;
     }, DUREE_LIBERATION_MS);
     if (d.genre === 'lien') d.lien.click();
-    else if (d.genre === 'historique') window.history.back();
-    else d.action();
+    else if (d.genre === 'historique') {
+      // Même déplacement que celui retenu (Précédent ou Suivant, d'un ou plusieurs pas).
+      navigationApi()
+        ?.traverseTo(d.cle)
+        .finished.catch(() => undefined);
+    } else d.action();
   }, [depart]);
 
   if (!depart || typeof document === 'undefined') return null;
@@ -364,14 +377,18 @@ export interface ErrorSummaryProps {
 /** Résumé d'erreurs en tête : annoncé, focalisé, chaque ligne mène au champ. */
 export function ErrorSummary({
   errors,
-  submitCount = 0,
+  submitCount,
   title,
   className,
 }: ErrorSummaryProps): React.ReactElement | null {
   const ref = useRef<HTMLDivElement>(null);
-  const visible = errors.length > 0;
+  // ADR-0074 § 9 : le résumé est celui de la SOUMISSION. Avant toute tentative
+  // d'envoi (`submitCount` à 0), les erreurs vues à la sortie d'un champ restent
+  // sous le champ : pas de bandeau rouge en tête d'une fenêtre qui vient de
+  // s'ouvrir parce que le focus a quitté le premier champ (qualité, 12 nov.).
+  const visible = errors.length > 0 && (submitCount === undefined || submitCount > 0);
   useEffect(() => {
-    if (visible && submitCount > 0) ref.current?.focus();
+    if (visible && submitCount !== undefined && submitCount > 0) ref.current?.focus();
   }, [visible, submitCount]);
   if (!visible) return null;
   return (

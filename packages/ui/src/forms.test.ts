@@ -77,7 +77,7 @@ import {
 } from './forms/money';
 import { MonthPicker, messageMois } from './forms/month-picker';
 import { OtpInput } from './forms/otp-input';
-import { placerPopover } from './forms/popover';
+import { placerPopover, signalerSaisie } from './forms/popover';
 import { Select } from './forms/select';
 
 const rendre = (el: React.ReactElement): string => renderToStaticMarkup(el);
@@ -577,6 +577,12 @@ describe('rendu accessible', () => {
     expect(e).toContain('role="alert"');
     expect(e).toContain('href="#nom"');
   });
+
+  it('ErrorSummary : rien avant la première soumission, le résumé ensuite', () => {
+    const erreurs = [{ id: 'nom', libelle: 'Nom', message: 'Obligatoire.' }];
+    expect(rendre(h(ErrorSummary, { errors: erreurs, submitCount: 0 }))).toBe('');
+    expect(rendre(h(ErrorSummary, { errors: erreurs, submitCount: 1 }))).toContain('role="alert"');
+  });
 });
 
 describe('mois (MonthPicker, décision n° 6)', () => {
@@ -800,14 +806,18 @@ describe('garde de navigation interne (décision n° 3)', () => {
     expect(partie).toBe(1);
   });
 
-  it('la garde écoute Précédent/Suivant avant le routeur et rejoue history.back()', () => {
+  it('la garde retient Précédent/Suivant avant le routeur (Navigation API) et les rejoue', () => {
     const source = readFileSync(
       fileURLToPath(new URL('./forms/form-kit.tsx', import.meta.url)),
       'utf8',
     );
-    expect(source).toContain("window.addEventListener('popstate', surHistorique, true)");
-    expect(source).toContain('e.stopImmediatePropagation()');
-    expect(source).toContain('window.history.back()');
+    // `navigate` part avant le changement d'adresse et avant le `popstate` de Next ;
+    // un écouteur `popstate` passerait après lui (constaté dans Chrome).
+    expect(source).toContain("nav?.addEventListener('navigate', surNavigation)");
+    expect(source).toContain("e.navigationType !== 'traverse' || !e.cancelable");
+    expect(source).toContain('e.preventDefault();');
+    expect(source).toContain('.traverseTo(d.cle)');
+    expect(source).not.toContain("addEventListener('popstate'");
     // « Rester » reste le choix par défaut : focus posé sur lui à l'ouverture.
     expect(source).toContain('rester.current?.focus()');
   });
@@ -840,5 +850,36 @@ describe('case à cocher : alignée sur la première ligne du libellé', () => {
     // Boîte de la hauteur d'une ligne du libellé (20 px, `leading-5`), case centrée dedans.
     expect(html).toMatch(/data-alignement="premiere-ligne" class="[^"]*\bh-5\b[^"]*items-center/);
     expect(html).toMatch(/<label[^>]*class="[^"]*leading-5/);
+  });
+});
+
+describe('modales empilées : un choix sans frappe compte comme une saisie', () => {
+  it('signalerSaisie émet un « input » qui remonte (détection de la fenêtre modale)', () => {
+    const recus: Event[] = [];
+    const el = { dispatchEvent: (e: Event) => recus.push(e) > 0 } as unknown as Element;
+    signalerSaisie(el);
+    expect(recus).toHaveLength(1);
+    expect(recus[0]!.type).toBe('input');
+    expect(recus[0]!.bubbles).toBe(true);
+    expect(() => signalerSaisie(null)).not.toThrow();
+  });
+
+  it('chaque choix (liste, entité, calendrier, segments, interrupteur) le signale', () => {
+    const lire = (f: string): string =>
+      readFileSync(fileURLToPath(new URL(`./forms/${f}`, import.meta.url)), 'utf8');
+    for (const f of [
+      'select.tsx',
+      'entity-picker.tsx',
+      'date-picker.tsx',
+      'month-picker.tsx',
+      'choices.tsx',
+    ]) {
+      expect(lire(f)).toContain('signalerSaisie(');
+    }
+    // La fenêtre de création reste isolée : ses saisies ne remontent pas au
+    // formulaire principal (portail + arrêt de propagation).
+    const picker = lire('entity-picker.tsx');
+    expect(picker).toContain('createPortal(');
+    expect(picker).toContain('onInput={(e) => e.stopPropagation()}');
   });
 });
