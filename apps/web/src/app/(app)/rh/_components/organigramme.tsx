@@ -5,14 +5,13 @@
 // focus itinérant, flèches, Début, Fin, `*` (voir `organigramme-model.ts`).
 // Une personne n'est un lien que si l'appelant peut ouvrir les dossiers.
 
+import { buttonClasses } from '@lalanda/ui';
 import { Building2, ChevronDown, ChevronRight, Network, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { hrApi, type HrOrgChartResponse, type HrOrgChartView } from '@/lib/api-hr';
-
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   arbreOrganigramme,
@@ -69,7 +68,7 @@ export function Organigramme(): React.ReactElement {
               <button
                 key={v.id}
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-pressed={vue === v.id}
                 onClick={() => setVue(v.id)}
               >
@@ -255,12 +254,16 @@ function Arbre({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           onClick={() => setOuverts(tousLesParents(racines))}
         >
           Tout déplier
         </button>
-        <button type="button" className={BOUTON_PETIT} onClick={() => setOuverts(new Set())}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm')}
+          onClick={() => setOuverts(new Set())}
+        >
           Tout replier
         </button>
         <p className="text-xs text-[var(--foreground-muted)] self-center">

@@ -3,14 +3,13 @@
 // Absences — ADR-0045 § 8 : « À valider » (tout manager ou détenteur de
 // `leave.approve`) et, avec `hr.read`, « Toutes les demandes » filtrées par statut.
 
+import { buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { hrApi, type LeaveRequestPage, type LeaveRequestStatus } from '@/lib/api-hr';
-
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesRh } from './rh-access';
 import { RH_BASE, lire, peutLireRh, type Lecture } from './rh-model';
@@ -39,14 +38,14 @@ export function Absences(): React.ReactElement {
             <nav className="flex gap-1" aria-label="Vues des absences">
               <Link
                 href={`${RH_BASE}/absences?vue=a-valider`}
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-current={vue === 'a-valider' ? 'page' : undefined}
               >
                 À valider
               </Link>
               <Link
                 href={`${RH_BASE}/absences?vue=toutes`}
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-current={vue === 'toutes' ? 'page' : undefined}
               >
                 Toutes
@@ -88,7 +87,7 @@ function Toutes(): React.ReactElement {
             <button
               key={f.libelle}
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-pressed={statut === f.valeur}
               onClick={() => setStatut(f.valeur)}
             >

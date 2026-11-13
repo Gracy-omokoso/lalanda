@@ -5,15 +5,13 @@
 // leur annulation. Mes documents (téléchargement) et mes éléments de liste
 // (cochables par l'assigné) : lot H7, servis par `GET /hr/me` depuis H4.
 
-import { Checkbox, buttonClasses } from '@lalanda/ui';
+import { Alert, Checkbox, buttonClasses } from '@lalanda/ui';
 import { CalendarPlus, ClipboardCheck, FileText, IdCard, Plane, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { hrApi, type LeaveRequestView, type LeaveTypeView } from '@/lib/api-hr';
 import { hrAdminApi } from '@/lib/api-hr-admin';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { DemandeAbsence } from './demande-absence';
 import { lienFrais } from './frais-model';
@@ -102,15 +100,15 @@ export function MonEspace(): React.ReactElement {
         {etat.etat === 'pret' && (etat.moi.isManager || etat.moi.canApprove) ? (
           <div className="flex flex-wrap gap-2 text-sm">
             {etat.moi.isManager ? (
-              <Link href={`${RH_BASE}/equipe`} className={BOUTON_PETIT}>
+              <Link href={`${RH_BASE}/equipe`} className={buttonClasses('secondary', 'sm')}>
                 Mon équipe
               </Link>
             ) : null}
-            <Link href={LIEN_A_VALIDER} className={BOUTON_PETIT}>
+            <Link href={LIEN_A_VALIDER} className={buttonClasses('secondary', 'sm')}>
               Absences à valider
             </Link>
             {etat.moi.isManager || etat.moi.isTeamLead ? (
-              <Link href={lienFrais('a-valider')} className={BOUTON_PETIT}>
+              <Link href={lienFrais('a-valider')} className={buttonClasses('secondary', 'sm')}>
                 Frais à valider
               </Link>
             ) : null}
@@ -182,9 +180,9 @@ export function MonEspace(): React.ReactElement {
               id="rh-moi-listes"
             >
               {erreurListe ? (
-                <Alerte>
+                <Alert tone="danger">
                   <p>{erreurListe}</p>
-                </Alerte>
+                </Alert>
               ) : null}
               <ul className="flex flex-col divide-y divide-[var(--border)] text-sm">
                 {etat.moi.checklistItems.map((i) => (
@@ -240,7 +238,7 @@ export function MonEspace(): React.ReactElement {
                     </span>
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       onClick={() => {
                         setErreurListe(null);
                         hrAdminApi
@@ -323,7 +321,7 @@ function Demandes({
                     peutAnnulerDemande(d, jour) ? (
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         aria-haspopup="dialog"
                         onClick={() => onAnnuler(d)}
                       >

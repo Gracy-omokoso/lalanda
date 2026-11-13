@@ -23,8 +23,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { hrApi, type HrEmployeeListItem } from '@/lib/api-hr';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
-
 import {
   FILTRES_COLLABORATEURS_INITIAUX,
   libelleContrat,
@@ -223,7 +221,7 @@ export function CollaborateursListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtres, suivante)}
         >
           Afficher plus de collaborateurs

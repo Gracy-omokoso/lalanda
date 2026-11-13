@@ -41,8 +41,6 @@ import {
   type ReviewSectionContentView,
 } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
-
 import {
   LIBELLES_SECTION,
   LIBELLES_STATUT_EVALUATION,
@@ -280,7 +278,7 @@ function Campagne({
       {c.status === 'draft' ? (
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           onClick={() => void agir(() => rh2Api.openReviewCycle(c.id, c.revision))}
         >
           Ouvrir
@@ -289,7 +287,7 @@ function Campagne({
       {c.status === 'open' ? (
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           onClick={() => void agir(() => rh2Api.closeReviewCycle(c.id, c.revision))}
         >
           Clore la campagne
@@ -379,7 +377,7 @@ function DetailEvaluation({
                   <button
                     key={s}
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     onClick={() => setEdition(s)}
                   >
                     Rédiger : {LIBELLES_SECTION[s].toLowerCase()}
@@ -414,7 +412,7 @@ function DetailEvaluation({
             lisibles.length > 0 ? (
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-start`}
+                className={buttonClasses('secondary', 'sm', 'self-start')}
                 disabled={envoi}
                 onClick={() => void afficher()}
               >
@@ -570,7 +568,12 @@ function RedactionSection({
       busy={envoi}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={onFermer}
+            disabled={envoi}
+          >
             Retour
           </button>
           <button
@@ -711,7 +714,12 @@ function NouvelleCampagne({
       busy={envoi}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={onFermer}
+            disabled={envoi}
+          >
             Retour
           </button>
           <button

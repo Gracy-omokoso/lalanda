@@ -10,6 +10,7 @@
 // n° 1), grille sémantique. Mêmes champs envoyés, mêmes validations.
 
 import {
+  Alert,
   Badge,
   Button,
   DatePicker,
@@ -34,8 +35,6 @@ import {
   type HolidayView,
   type LeaveTypeFull,
 } from '@/lib/api-hr-admin';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 // ADR-0068 § 5 : jours fériés de la RDC proposés, « à vérifier ».
 import { hrLot1Api } from '@/lib/api-hr-lot1';
@@ -62,13 +61,13 @@ import { Chargement, DialogueDecision, EchecLecture, Panneau, PhraseSection } fr
 function Erreurs({ erreurs }: { erreurs: string[] }): React.ReactElement | null {
   if (erreurs.length === 0) return null;
   return (
-    <Alerte>
+    <Alert tone="danger">
       <ul className="list-disc pl-4">
         {erreurs.map((e) => (
           <li key={e}>{e}</li>
         ))}
       </ul>
-    </Alerte>
+    </Alert>
   );
 }
 
@@ -191,7 +190,7 @@ export function TypesAbsenceReglages({ modifier }: { modifier: boolean }): React
                 <span className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setEdition(t)}
                   >
@@ -199,7 +198,7 @@ export function TypesAbsenceReglages({ modifier }: { modifier: boolean }): React
                   </button>
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setAArchiver(t)}
                   >
@@ -533,7 +532,7 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
               {modifier && h.toVerify ? (
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   title={h.source ?? undefined}
                   onClick={() => {
                     void hrLot1Api
@@ -550,7 +549,7 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
               {modifier ? (
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   aria-haspopup="dialog"
                   onClick={() => setASupprimer(h)}
                 >
@@ -743,7 +742,7 @@ export function ModelesReglages({ modifier }: { modifier: boolean }): React.Reac
                 <span className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setEdition(m)}
                   >
@@ -751,7 +750,7 @@ export function ModelesReglages({ modifier }: { modifier: boolean }): React.Reac
                   </button>
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setASupprimer(m)}
                   >
@@ -918,7 +917,7 @@ function FormulaireModele({
           </FormGrid>
           <button
             type="button"
-            className={`${BOUTON_DANGER} self-start`}
+            className={buttonClasses('danger', 'sm', 'self-start')}
             onClick={() => setF({ ...f, items: f.items.filter((_, j) => j !== i) })}
           >
             Retirer l’élément
@@ -928,7 +927,7 @@ function FormulaireModele({
       {f.items.length < 50 ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-start`}
+          className={buttonClasses('secondary', 'sm', 'self-start')}
           onClick={() => setF({ ...f, items: [...f.items, { ...LIGNE_MODELE_VIDE }] })}
         >
           Ajouter un élément

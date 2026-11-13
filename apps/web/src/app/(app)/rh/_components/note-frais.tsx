@@ -39,7 +39,6 @@ import { rh2Api } from '@/lib/api-rh-2';
 import { treasuryApi, type TreasuryAccountView } from '@/lib/treasury-api';
 
 import { WorkProjectSelect } from '../../tresorerie/_components/work-project-select';
-import { BOUTON_PETIT, BOUTON_DANGER } from '../../ventes/_components/form-ui';
 
 import {
   ACCEPT_JUSTIFICATIF,
@@ -175,7 +174,7 @@ export function NoteFormulaire({
                 {lignes.length > 1 ? (
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     onClick={() => setLignes((ls) => ls.filter((_, j) => j !== i))}
                   >
                     Retirer
@@ -263,7 +262,7 @@ export function NoteFormulaire({
         {lignes.length < 50 ? (
           <button
             type="button"
-            className={`${BOUTON_PETIT} self-start`}
+            className={buttonClasses('secondary', 'sm', 'self-start')}
             onClick={() => setLignes((ls) => [...ls, ligneVide(jour)])}
           >
             + Ajouter une ligne
@@ -515,7 +514,7 @@ export function NoteDetail({
               <>
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   disabled={envoi}
                   onClick={() => void supprimer()}
                 >
@@ -523,7 +522,7 @@ export function NoteDetail({
                 </button>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={envoi}
                   onClick={() => setDialogue('modifier')}
                 >
@@ -534,7 +533,7 @@ export function NoteDetail({
             {g.annuler ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={envoi}
                 onClick={() => setDialogue('annuler')}
               >
@@ -544,7 +543,7 @@ export function NoteDetail({
             {g.dupliquer ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={envoi}
                 onClick={() =>
                   void agir(() => rh2Api.duplicateExpenseReport(note.id), 'Copie impossible.')
@@ -556,7 +555,7 @@ export function NoteDetail({
             {g.annulerRemboursement ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={envoi}
                 onClick={() => setDialogue('annuler-remboursement')}
               >
@@ -567,7 +566,7 @@ export function NoteDetail({
               <>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={envoi}
                   onClick={() => setDialogue('refuser')}
                 >
@@ -672,7 +671,7 @@ export function NoteDetail({
                     <span className="text-[var(--foreground-muted)]">Aucun justificatif</span>
                   )}
                   {brouillon ? (
-                    <label className={`${BOUTON_PETIT} cursor-pointer`}>
+                    <label className={buttonClasses('secondary', 'sm', 'cursor-pointer')}>
                       {l.hasReceipt ? 'Remplacer le ticket' : 'Ajouter la photo du ticket'}
                       <input
                         type="file"

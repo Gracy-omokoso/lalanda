@@ -11,6 +11,7 @@
 // validation (`validerSortie`).
 
 import {
+  Alert,
   Badge,
   Button,
   Checkbox,
@@ -28,8 +29,6 @@ import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { hrAdminApi, type ChecklistTemplateView, type ChecklistView } from '@/lib/api-hr-admin';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import {
@@ -128,7 +127,7 @@ export function FicheParcours(): React.ReactElement {
           {gerer ? (
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-haspopup="dialog"
               onClick={() => setLancer(true)}
             >
@@ -156,9 +155,9 @@ export function FicheParcours(): React.ReactElement {
         }
       >
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {listes === null ? (
           <Chargement texte="Chargement des listes…" />
@@ -243,7 +242,7 @@ export function FicheParcours(): React.ReactElement {
               <PhraseSection>{PHRASE_SORTIE}</PhraseSection>
               <button
                 type="button"
-                className={`${BOUTON_DANGER} self-start`}
+                className={buttonClasses('danger', 'sm', 'self-start')}
                 aria-haspopup="dialog"
                 onClick={() => setSortie(true)}
               >
@@ -261,7 +260,7 @@ export function FicheParcours(): React.ReactElement {
                 {peutReintegrer(fiche, jour) ? (
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setReintegrer(true)}
                   >
@@ -272,7 +271,7 @@ export function FicheParcours(): React.ReactElement {
                 {peutDemanderAnonymisation(actions, fiche) ? (
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setAnonymiser(true)}
                   >
@@ -413,9 +412,9 @@ function LancerListe({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
@@ -498,9 +497,9 @@ function FormulaireSortie({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
@@ -556,12 +555,17 @@ function Anonymisation({
       busy={envoi}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={onFermer}
+            disabled={envoi}
+          >
             Annuler
           </button>
           <button
             type="button"
-            className={BOUTON_DANGER}
+            className={buttonClasses('danger', 'sm')}
             disabled={!ok || envoi}
             onClick={() => void confirmer()}
           >
@@ -589,9 +593,9 @@ function Anonymisation({
           </Field>
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>

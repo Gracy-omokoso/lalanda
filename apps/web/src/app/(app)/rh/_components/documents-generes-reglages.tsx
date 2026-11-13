@@ -8,6 +8,7 @@
 // ADR-0074 : mise en page en `Select`, grille sémantique, textes en `TextArea`.
 
 import {
+  Alert,
   Button,
   Field,
   FormGrid,
@@ -28,7 +29,6 @@ import {
   type GeneratedDocumentSettingsView,
 } from '@/lib/api-hr-generated-documents';
 
-import { Alerte } from '../../ventes/_components/form-ui';
 import { lire, messageRh, type Lecture } from './rh-model';
 import { Chargement, EchecLecture, Panneau } from './rh-ui';
 
@@ -192,7 +192,7 @@ function Formulaire({
         void enregistrer();
       }}
     >
-      {alerte ? <Alerte>{alerte}</Alerte> : null}
+      {alerte ? <Alert tone="danger">{alerte}</Alert> : null}
       <FormGrid>
         <Field id={`${id}-modele`} label="Mise en page par défaut" size="md">
           <Select<typeof templateId>

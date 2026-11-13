@@ -12,7 +12,16 @@
 // grille sémantique, options d'impression en interrupteurs, sélection du lot
 // en cases stylées. Mêmes champs envoyés.
 
-import { Checkbox, Field, FormGrid, Select, Switch, TextInput, buttonClasses } from '@lalanda/ui';
+import {
+  Alert,
+  Checkbox,
+  Field,
+  FormGrid,
+  Select,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Download, FileArchive, IdCard, Upload } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
@@ -26,7 +35,6 @@ import {
   type CardVariant,
 } from '@/lib/api-hr-cards';
 
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   LIBELLE_ORIENTATION,
   LIBELLE_TYPE,
@@ -110,7 +118,12 @@ function Vignette({
         </span>
         <span className="text-[var(--foreground-muted)]">{modele.description}</span>
         {onChoisir ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onChoisir} aria-pressed={choisi}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={onChoisir}
+            aria-pressed={choisi}
+          >
             {choisi ? 'Modèle par défaut' : 'Choisir ce modèle'}
           </button>
         ) : null}
@@ -204,7 +217,7 @@ export function CartesRh(): React.ReactElement {
           l’organisation. La carte d’un collaborateur se gère dans l’onglet « Cartes » de sa fiche.
         </p>
       </header>
-      {alerte ? <Alerte>{alerte}</Alerte> : null}
+      {alerte ? <Alert tone="danger">{alerte}</Alert> : null}
       {info ? (
         <p role="status" className="text-sm text-[var(--success,inherit)]">
           {info}
@@ -263,7 +276,7 @@ export function CartesRh(): React.ReactElement {
               {ks.accent ? (
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={!gerer}
                   onClick={() => majType({ accent: null })}
                 >
@@ -403,7 +416,7 @@ function Lot({ type }: { type: CardKind }): React.ReactElement {
       <h2 id={`${id}-lot`} className="text-base font-semibold">
         Génération par lot — {LIBELLE_TYPE[type].toLowerCase()}
       </h2>
-      {alerte ? <Alerte>{alerte}</Alerte> : null}
+      {alerte ? <Alert tone="danger">{alerte}</Alert> : null}
       <FormGrid>
         <Field id={`${id}-q`} label="Rechercher un collaborateur" size="md">
           <TextInput type="search" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -548,7 +561,7 @@ function SurMesure({
         </li>
       </ul>
       {alerte ? (
-        <Alerte>
+        <Alert tone="danger">
           <span>{alerte}</span>
           {erreurs.length > 0 ? (
             <ul className="list-disc pl-5">
@@ -557,7 +570,7 @@ function SurMesure({
               ))}
             </ul>
           ) : null}
-        </Alerte>
+        </Alert>
       ) : null}
       {info ? (
         <p role="status" className="text-sm">
@@ -578,7 +591,11 @@ function SurMesure({
               if (f) void installer(f);
             }}
           />
-          <button type="button" className={BOUTON_PETIT} onClick={() => ref.current?.click()}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => ref.current?.click()}
+          >
             <Upload aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
             Installer un modèle (.zip)
           </button>

@@ -10,6 +10,7 @@
 // « + » (fiche service complète en fenêtre, sous `hr.manage`).
 
 import {
+  Alert,
   Badge,
   Button,
   EntityPicker,
@@ -28,8 +29,6 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { HrDepartmentView } from '@/lib/api-hr';
 import { hrLot1Api, type PositionDetailView, type PositionView } from '@/lib/api-hr-lot1';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { LIBELLES_STATUT_POSTE } from './lot1-model';
 import { useReferentielsRh } from './referentiels';
@@ -127,9 +126,9 @@ export function Postes(): React.ReactElement {
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {lecture === null ? (
@@ -179,7 +178,7 @@ export function Postes(): React.ReactElement {
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       aria-haspopup="dialog"
                       onClick={() => ouvrir(p)}
                     >
@@ -188,7 +187,7 @@ export function Postes(): React.ReactElement {
                     {gerer && p.status !== 'deleted' ? (
                       <button
                         type="button"
-                        className={`${BOUTON_PETIT} ml-1`}
+                        className={buttonClasses('secondary', 'sm', 'ml-1')}
                         aria-haspopup="dialog"
                         onClick={() => setEdition(p)}
                       >
@@ -198,7 +197,7 @@ export function Postes(): React.ReactElement {
                     {gerer && p.status === 'open' ? (
                       <button
                         type="button"
-                        className={`${BOUTON_DANGER} ml-1`}
+                        className={buttonClasses('danger', 'sm', 'ml-1')}
                         onClick={() => {
                           setErreur(null);
                           hrLot1Api
@@ -385,9 +384,9 @@ function FormulairePoste({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">

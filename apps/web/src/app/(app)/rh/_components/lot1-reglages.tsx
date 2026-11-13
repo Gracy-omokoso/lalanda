@@ -7,6 +7,7 @@
 // ADR-0074 : préfixe en `TextInput`, nombre de chiffres en `Select`.
 
 import {
+  Alert,
   Button,
   Field,
   FormGrid,
@@ -24,8 +25,6 @@ import {
   type CountryHolidaysProposalView,
   type EmployeeNumberingView,
 } from '@/lib/api-hr-lot1';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formatJour, lire, messageRh, type Lecture } from './rh-model';
 import { Chargement, EchecLecture, Panneau } from './rh-ui';
@@ -175,9 +174,9 @@ function FormulaireMatricules({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
@@ -248,12 +247,17 @@ export function ChargerFeriesRdc({
         ))}
       </ul>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm')}
+          onClick={onAnnuler}
+          disabled={envoi}
+        >
           Annuler
         </button>
         <button

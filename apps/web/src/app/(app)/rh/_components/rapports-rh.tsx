@@ -8,7 +8,7 @@
 //
 // ADR-0074 : période et service en `Select` (même lecture `periodeDepuis`).
 
-import { Field, FormGrid, Select, buttonClasses } from '@lalanda/ui';
+import { Alert, Field, FormGrid, Select, buttonClasses } from '@lalanda/ui';
 import {
   BarChart3,
   Download,
@@ -23,8 +23,6 @@ import { useEffect, useState } from 'react';
 import type { HrDepartmentView } from '@/lib/api-hr';
 import { hrApi } from '@/lib/api-hr';
 import { hrAdminApi, type HrReportsView } from '@/lib/api-hr-admin';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_PERIODE,
@@ -163,9 +161,9 @@ export function RapportsRh(): React.ReactElement {
       </Bandeau>
 
       {export_.erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{export_.erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {lecture === null ? (

@@ -11,7 +11,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { hrApi, type LeaveRequestPage, type LeaveRequestView } from '@/lib/api-hr';
 
 import { formatInstantJour } from '../../achats/_components/achats-model';
-import { BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesRh } from './rh-access';
 import { formatJours, libellePeriode, libelleType, lire, type Lecture } from './rh-model';
@@ -85,7 +84,7 @@ export function ValidationsListe({ limite = 50 }: { limite?: number }): React.Re
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   aria-haspopup="dialog"
                   onClick={() => setDecision({ demande: d, sens: 'refuser' })}
                 >
@@ -142,7 +141,7 @@ export function ValidationsListe({ limite = 50 }: { limite?: number }): React.Re
       ) : null}
       <button
         type="button"
-        className={`${BOUTON_PETIT} self-start`}
+        className={buttonClasses('secondary', 'sm', 'self-start')}
         onClick={() => setVersion((v) => v + 1)}
       >
         Actualiser

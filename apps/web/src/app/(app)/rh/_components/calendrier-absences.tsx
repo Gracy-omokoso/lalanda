@@ -8,13 +8,12 @@
 //
 // ADR-0074 : affichage en segments, portée en `Select`.
 
-import { SegmentedControl, Select } from '@lalanda/ui';
+import { SegmentedControl, Select, buttonClasses } from '@lalanda/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
 import { hrApi, type HrCalendarScope, type HrCalendarView } from '@/lib/api-hr';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { JOURS_COURTS, jourSemaine } from '../../projets/_components/calendar-model';
 
 import {
@@ -90,7 +89,7 @@ export function CalendrierAbsences({
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           aria-label={vue === 'mois' ? 'Mois précédent' : 'Semaine précédente'}
           onClick={() => setAncre(decaler(vue, ancre, -1))}
         >
@@ -98,13 +97,17 @@ export function CalendrierAbsences({
         </button>
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           aria-label={vue === 'mois' ? 'Mois suivant' : 'Semaine suivante'}
           onClick={() => setAncre(decaler(vue, ancre, 1))}
         >
           <ChevronRight aria-hidden="true" className="h-4 w-4" />
         </button>
-        <button type="button" className={BOUTON_PETIT} onClick={() => setAncre(aujourdhui())}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm')}
+          onClick={() => setAncre(aujourdhui())}
+        >
           Aujourd’hui
         </button>
         <h3

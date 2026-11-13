@@ -4,15 +4,13 @@
 // et compte), mon équipe, fonction éteinte expliquée, carte entièrement cliquable,
 // aperçu d'un justificatif sans adresse publique.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { Power } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { OrgAction } from '@/lib/api';
 import { hrApi } from '@/lib/api-hr';
 import { rh2Api } from '@/lib/api-rh-2';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { apercuEnLigne, type Moi } from './frais-model';
 import { useAccesRh } from './rh-access';
@@ -166,7 +164,12 @@ export function VoirJustificatif({
 
   return (
     <>
-      <button type="button" className={BOUTON_PETIT} disabled={envoi} onClick={() => void ouvrir()}>
+      <button
+        type="button"
+        className={buttonClasses('secondary', 'sm')}
+        disabled={envoi}
+        onClick={() => void ouvrir()}
+      >
         {envoi ? 'Ouverture…' : 'Voir le justificatif'}
       </button>
       {erreur ? <span className="text-xs text-[var(--danger)]">{erreur}</span> : null}
@@ -201,9 +204,9 @@ export function VoirJustificatif({
 export function ErreurAction({ erreur }: { erreur: string | null }): React.ReactElement | null {
   if (!erreur) return null;
   return (
-    <Alerte>
+    <Alert tone="danger">
       <p>{erreur}</p>
-    </Alerte>
+    </Alert>
   );
 }
 

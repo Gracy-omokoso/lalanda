@@ -14,6 +14,7 @@ import {
   type HrIdDocumentKind,
 } from '@lalanda/shared/hr';
 import {
+  Alert,
   Button,
   DatePicker,
   Field,
@@ -25,13 +26,12 @@ import {
   SubmitButton,
   TextArea,
   TextInput,
+  buttonClasses,
   type FieldSize,
 } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import type { HrPrivateField, HrPrivateSections } from '@/lib/api-hr-admin';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_PERIODE_SALAIRE,
@@ -138,7 +138,11 @@ function Ligne({
     <fieldset className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
       <legend className="px-1 text-xs font-semibold">{titre}</legend>
       <FormGrid>{children}</FormGrid>
-      <button type="button" className={`${BOUTON_DANGER} self-start`} onClick={onRetirer}>
+      <button
+        type="button"
+        className={buttonClasses('danger', 'sm', 'self-start')}
+        onClick={onRetirer}
+      >
         Retirer
       </button>
     </fieldset>
@@ -198,7 +202,11 @@ export function FormulaireSensible<F extends HrPrivateField>({
     plein ? (
       <p className="text-xs text-[var(--foreground-muted)]">Nombre maximal atteint.</p>
     ) : (
-      <button type="button" className={`${BOUTON_PETIT} self-start`} onClick={onClick}>
+      <button
+        type="button"
+        className={buttonClasses('secondary', 'sm', 'self-start')}
+        onClick={onClick}
+      >
         {libelle}
       </button>
     );
@@ -437,13 +445,13 @@ export function FormulaireSensible<F extends HrPrivateField>({
 
       {erreurs.length > 0 ? (
         <div id={`${id}-erreurs`}>
-          <Alerte>
+          <Alert tone="danger">
             <ul className="list-disc pl-4">
               {erreurs.map((e) => (
                 <li key={e}>{e}</li>
               ))}
             </ul>
-          </Alerte>
+          </Alert>
         </div>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">

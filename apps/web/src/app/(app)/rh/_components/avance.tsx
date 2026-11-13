@@ -31,7 +31,6 @@ import { HR_PAYMENT_METHOD_LABELS, type AdvanceView } from '@lalanda/shared/hr';
 import type { OrgAction } from '@/lib/api';
 import { rh2Api } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 
 import {
@@ -240,7 +239,7 @@ export function AvanceDetail({
             {g.annuler ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={envoi}
                 onClick={() => setDialogue('annuler')}
               >
@@ -250,7 +249,7 @@ export function AvanceDetail({
             {g.regulariser ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={envoi}
                 onClick={() => setDialogue('regulariser')}
               >
@@ -261,7 +260,7 @@ export function AvanceDetail({
               <>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={envoi}
                   onClick={() => setDialogue('refuser')}
                 >
@@ -338,7 +337,7 @@ export function AvanceDetail({
             ) : (
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-start`}
+                className={buttonClasses('secondary', 'sm', 'self-start')}
                 onClick={() => void afficherMotif()}
               >
                 Afficher le motif (lecture journalisée)

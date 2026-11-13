@@ -11,6 +11,7 @@
 // options en interrupteurs. Mêmes champs envoyés, même `validerDocument`.
 
 import {
+  Alert,
   Badge,
   DatePicker,
   Field,
@@ -26,8 +27,6 @@ import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { hrAdminApi, type HrDocumentView } from '@/lib/api-hr-admin';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   ACCEPT_DOCUMENT,
@@ -123,9 +122,9 @@ export function FicheDocuments(): React.ReactElement {
           </p>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {lecture === null ? (
           <Chargement texte="Chargement des documents…" />
@@ -169,7 +168,7 @@ export function FicheDocuments(): React.ReactElement {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       disabled={occupe === d.id}
                       onClick={() => void telecharger(d)}
                     >
@@ -180,7 +179,7 @@ export function FicheDocuments(): React.ReactElement {
                     {peutSupprimerDocument(actions, d) ? (
                       <button
                         type="button"
-                        className={BOUTON_DANGER}
+                        className={buttonClasses('danger', 'sm')}
                         aria-haspopup="dialog"
                         onClick={() => setASupprimer(d)}
                       >
@@ -345,16 +344,21 @@ function EnvoiDocument({
         />
       ) : null}
       {erreurs.length > 0 ? (
-        <Alerte>
+        <Alert tone="danger">
           <ul className="list-disc pl-4">
             {erreurs.map((e) => (
               <li key={e}>{e}</li>
             ))}
           </ul>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm')}
+          onClick={onAnnuler}
+          disabled={envoi}
+        >
           Annuler
         </button>
         <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>

@@ -33,8 +33,6 @@ import {
   type ShiftView,
 } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
-
 import {
   LIBELLES_STATUT_CRENEAU,
   brouillonsPublies,
@@ -164,14 +162,14 @@ function PlanningActif({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={() => setLundi(decaler(lundi, -7))}
             >
               ← Précédente
             </button>
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={() => setLundi(decaler(lundi, 7))}
             >
               Suivante →
@@ -180,7 +178,7 @@ function PlanningActif({
               <>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={envoi}
                   onClick={() =>
                     void agir(() => rh2Api.copyWeek(decaler(lundi, -7), lundi), 'Copie impossible.')
@@ -191,7 +189,7 @@ function PlanningActif({
                 {brouillons.length > 0 ? (
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     disabled={envoi}
                     onClick={() =>
                       void agir(() => rh2Api.publishShifts(brouillons), 'Publication impossible.')
@@ -518,12 +516,20 @@ function DetailCreneau({
         footer={
           <div className="flex flex-wrap justify-end gap-2">
             {c.canPlan && c.status !== 'cancelled' ? (
-              <button type="button" className={BOUTON_PETIT} onClick={() => setDialogue('annuler')}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setDialogue('annuler')}
+              >
                 Annuler le créneau
               </button>
             ) : null}
             {!c.canPlan && c.status === 'published' ? (
-              <button type="button" className={BOUTON_PETIT} onClick={() => setDialogue('indispo')}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setDialogue('indispo')}
+              >
                 Signaler une indisponibilité
               </button>
             ) : null}

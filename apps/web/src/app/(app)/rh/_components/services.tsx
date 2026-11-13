@@ -9,6 +9,7 @@
 // fenêtre est déjà celle de création d'un service), grille sémantique.
 
 import {
+  Alert,
   Button,
   EntityPicker,
   Field,
@@ -24,8 +25,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { hrApi, type HrDepartmentView, type HrEmployeeListItem } from '@/lib/api-hr';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesRh } from './rh-access';
 import {
@@ -157,9 +156,9 @@ export function FormulaireService({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
@@ -219,7 +218,7 @@ export function Services(): React.ReactElement {
         sousTitre="L’organisation en services et sous-services, huit niveaux au plus."
         actions={
           <>
-            <Link href={`${RH_BASE}/organigramme`} className={BOUTON_PETIT}>
+            <Link href={`${RH_BASE}/organigramme`} className={buttonClasses('secondary', 'sm')}>
               <Network aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
               Organigramme
             </Link>
@@ -275,7 +274,7 @@ export function Services(): React.ReactElement {
                 <span className="flex gap-2">
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     aria-label={`Modifier ${s.name}`}
                     onClick={() => setEdition(s)}
@@ -284,7 +283,7 @@ export function Services(): React.ReactElement {
                   </button>
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     aria-haspopup="dialog"
                     aria-label={`Archiver ${s.name}`}
                     onClick={() => setArchive(s)}

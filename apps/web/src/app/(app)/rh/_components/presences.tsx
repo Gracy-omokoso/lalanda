@@ -31,8 +31,6 @@ import {
   type HrPresenceSettingsView,
 } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
-
 import {
   LIBELLES_SOURCE,
   LIBELLES_STATUT_CORRECTION,
@@ -225,7 +223,11 @@ function PresencesActives({
             >
               Je pars
             </button>
-            <button type="button" className={BOUTON_PETIT} onClick={() => setDemande(true)}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setDemande(true)}
+            >
               + Demander une correction
             </button>
           </div>
@@ -260,14 +262,14 @@ function PresencesActives({
             ) : null}
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={() => setLundi(decaler(lundi, -7))}
             >
               ← Semaine précédente
             </button>
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={() => setLundi(decaler(lundi, 7))}
             >
               Semaine suivante →
@@ -381,14 +383,14 @@ function PresencesActives({
                     <span className="flex gap-1">
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         onClick={() => setDecision({ id: c.id, accepter: false })}
                       >
                         Refuser
                       </button>
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         onClick={() => setDecision({ id: c.id, accepter: true })}
                       >
                         Accepter

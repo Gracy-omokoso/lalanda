@@ -11,6 +11,7 @@
 
 import type { TeamMemberView, TeamView } from '@lalanda/shared/hr';
 import {
+  Alert,
   Button,
   EntityPicker,
   Field,
@@ -29,7 +30,6 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { teamsApi } from '@/lib/teams-api';
 
 import { Avatar, PileAvatars } from '../../projets/_components/elements';
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   candidatsAjoutables,
@@ -131,9 +131,9 @@ function FormulaireEquipe({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
@@ -204,7 +204,7 @@ function FicheEquipe({
           <span className="flex gap-2">
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={onEditer}
               aria-haspopup="dialog"
             >
@@ -212,7 +212,7 @@ function FicheEquipe({
             </button>
             <button
               type="button"
-              className={BOUTON_DANGER}
+              className={buttonClasses('danger', 'sm')}
               onClick={onSupprimer}
               aria-haspopup="dialog"
             >
@@ -248,7 +248,7 @@ function FicheEquipe({
                 {gerer ? (
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     disabled={envoi}
                     onClick={() =>
                       void agir(
@@ -307,9 +307,9 @@ function FicheEquipe({
         </form>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </article>
   );
@@ -481,17 +481,21 @@ export function Equipes(): React.ReactElement {
               Les personnes restent membres de l’organisation.
             </p>
             {erreurSuppression ? (
-              <Alerte>
+              <Alert tone="danger">
                 <p>{erreurSuppression}</p>
-              </Alerte>
+              </Alert>
             ) : null}
             <div className="flex justify-end gap-2">
-              <button type="button" className={BOUTON_PETIT} onClick={() => setSuppression(null)}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setSuppression(null)}
+              >
                 Annuler
               </button>
               <button
                 type="button"
-                className={BOUTON_DANGER}
+                className={buttonClasses('danger', 'sm')}
                 onClick={() => {
                   void teamsApi
                     .remove(suppression.id)

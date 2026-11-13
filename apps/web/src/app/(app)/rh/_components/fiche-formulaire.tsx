@@ -6,6 +6,7 @@
 // personnelles se saisissent dans l'onglet des données sensibles (lot H7).
 
 import {
+  Alert,
   Button,
   DatePicker,
   EntityPicker,
@@ -31,8 +32,6 @@ import { useEffect, useId, useState } from 'react';
 import { hrApi, type HrDepartmentView, type HrEmployeeView } from '@/lib/api-hr';
 // ADR-0068 : matricule automatique, poste du référentiel, « Inviter sur Lalanda ».
 import { hrLot1Api, type PositionView } from '@/lib/api-hr-lot1';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   formCollaborateur,
@@ -466,9 +465,9 @@ export function FicheFormulaire({
       </FormGrid>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <StickyActions>
         <Button size="sm" onClick={onAnnuler} disabled={envoi}>

@@ -10,6 +10,7 @@
 // validateur unique en interrupteur, grille sémantique. Mêmes champs envoyés.
 
 import {
+  Alert,
   Button,
   Checkbox,
   ChoiceCards,
@@ -28,8 +29,6 @@ import { useEffect, useId, useState } from 'react';
 import { HR_APPROVAL_FLOWS, HR_WEEKDAYS, type HrApprovalFlow } from '@lalanda/shared/hr';
 
 import { hrAdminApi, type HrSettingsFull } from '@/lib/api-hr-admin';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { FeriesReglages, ModelesReglages, TypesAbsenceReglages } from './reglages-listes';
 // ADR-0068 § 2 : matricules.
@@ -243,13 +242,13 @@ export function ReglagesRh(): React.ReactElement {
 function Erreurs({ erreurs }: { erreurs: string[] }): React.ReactElement | null {
   if (erreurs.length === 0) return null;
   return (
-    <Alerte>
+    <Alert tone="danger">
       <ul className="list-disc pl-4">
         {erreurs.map((e) => (
           <li key={e}>{e}</li>
         ))}
       </ul>
-    </Alerte>
+    </Alert>
   );
 }
 

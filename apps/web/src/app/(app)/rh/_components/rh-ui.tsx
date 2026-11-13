@@ -5,12 +5,10 @@
 // phrase d'indisponibilité (route pas encore livrée : 404, jamais de donnée
 // inventée) et une fenêtre de décision avec commentaire.
 
-import { Badge, Button, Field, Modal, TextArea } from '@lalanda/ui';
+import { Alert, Badge, Button, Field, Modal, TextArea, buttonClasses } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import type { LeaveRequestView } from '@/lib/api-hr';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_STATUT_DEMANDE,
@@ -46,17 +44,18 @@ export function EchecLecture({
     );
   }
   return (
-    <Alerte
+    <Alert
+      tone="danger"
       action={
         onReessayer ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onReessayer}>
+          <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onReessayer}>
             Réessayer
           </button>
         ) : undefined
       }
     >
       <p>{messageRh(erreur, repli)}</p>
-    </Alerte>
+    </Alert>
   );
 }
 
@@ -191,9 +190,9 @@ export function DialogueDecision({
           </Field>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>

@@ -10,7 +10,7 @@
 //
 // ADR-0074 : consentements en cases stylées (accords). Mêmes champs envoyés.
 
-import { Badge, Checkbox, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Checkbox, buttonClasses } from '@lalanda/ui';
 import { BadgeCheck, Camera, Download, IdCard, RefreshCw, ShieldOff, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -22,7 +22,6 @@ import {
   type CardSettingsView,
 } from '@/lib/api-hr-cards';
 
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   LIBELLE_TYPE,
   messageExport,
@@ -150,7 +149,7 @@ export function FicheCartes(): React.ReactElement {
       </button>
       <button
         type="button"
-        className={BOUTON_PETIT}
+        className={buttonClasses('secondary', 'sm')}
         disabled={disabled || occupe !== null}
         onClick={() => void exporter(kind, 'png', 'recto')}
       >
@@ -159,7 +158,7 @@ export function FicheCartes(): React.ReactElement {
       {kind === 'business' || reglages?.badgeVerso !== false ? (
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           disabled={disabled || occupe !== null}
           onClick={() => void exporter(kind, 'png', 'verso')}
         >
@@ -171,7 +170,7 @@ export function FicheCartes(): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-5">
-      {alerte ? <Alerte>{alerte}</Alerte> : null}
+      {alerte ? <Alert tone="danger">{alerte}</Alert> : null}
 
       <section className={SECTION} aria-labelledby={`${id}-photo`}>
         <h2 id={`${id}-photo`} className="text-base font-semibold">
@@ -252,7 +251,7 @@ export function FicheCartes(): React.ReactElement {
                   />
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     disabled={!p.consent.photo || occupe !== null}
                     onClick={() => fichierPhoto.current?.click()}
                   >
@@ -261,7 +260,7 @@ export function FicheCartes(): React.ReactElement {
                   {p.photo ? (
                     <button
                       type="button"
-                      className={BOUTON_DANGER}
+                      className={buttonClasses('danger', 'sm')}
                       disabled={occupe !== null}
                       onClick={() =>
                         void agir(
@@ -316,7 +315,7 @@ export function FicheCartes(): React.ReactElement {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={occupe !== null}
               onClick={() => {
                 if (
@@ -349,7 +348,7 @@ export function FicheCartes(): React.ReactElement {
             {p.verification.issued ? (
               <button
                 type="button"
-                className={BOUTON_DANGER}
+                className={buttonClasses('danger', 'sm')}
                 disabled={occupe !== null}
                 onClick={() => {
                   if (

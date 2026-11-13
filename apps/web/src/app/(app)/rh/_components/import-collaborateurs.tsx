@@ -10,7 +10,7 @@
 //
 // ADR-0074 : les deux options sont des interrupteurs ; le fichier reste un champ natif.
 
-import { Badge, Switch, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Switch, buttonClasses } from '@lalanda/ui';
 import { FileUp, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -21,8 +21,6 @@ import {
   type EmployeeImportPreview,
   type EmployeeImportResult,
 } from '@/lib/api-hr-lot1';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { libelleManagerImport, peutInviterSurLalanda } from './lot1-model';
 import { useAccesRh } from './rh-access';
@@ -105,10 +103,18 @@ export function ImportCollaborateurs(): React.ReactElement {
         sousTitre="Reprenez votre registre du personnel depuis Excel (.xlsx) ou un fichier .csv. Rien n’est créé avant votre confirmation ; les matricules du fichier sont conservés."
         actions={
           <span className="flex flex-wrap gap-2">
-            <button type="button" className={BOUTON_PETIT} onClick={() => void modele('xlsx')}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => void modele('xlsx')}
+            >
               Télécharger le modèle (.xlsx)
             </button>
-            <button type="button" className={BOUTON_PETIT} onClick={() => void modele('csv')}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => void modele('csv')}
+            >
               Modèle (.csv)
             </button>
           </span>
@@ -145,9 +151,9 @@ export function ImportCollaborateurs(): React.ReactElement {
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {envoi && !apercu ? <p className="text-sm">Lecture du fichier…</p> : null}
 
@@ -282,7 +288,10 @@ export function ImportCollaborateurs(): React.ReactElement {
               </li>
             ))}
           </ul>
-          <Link className={`${BOUTON_PETIT} self-start`} href={`${RH_BASE}/collaborateurs`}>
+          <Link
+            className={buttonClasses('secondary', 'sm', 'self-start')}
+            href={`${RH_BASE}/collaborateurs`}
+          >
             Voir les collaborateurs
           </Link>
         </div>

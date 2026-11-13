@@ -13,6 +13,7 @@
 // Mêmes champs envoyés, même `validerForm`.
 
 import {
+  Alert,
   Checkbox,
   DatePicker,
   Field,
@@ -33,7 +34,6 @@ import {
   type GeneratedDocumentView,
 } from '@/lib/api-hr-generated-documents';
 
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   ATTESTATION_TITLE_LABELS,
   GENERATED_DOCUMENT_KIND_LABELS,
@@ -239,7 +239,7 @@ function FormulaireGeneration({
         void agir('generer');
       }}
     >
-      {alerte ? <Alerte>{alerte}</Alerte> : null}
+      {alerte ? <Alert tone="danger">{alerte}</Alert> : null}
       <FormGrid>
         <Field id={`${id}-type`} label="Type de document" required size="md">
           <Select<GeneratedDocumentKind>
@@ -347,7 +347,7 @@ function FormulaireGeneration({
               </FormGrid>
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-end`}
+                className={buttonClasses('secondary', 'sm', 'self-end')}
                 disabled={form.emplois.length === 1}
                 onClick={() => maj({ emplois: form.emplois.filter((_, k) => k !== i) })}
               >
@@ -359,7 +359,7 @@ function FormulaireGeneration({
           {form.emplois.length < 10 ? (
             <button
               type="button"
-              className={`${BOUTON_PETIT} self-start`}
+              className={buttonClasses('secondary', 'sm', 'self-start')}
               onClick={() =>
                 maj({
                   emplois: [

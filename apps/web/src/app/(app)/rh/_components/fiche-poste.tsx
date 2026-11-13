@@ -7,12 +7,19 @@
 //
 // ADR-0074 : poste en `Select` (groupe des vacants), date d'effet en `DatePicker`.
 
-import { Button, DatePicker, Field, FormGrid, Select, SubmitButton, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  Select,
+  SubmitButton,
+  TextInput,
+} from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { hrLot1Api, type PositionView } from '@/lib/api-hr-lot1';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import { corpsChangementPoste, optionPoste, type ChoixPoste } from './lot1-model';
@@ -128,9 +135,9 @@ export function ChangementPoste({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">

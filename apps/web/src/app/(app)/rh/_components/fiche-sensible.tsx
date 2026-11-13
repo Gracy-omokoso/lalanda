@@ -10,7 +10,7 @@
 // modale (`hr.manage` + `hr.sensitive.read`) ; le collaborateur lit ses propres
 // données mais ne les modifie pas.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { Eye, EyeOff, Lock, Pencil, ShieldAlert } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
@@ -20,8 +20,6 @@ import {
   type HrPrivateField,
   type HrPrivateSections,
 } from '@/lib/api-hr-admin';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import { FormulaireSensible } from './formulaire-sensible';
@@ -166,7 +164,7 @@ export function FicheSensible(): React.ReactElement {
                     affichee ? (
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         onClick={() =>
                           setClair((c) => {
                             const n = { ...c };
@@ -181,7 +179,7 @@ export function FicheSensible(): React.ReactElement {
                     ) : (
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         aria-haspopup="dialog"
                         onClick={() => setDemande({ section: s, edition: false })}
                       >
@@ -193,7 +191,7 @@ export function FicheSensible(): React.ReactElement {
                   {modifier ? (
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       aria-haspopup="dialog"
                       onClick={() =>
                         existe && !affichee
@@ -311,7 +309,12 @@ function ConfirmationAffichage({
       busy={envoi}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={onFermer}
+            disabled={envoi}
+          >
             Annuler
           </button>
           <button
@@ -334,9 +337,9 @@ function ConfirmationAffichage({
           </p>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>

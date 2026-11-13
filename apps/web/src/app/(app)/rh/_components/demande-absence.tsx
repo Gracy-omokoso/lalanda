@@ -9,6 +9,7 @@
 // segments. Mêmes champs envoyés, même validation (`validerDemande`).
 
 import {
+  Alert,
   Button,
   DatePicker,
   Field,
@@ -24,8 +25,6 @@ import {
 import { useEffect, useId, useState } from 'react';
 
 import { hrApi, type LeaveRequestView, type LeaveTypeView } from '@/lib/api-hr';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   aideType,
@@ -258,9 +257,9 @@ function Formulaire({
       </FormGrid>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">

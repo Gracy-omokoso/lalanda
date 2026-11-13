@@ -5,6 +5,7 @@
 // l'appelant peut décider), à payer (`payables.pay`), toutes (`expenses.approve`,
 // `payables.pay`, `hr.read` — sans justificatif pour `hr.read` seul).
 
+import { buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck, HandCoins, Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -19,8 +20,6 @@ import {
   type ExpenseReportPage,
   type ExpenseReportView,
 } from '@/lib/api-rh-2';
-
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { AvanceDetail } from './avance';
 import {
@@ -110,7 +109,7 @@ export function FraisAvances(): React.ReactElement {
                 <Link
                   key={v}
                   href={lienFrais(v)}
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   aria-current={vue === v ? 'page' : undefined}
                 >
                   {LIBELLES_VUE[v]}

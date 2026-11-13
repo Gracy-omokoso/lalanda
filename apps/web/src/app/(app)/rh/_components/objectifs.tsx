@@ -26,8 +26,6 @@ import type { GoalFinalStatus } from '@lalanda/shared/hr';
 
 import { rh2Api, type GoalView, type HrPerformanceSettingsView } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
-
 import {
   LIBELLES_STATUT_OBJECTIF,
   STATUTS_FINAUX_OBJECTIF,
@@ -223,7 +221,7 @@ function ObjectifsActifs(): React.ReactElement {
                     {gestes.avancer ? (
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         onClick={() => setDialogue({ type: 'avancer', objectif: g })}
                       >
                         Déclarer un avancement
@@ -232,7 +230,7 @@ function ObjectifsActifs(): React.ReactElement {
                     {gestes.clore ? (
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         onClick={() => setDialogue({ type: 'clore', objectif: g })}
                       >
                         Poser le résultat

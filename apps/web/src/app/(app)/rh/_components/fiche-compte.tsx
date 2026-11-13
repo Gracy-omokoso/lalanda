@@ -9,6 +9,7 @@
 // pleine largeur). Mêmes champs envoyés, même contrôle à l'envoi.
 
 import {
+  Alert,
   Badge,
   Button,
   Field,
@@ -23,8 +24,6 @@ import { KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { LIBELLES_INVITATION, hrLot1Api, type EmployeeAccountView } from '@/lib/api-hr-lot1';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import { ChangementPoste } from './fiche-poste';
@@ -93,7 +92,7 @@ export function FicheCompte(): React.ReactElement | null {
           {changerPoste ? (
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-haspopup="dialog"
               onClick={() => setMutation(true)}
             >
@@ -103,7 +102,7 @@ export function FicheCompte(): React.ReactElement | null {
           {gerer && fiche.employeeNumber === null ? (
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={envoi}
               onClick={() =>
                 void agir(async () => {
@@ -118,7 +117,7 @@ export function FicheCompte(): React.ReactElement | null {
           {corriger && fiche.employeeNumber !== null ? (
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-haspopup="dialog"
               onClick={() => setCorrection(true)}
             >
@@ -186,7 +185,7 @@ export function FicheCompte(): React.ReactElement | null {
                     </button>
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       disabled={envoi}
                       onClick={() =>
                         void agir(async () => {
@@ -209,9 +208,9 @@ export function FicheCompte(): React.ReactElement | null {
           </p>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
       <Modal
@@ -307,9 +306,9 @@ function CorrectionMatricule({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
