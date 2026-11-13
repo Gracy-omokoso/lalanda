@@ -7,7 +7,7 @@
 // fenêtre modale (multipart). La requête ne porte que le type et l'identifiant.
 // Réutilisable : une insertion d'une ligne par fiche.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Alert, buttonClasses } from '@lalanda/ui';
 import { Download, Paperclip, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -38,7 +38,6 @@ import {
   PhraseSection,
   enregistrerFichier,
 } from '../app/(app)/documents/_components/documents-ui';
-import { Alerte, BOUTON_PETIT } from '../app/(app)/ventes/_components/form-ui';
 
 const ORIGINE: Record<EntityPieceView['ownerType'], string> = {
   supplier_invoice: 'Facture fournisseur',
@@ -125,9 +124,9 @@ export function EntityDocumentsPanel({
       }
     >
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {lecture === null ? (
         <Chargement />
@@ -164,7 +163,7 @@ export function EntityDocumentsPanel({
                     </span>
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       disabled={occupe === p.href}
                       onClick={() => void telechargerPiece(p)}
                     >
