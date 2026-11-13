@@ -14,16 +14,19 @@
 // décimale lue par `preparerFacture`), validation à la sortie du champ.
 
 import {
+  Alert,
   Button,
   DatePicker,
   ErrorSummary,
   Field,
+  FileInput,
   FormGrid,
   Modal,
   MoneyInput,
   SegmentedControl,
   Select,
   TextInput,
+  buttonClasses,
   estRaccourciEnregistrer,
   resumerErreurs,
   useBlurValidation,
@@ -36,7 +39,6 @@ import { purchasesPayablesApi, type SupplierInvoiceView } from '@/lib/api-purcha
 import { treasuryApi, type ExpenseCategoryView } from '@/lib/treasury-api';
 
 import { WorkProjectSelect } from '../../tresorerie/_components/work-project-select';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { lienFacture, messageAchats } from './achats-model';
@@ -228,9 +230,9 @@ export function FenetreFacture({
     >
       {f === null ? (
         erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
             Lecture de la commande…
@@ -495,7 +497,11 @@ export function FenetreFacture({
                 </FormGrid>
                 <button
                   type="button"
-                  className={`${BOUTON_PETIT} mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11`}
+                  className={buttonClasses(
+                    'secondary',
+                    'sm',
+                    'mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11',
+                  )}
                   aria-label={`Retirer la taxe ${i + 1}`}
                   onClick={() => maj({ taxes: f.taxes.filter((_, j) => j !== i) })}
                 >
@@ -506,7 +512,11 @@ export function FenetreFacture({
             {f.taxes.length < 5 ? (
               <button
                 type="button"
-                className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start max-sm:h-11`}
+                className={buttonClasses(
+                  'secondary',
+                  'sm',
+                  'inline-flex items-center gap-1 self-start max-sm:h-11',
+                )}
                 onClick={() => maj({ taxes: [...f.taxes, { label: 'TVA', amount: '' }] })}
               >
                 <Plus aria-hidden="true" className="h-4 w-4" />
@@ -620,7 +630,7 @@ export function FenetreFacture({
                 {f.imputations.length > 1 ? (
                   <button
                     type="button"
-                    className={`${BOUTON_PETIT} self-end max-sm:h-11`}
+                    className={buttonClasses('secondary', 'sm', 'self-end max-sm:h-11')}
                     onClick={() => maj({ imputations: f.imputations.filter((_, j) => j !== i) })}
                   >
                     Retirer
@@ -631,7 +641,11 @@ export function FenetreFacture({
             {f.imputations.length < 20 ? (
               <button
                 type="button"
-                className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start max-sm:h-11`}
+                className={buttonClasses(
+                  'secondary',
+                  'sm',
+                  'inline-flex items-center gap-1 self-start max-sm:h-11',
+                )}
                 onClick={() =>
                   maj({
                     imputations: [
@@ -656,25 +670,19 @@ export function FenetreFacture({
               hint="PDF (10 Mio) ou photo PNG, JPEG, WebP (2 Mio). Elle peut aussi être jointe plus tard depuis la fiche."
               error={affiches['piece']}
             >
-              {({ id: idPiece, describedBy, invalid }) => (
-                <input
-                  id={idPiece}
-                  type="file"
-                  accept={TYPES_PIECE}
-                  className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
-                  onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
-                  aria-describedby={describedBy}
-                  aria-invalid={invalid || undefined}
-                />
-              )}
+              <FileInput
+                accept={TYPES_PIECE}
+                onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
+              />
             </Field>
           </FormGrid>
 
           {erreur ? (
-            <Alerte
+            <Alert
+              tone="danger"
               action={
                 doublon ? (
-                  <Link href={lienFacture(doublon)} className={BOUTON_PETIT}>
+                  <Link href={lienFacture(doublon)} className={buttonClasses('secondary', 'sm')}>
                     Ouvrir la facture déjà saisie
                   </Link>
                 ) : null
@@ -688,7 +696,7 @@ export function FenetreFacture({
                   {formatMontant(ecartTotal.difference.replace(/^[-+]/, ''), f.currency)}.
                 </p>
               ) : null}
-            </Alerte>
+            </Alert>
           ) : null}
         </div>
       )}

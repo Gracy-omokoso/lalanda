@@ -14,6 +14,7 @@
 // stylées, dépense à rattacher en cartes de choix. Mêmes champs envoyés.
 
 import {
+  Alert,
   Button,
   Checkbox,
   ChoiceCards,
@@ -38,7 +39,6 @@ import {
 } from '@/lib/api-purchases-payables';
 import { treasuryApi, type TreasuryAccountView } from '@/lib/treasury-api';
 
-import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -276,9 +276,9 @@ export function FenetrePaiement({
     >
       {f === null ? (
         erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
             Lecture des factures à payer…
@@ -425,9 +425,9 @@ export function FenetrePaiement({
           />
 
           {erreur ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           ) : null}
         </div>
       )}

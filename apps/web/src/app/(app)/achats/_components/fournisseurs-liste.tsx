@@ -6,7 +6,16 @@
 //
 // ADR-0074 : recherche en `TextInput` (icône), archivés en interrupteur.
 
-import { Badge, Field, FormGrid, Modal, Switch, TextInput, buttonClasses } from '@lalanda/ui';
+import {
+  Alert,
+  Badge,
+  Field,
+  FormGrid,
+  Modal,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Plus, Search, Truck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,7 +24,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { purchasesApi, type SupplierListItem } from '@/lib/api-purchases';
 
 import { Bandeau, MontantsLignes } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesAchats } from './achats-access';
 import { lienFournisseur, messageAchats, peutGererAchats } from './achats-model';
@@ -107,9 +115,9 @@ export function FournisseursListe(): React.ReactElement {
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <Modal
@@ -174,7 +182,7 @@ export function FournisseursListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtres, suivante)}
         >
           Afficher plus de fournisseurs

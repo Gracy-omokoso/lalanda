@@ -4,10 +4,8 @@
 // Le motif obligatoire est vérifié ici ; l'API le revérifie et reste juge.
 // ADR-0074 : `Field` + `TextArea`, boutons `Button` avec état d'envoi.
 
-import { Button, Field, Modal, TextArea } from '@lalanda/ui';
+import { Alert, Button, Field, Modal, TextArea } from '@lalanda/ui';
 import { useId, useState } from 'react';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { messageAchats } from './achats-model';
 
@@ -97,9 +95,9 @@ export function DialogueMotif({
           </Field>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>

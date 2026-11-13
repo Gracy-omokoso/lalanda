@@ -4,7 +4,7 @@
 // approuvables par l'utilisateur (`GET /purchases/approvals/pending`). On
 // approuve ou refuse depuis la fiche, qui montre lignes et taxes déclarées.
 
-import { Badge } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -12,7 +12,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { purchasesApi, type PurchaseOrderView } from '@/lib/api-purchases';
 
 import { Bandeau, PhraseSection } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesAchats } from './achats-access';
 import { lienCommande, messageAchats, peutApprouverAchats } from './achats-model';
@@ -61,9 +60,9 @@ export function Validations(): React.ReactElement {
       {etat === 'pret' && !approuver ? (
         <PhraseSection>{PHRASE_SANS_DROIT_VALIDATION}</PhraseSection>
       ) : erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : items === null ? (
         <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
           Chargement…
@@ -107,7 +106,7 @@ export function Validations(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(suivante)}
         >
           Afficher plus de demandes

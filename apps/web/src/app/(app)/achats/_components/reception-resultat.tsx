@@ -3,7 +3,7 @@
 // Compte rendu d'une réception enregistrée : statut de la commande et reste à
 // recevoir par ligne, TELS QUE RENDUS par l'API (moteur `orderReceptionStatus`).
 
-import { Badge } from '@lalanda/ui';
+import { Badge, buttonClasses } from '@lalanda/ui';
 import { PackageCheck } from 'lucide-react';
 import Link from 'next/link';
 
@@ -11,8 +11,6 @@ import type {
   PurchaseOrderDetailView,
   PurchaseReceptionWriteResult,
 } from '@/lib/api-purchases-payables';
-
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { LIBELLES_STATUT, lienReception, tonStatut } from './achats-model';
 import { phrasesResultat } from './receptions-model';
@@ -44,10 +42,13 @@ export function ResultatReception({
           </Badge>
         </p>
         <span className="flex gap-2">
-          <Link href={lienReception(resultat.reception.id)} className={BOUTON_PETIT}>
+          <Link
+            href={lienReception(resultat.reception.id)}
+            className={buttonClasses('secondary', 'sm')}
+          >
             Ouvrir la réception
           </Link>
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer}>
+          <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onFermer}>
             Fermer
           </button>
         </span>

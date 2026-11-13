@@ -9,7 +9,7 @@
 //
 // ADR-0074 : commentaire et motif en `Field` + `TextArea`, boutons `Button`.
 
-import { Badge, Button, Field, Modal, TextArea, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Button, Field, Modal, TextArea, buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck, ClipboardList, History, ListOrdered } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -19,7 +19,6 @@ import { purchasesApi, type PurchaseOrderView } from '@/lib/api-purchases';
 
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
 import { ApercuDocument } from '../../ventes/_components/apercu-document';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -172,9 +171,9 @@ function DialogueDecision({
           </>
         )}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>
@@ -196,7 +195,7 @@ function BoutonAction({
     <span className="flex flex-col gap-1">
       <button
         type="button"
-        className={principal ? buttonClasses('primary', 'sm') : BOUTON_PETIT}
+        className={principal ? buttonClasses('primary', 'sm') : buttonClasses('secondary', 'sm')}
         disabled={!a.actif || occupe}
         aria-describedby={a.raison ? `${id}-raison` : undefined}
         onClick={() => onClic(a.id)}
@@ -291,9 +290,9 @@ export function CommandeFiche({ orderId }: { orderId: string }): React.ReactElem
       <section className="flex min-w-0 flex-col gap-5">
         {retour}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
             Chargement de la demande…
@@ -347,19 +346,19 @@ export function CommandeFiche({ orderId }: { orderId: string }): React.ReactElem
           </div>
         ) : null}
         {erreurAction ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreurAction}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </Bandeau>
 
       {o.cancellation ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>
             Annulée le {formatInstantJour(o.cancellation.at)} par{' '}
             {nomPersonne(membres, o.cancellation.by, moi)} : {o.cancellation.reason}
           </p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">

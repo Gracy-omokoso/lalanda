@@ -9,7 +9,7 @@
 // Tant que la fiche 360° n'est pas servie (404, lot P6), l'écran montre
 // l'identité lue dans la liste — rendue par l'API — et le dit.
 
-import { Badge, Modal, afficherTelephone, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Modal, afficherTelephone, buttonClasses } from '@lalanda/ui';
 import {
   ClipboardList,
   CreditCard,
@@ -35,7 +35,6 @@ import {
 } from '@/lib/api-purchases';
 
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -104,13 +103,17 @@ function MoyenPaiement({
           <span className="font-mono text-xs tabular-nums">{moyen.masked}</span>
         </span>
         {clair ? (
-          <button type="button" className={BOUTON_PETIT} onClick={() => setClair(null)}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => setClair(null)}
+          >
             Masquer
           </button>
         ) : (
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             disabled={!bouton.actif}
             aria-describedby={bouton.actif ? undefined : `${id}-raison`}
             aria-haspopup="dialog"
@@ -143,7 +146,11 @@ function MoyenPaiement({
         busy={envoi}
         footer={
           <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className={BOUTON_PETIT} onClick={() => setConfirmation(false)}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setConfirmation(false)}
+            >
               Annuler
             </button>
             <button
@@ -163,9 +170,9 @@ function MoyenPaiement({
             {moyen.label} — {moyen.masked}
           </p>
           {erreur ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           ) : null}
         </div>
       </Modal>
@@ -200,13 +207,13 @@ function Identite({ s }: { s: SupplierView }): React.ReactElement {
       </Panneau>
       <Panneau titre="Coordonnées de paiement" icone={CreditCard} id="fo-paiement">
         {s.paymentDetailsChangedAlert ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>
               Coordonnées de paiement modifiées le{' '}
               {formatInstantJour(s.paymentDetailsChangedAlert.at)}. Vérifiez-les auprès du
               fournisseur avant de payer.
             </p>
-          </Alerte>
+          </Alert>
         ) : null}
         {s.paymentMethods.length === 0 ? (
           <PhraseSection>Aucun moyen de paiement enregistré.</PhraseSection>
@@ -392,9 +399,9 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
       <section className="flex min-w-0 flex-col gap-5">
         {retour}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
             Chargement du fournisseur…
@@ -446,9 +453,9 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
       {o ? (
         <SectionsFiche sections={o.sections} />
       ) : erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </section>
   );

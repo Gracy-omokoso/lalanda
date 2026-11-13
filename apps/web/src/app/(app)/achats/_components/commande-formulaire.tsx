@@ -10,6 +10,7 @@
 // lue par `preparerCommande`), largeurs sémantiques. Mêmes champs envoyés.
 
 import {
+  Alert,
   DatePicker,
   EntityPicker,
   ErrorSummary,
@@ -22,6 +23,7 @@ import {
   SubmitButton,
   TextArea,
   TextInput,
+  buttonClasses,
   resumerErreurs,
   useBlurValidation,
 } from '@lalanda/ui';
@@ -32,7 +34,6 @@ import { purchasesApi, type SupplierView } from '@/lib/api-purchases';
 import { stockApi } from '@/lib/api-stock';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { messageAchats, peutGererAchats } from './achats-model';
 import { lignesPreremplies, type ArticlePrerempli } from './commande-prefill-model';
@@ -376,7 +377,11 @@ export function NouvelleDemande({
                   </span>
                   <button
                     type="button"
-                    className={`${BOUTON_PETIT} inline-flex h-8 w-8 items-center justify-center p-0 max-sm:h-10 max-sm:w-10`}
+                    className={buttonClasses(
+                      'secondary',
+                      'sm',
+                      'inline-flex h-8 w-8 items-center justify-center p-0 max-sm:h-10 max-sm:w-10',
+                    )}
                     disabled={f.lignes.length === 1}
                     aria-label={`Retirer la ligne ${i + 1}`}
                     onClick={() =>
@@ -448,7 +453,11 @@ export function NouvelleDemande({
           })}
           <button
             type="button"
-            className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start max-sm:h-11`}
+            className={buttonClasses(
+              'secondary',
+              'sm',
+              'inline-flex items-center gap-1 self-start max-sm:h-11',
+            )}
             disabled={f.lignes.length >= 100}
             onClick={() => setF((p) => ({ ...p, lignes: [...p.lignes, ligneVide()] }))}
           >
@@ -490,7 +499,11 @@ export function NouvelleDemande({
               </FormGrid>
               <button
                 type="button"
-                className={`${BOUTON_PETIT} mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11`}
+                className={buttonClasses(
+                  'secondary',
+                  'sm',
+                  'mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11',
+                )}
                 aria-label={`Retirer la taxe ${i + 1}`}
                 onClick={() => setF((p) => ({ ...p, taxes: p.taxes.filter((_, j) => j !== i) }))}
               >
@@ -501,7 +514,11 @@ export function NouvelleDemande({
           <div className="col-span-full">
             <button
               type="button"
-              className={`${BOUTON_PETIT} inline-flex items-center gap-1 max-sm:h-11`}
+              className={buttonClasses(
+                'secondary',
+                'sm',
+                'inline-flex items-center gap-1 max-sm:h-11',
+              )}
               disabled={f.taxes.length >= 5}
               onClick={() =>
                 setF((p) => ({ ...p, taxes: [...p.taxes, { label: 'TVA', amount: '' }] }))
@@ -519,9 +536,9 @@ export function NouvelleDemande({
         soumettez pour approbation depuis sa fiche.
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="max-sm:h-11">

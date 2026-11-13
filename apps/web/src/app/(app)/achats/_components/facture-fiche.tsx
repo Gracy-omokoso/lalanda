@@ -7,7 +7,7 @@
 // Les gestes viennent de `actionsFacture` (droits servis par le serveur) ; l'API
 // reste juge et ses refus s'affichent. Rien n'est calculé ici.
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import { Banknote, FileText, ListOrdered, Paperclip, Scale } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -21,7 +21,6 @@ import {
 } from '@/lib/api-purchases-payables';
 
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -114,7 +113,7 @@ function BoutonGeste({
     <span className="flex flex-col gap-1">
       <button
         type="button"
-        className={principal ? buttonClasses('primary', 'sm') : BOUTON_PETIT}
+        className={principal ? buttonClasses('primary', 'sm') : buttonClasses('secondary', 'sm')}
         disabled={!a.actif || occupe}
         aria-describedby={a.raison ? `${id}-raison` : undefined}
         onClick={() => onClic(a.id)}
@@ -216,9 +215,9 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
       <section className="flex min-w-0 flex-col gap-5">
         {retour}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
             Chargement de la facture…
@@ -282,31 +281,31 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
           </div>
         ) : null}
         {erreurGeste ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreurGeste}</p>
             {refusEcarts && refusEcarts.length > 0 ? (
               <TableauEcarts variances={refusEcarts} f={f} />
             ) : null}
-          </Alerte>
+          </Alert>
         ) : null}
       </Bandeau>
 
       {f.cancellation ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>
             Annulée le {formatInstantJour(f.cancellation.at)} par{' '}
             {nomPersonne(membres, f.cancellation.by, moi)} : {f.cancellation.reason}
           </p>
-        </Alerte>
+        </Alert>
       ) : null}
       {f.dispute ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>
             En litige depuis le {formatInstantJour(f.dispute.at)} (
             {nomPersonne(membres, f.dispute.by, moi)}) : {f.dispute.reason}. Le paiement est bloqué
             tant que le litige n’est pas levé.
           </p>
-        </Alerte>
+        </Alert>
       ) : null}
       {f.forcedValidation ? (
         <p className="rounded-[var(--radius-md)] border border-[var(--warn)]/50 p-3 text-sm">
@@ -526,7 +525,7 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
                     {p.status === 'recorded' && peutPayerFournisseurs(actions) ? (
                       <button
                         type="button"
-                        className={`${BOUTON_PETIT} mt-1 w-fit`}
+                        className={buttonClasses('secondary', 'sm', 'mt-1 w-fit')}
                         onClick={() => setAAnnuler(p)}
                       >
                         Annuler ce paiement

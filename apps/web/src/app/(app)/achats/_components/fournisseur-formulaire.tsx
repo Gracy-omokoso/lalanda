@@ -11,6 +11,7 @@
 // et `onCree` rend la fiche créée, choisie d'office.
 
 import {
+  Alert,
   Button,
   ErrorSummary,
   Field,
@@ -30,8 +31,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { purchasesApi, type SupplierView } from '@/lib/api-purchases';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { identifiantExistant, lienFournisseur, messageAchats } from './achats-model';
 import {
@@ -121,9 +120,9 @@ export function NouveauFournisseur({
           Fournisseur créé.
         </p>
         {avertissements.phrases.map((ph) => (
-          <Alerte key={ph}>
+          <Alert tone="danger" key={ph}>
             <p>{ph}</p>
-          </Alerte>
+          </Alert>
         ))}
         <button
           type="button"
@@ -264,7 +263,7 @@ export function NouveauFournisseur({
       </fieldset>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
           {existant ? (
             <p>
@@ -273,7 +272,7 @@ export function NouveauFournisseur({
               </Link>
             </p>
           ) : null}
-        </Alerte>
+        </Alert>
       ) : null}
       <FormGrid>
         <div className="col-span-full flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

@@ -3,7 +3,7 @@
 // Réceptions — ADR-0044 § 3.4 et § 8 : liste (filtrable par commande) et création
 // depuis une commande, en fenêtre modale. Aucune quantité n'est additionnée ici.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { PackageCheck, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -18,7 +18,6 @@ import {
 } from '@/lib/api-purchases-payables';
 
 import { Bandeau } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -85,9 +84,9 @@ function ChoixCommande({
     >
       <div className="flex flex-col gap-3 text-sm">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {items === null ? (
           <p className="text-[var(--foreground-muted)]">Chargement des commandes…</p>
@@ -186,9 +185,9 @@ export function ReceptionsListe(): React.ReactElement {
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {resultat ? (
@@ -258,7 +257,7 @@ export function ReceptionsListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(commandeFiltre, suivante)}
         >
           Afficher plus de réceptions

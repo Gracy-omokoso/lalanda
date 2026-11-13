@@ -4,7 +4,7 @@
 // une route pas encore livrée (404) affiche une phrase, jamais un chiffre
 // inventé. Montants et nombres : ceux de l'API (moteur).
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import { ClipboardList, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -12,7 +12,6 @@ import { useEffect, useState } from 'react';
 import { purchasesApi, type PurchaseOrderView } from '@/lib/api-purchases';
 import { purchasesPayablesApi } from '@/lib/api-purchases-payables';
 
-import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
 
@@ -149,9 +148,9 @@ export function VueEnsemble(): React.ReactElement {
         }
       >
         {erreurMiennes ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreurMiennes}</p>
-          </Alerte>
+          </Alert>
         ) : miennes === null ? (
           <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
         ) : miennes.length === 0 ? (

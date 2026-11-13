@@ -14,7 +14,7 @@
 // fenêtre modale réparti sur plusieurs factures, rattachement d'une dépense déjà
 // saisie : inchangés.
 
-import { StatusPill } from '@lalanda/ui';
+import { Alert, StatusPill } from '@lalanda/ui';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -40,7 +40,6 @@ import {
 } from '@/lib/api-purchases-payables';
 import { runStatsApi } from '@/lib/api-run-stats';
 
-import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -248,9 +247,9 @@ export function APayer(): React.ReactElement {
           </p>
         ) : listes.erreur ? (
           <div className="p-3">
-            <Alerte>
+            <Alert tone="danger">
               <p>{listes.erreur}</p>
-            </Alerte>
+            </Alert>
           </div>
         ) : factures.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--foreground-muted)]">

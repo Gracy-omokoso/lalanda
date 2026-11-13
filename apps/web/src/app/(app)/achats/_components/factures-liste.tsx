@@ -11,7 +11,7 @@
 // (`?commande=<id>`, préremplie par l'API). Montants et restes : ceux de l'API ;
 // les compteurs des onglets viennent du même calcul serveur que les filtres.
 
-import { StatusPill, buttonClasses } from '@lalanda/ui';
+import { Alert, StatusPill, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -30,7 +30,6 @@ import { useTableau } from '@/components/tableau-de-bord/use-tableau';
 import { purchasesPayablesApi, type SupplierInvoiceListItem } from '@/lib/api-purchases-payables';
 import { runStatsApi } from '@/lib/api-run-stats';
 
-import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -209,9 +208,9 @@ export function FacturesListe(): React.ReactElement {
 
         {erreur ? (
           <div className="p-3">
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           </div>
         ) : null}
         {items === null ? (

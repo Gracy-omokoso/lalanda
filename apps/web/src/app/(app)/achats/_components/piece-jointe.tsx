@@ -5,10 +5,9 @@
 // un lien local. L'API vérifie le contenu (signature PDF, image assainie).
 
 import type { PurchaseAttachmentView } from '@lalanda/shared/purchases';
+import { buttonClasses } from '@lalanda/ui';
 import { Paperclip } from 'lucide-react';
 import { useState } from 'react';
-
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formatInstantJour, messageAchats } from './achats-model';
 import { TYPES_PIECE, verifierPiece } from './factures-model';
@@ -82,7 +81,11 @@ export function PieceJointe({
           <span className="text-xs text-[var(--foreground-muted)]">
             {taille(piece.size)} · {formatInstantJour(piece.uploadedAt)}
           </span>
-          <button type="button" className={BOUTON_PETIT} onClick={() => void ouvrir()}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => void ouvrir()}
+          >
             Télécharger
           </button>
         </div>
@@ -90,7 +93,7 @@ export function PieceJointe({
         <p className="text-[var(--foreground-muted)]">{manque}</p>
       )}
       {piece === null && peutJoindre ? (
-        <label className={`${BOUTON_PETIT} w-fit cursor-pointer`}>
+        <label className={buttonClasses('secondary', 'sm', 'w-fit cursor-pointer')}>
           {envoi ? 'Envoi…' : 'Joindre un PDF ou une photo'}
           <input
             type="file"

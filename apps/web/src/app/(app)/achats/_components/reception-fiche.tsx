@@ -3,7 +3,7 @@
 // Fiche d'une réception — ADR-0044 § 2.4, § 3.4 : lignes reçues, bon de livraison,
 // pièce jointe, annulation motivée (jamais d'effacement).
 
-import { Badge } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import { ListOrdered, PackageCheck, Paperclip } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -11,7 +11,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { purchasesPayablesApi, type PurchaseReceptionView } from '@/lib/api-purchases-payables';
 
 import { Bandeau, Panneau, Tuile } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesAchats } from './achats-access';
 import {
@@ -60,9 +59,9 @@ export function ReceptionFiche({ receptionId }: { receptionId: string }): React.
       <section className="flex min-w-0 flex-col gap-5">
         {retour}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
             Chargement de la réception…
@@ -102,7 +101,11 @@ export function ReceptionFiche({ receptionId }: { receptionId: string }): React.
         </dl>
         {peutAnnulerReception(r, actions) ? (
           <div>
-            <button type="button" className={BOUTON_PETIT} onClick={() => setAnnuler(true)}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setAnnuler(true)}
+            >
               Annuler la réception
             </button>
           </div>
@@ -110,12 +113,12 @@ export function ReceptionFiche({ receptionId }: { receptionId: string }): React.
       </Bandeau>
 
       {r.cancellation ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>
             Annulée le {formatInstantJour(r.cancellation.at)} par{' '}
             {nomPersonne(membres, r.cancellation.by, moi)} : {r.cancellation.reason}
           </p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">

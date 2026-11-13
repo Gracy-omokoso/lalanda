@@ -10,7 +10,7 @@
 // Création d'une demande en fenêtre modale (`purchase.request`). Montants TTC
 // rendus par l'API ; compteurs des onglets servis par le même calcul serveur.
 
-import { Modal, StatusPill, buttonClasses } from '@lalanda/ui';
+import { Alert, Modal, StatusPill, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -29,7 +29,6 @@ import { useTableau } from '@/components/tableau-de-bord/use-tableau';
 import { purchasesApi, type PurchaseOrderView } from '@/lib/api-purchases';
 import { runStatsApi } from '@/lib/api-run-stats';
 
-import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -216,9 +215,9 @@ export function CommandesListe(): React.ReactElement {
         </div>
         {erreur ? (
           <div className="p-3">
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           </div>
         ) : null}
         {items === null ? (

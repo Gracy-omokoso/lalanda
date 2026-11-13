@@ -8,7 +8,18 @@
 // ADR-0074 : date en `DatePicker` (bornée à aujourd'hui comme avant), quantités
 // à la largeur d'une quantité, composants de `@lalanda/ui`. Mêmes champs envoyés.
 
-import { Button, DatePicker, Field, FormGrid, Modal, TextArea, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  DatePicker,
+  Field,
+  FileInput,
+  FormGrid,
+  Modal,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import {
@@ -16,8 +27,6 @@ import {
   type PurchaseOrderDetailView,
   type PurchaseReceptionWriteResult,
 } from '@/lib/api-purchases-payables';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formatJour, messageAchats } from './achats-model';
 import { numeroCommande } from './commandes-model';
@@ -145,7 +154,7 @@ export function FenetreReception({
           <legend className="mb-1 text-sm font-semibold">Quantités reçues</legend>
           <button
             type="button"
-            className={`${BOUTON_PETIT} self-start max-sm:h-11`}
+            className={buttonClasses('secondary', 'sm', 'self-start max-sm:h-11')}
             onClick={() => setF(toutRecu(f))}
           >
             Tout est arrivé (quantités commandées)
@@ -219,23 +228,16 @@ export function FenetreReception({
             hint="PDF (10 Mio) ou photo PNG, JPEG, WebP (2 Mio)."
             error={champs['piece']}
           >
-            {({ id: idPiece, describedBy, invalid }) => (
-              <input
-                id={idPiece}
-                type="file"
-                accept={TYPES_PIECE}
-                className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
-                onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
-                aria-describedby={describedBy}
-                aria-invalid={invalid || undefined}
-              />
-            )}
+            <FileInput
+              accept={TYPES_PIECE}
+              onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
+            />
           </Field>
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>
