@@ -7,9 +7,11 @@
 // ou d'une autre organisation : l'API répond 404, l'écran le dit.
 
 import {
+  Alert,
   Badge,
   DatePicker,
   Field,
+  FileInput,
   FormGrid,
   Modal,
   Select,
@@ -40,7 +42,6 @@ import {
 } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT, CHAMP, aria } from '../../ventes/_components/form-ui';
 
 import { optionsDossiers } from './arbre-model';
 import { EditeurLiens } from './depot-document';
@@ -209,7 +210,7 @@ export function DocumentFiche({ documentId }: { documentId: string }): React.Rea
               <>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   aria-haspopup="dialog"
                   onClick={() => setFenetre('modifier')}
                 >
@@ -217,7 +218,7 @@ export function DocumentFiche({ documentId }: { documentId: string }): React.Rea
                 </button>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   aria-haspopup="dialog"
                   onClick={() => setFenetre('version')}
                 >
@@ -226,7 +227,7 @@ export function DocumentFiche({ documentId }: { documentId: string }): React.Rea
                 </button>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   aria-haspopup="dialog"
                   onClick={() => setFenetre('corbeille')}
                 >
@@ -281,9 +282,9 @@ export function DocumentFiche({ documentId }: { documentId: string }): React.Rea
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -307,7 +308,7 @@ export function DocumentFiche({ documentId }: { documentId: string }): React.Rea
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       disabled={occupe === v.id}
                       onClick={() => void telecharger(v)}
                     >
@@ -318,7 +319,7 @@ export function DocumentFiche({ documentId }: { documentId: string }): React.Rea
                     {ecrire && !courante ? (
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         disabled={occupe === v.id}
                         onClick={() => void restaurerVersion(v)}
                       >
@@ -424,18 +425,13 @@ function DialogueVersion({
       <form noValidate onSubmit={(e) => void envoyer(e)} className="flex flex-col gap-3">
         <FormGrid>
           <Field id={`${id}-fichier`} label="Fichier" required size="full" error={champ}>
-            <input
-              id={`${id}-fichier`}
-              type="file"
+            <FileInput
               accept={ACCEPT_DOCUMENT}
-              className={`${CHAMP} max-sm:text-base`}
-              aria-required="true"
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 setFichier(f);
                 setChamp(f ? (validerFichier(f) ?? undefined) : undefined);
               }}
-              {...aria(`${id}-fichier`, champ)}
             />
           </Field>
           <Field id={`${id}-note`} label="Ce qui change" optional size="full">
@@ -451,9 +447,9 @@ function DialogueVersion({
           <p className="text-xs text-[var(--foreground-muted)]">{PHRASE_SENSIBLE}</p>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <SubmitButton size="sm" busy={envoi} busyLabel="Envoi…" className="self-start max-sm:h-11">
           Déposer la version
@@ -495,7 +491,12 @@ function DialogueCorbeille({
       size="sm"
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={onFermer}
+            disabled={envoi}
+          >
             Retour
           </button>
           <button
@@ -514,9 +515,9 @@ function DialogueCorbeille({
         corbeille.
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </Modal>
   );
@@ -643,9 +644,9 @@ function DialogueMetadonnees({
           version.
         </p>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <SubmitButton
           size="sm"

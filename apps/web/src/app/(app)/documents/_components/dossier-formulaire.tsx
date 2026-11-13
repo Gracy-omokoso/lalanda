@@ -7,6 +7,7 @@
 // et ne peut qu'ajouter des restrictions : l'API en juge.
 
 import {
+  Alert,
   Button,
   Checkbox,
   ChoiceCards,
@@ -22,8 +23,6 @@ import {
 import { useId, useState } from 'react';
 
 import { documentsApi, type DocumentFolderView } from '@/lib/api-documents';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   ACTIONS_DOSSIER,
@@ -217,9 +216,9 @@ export function DossierFormulaire({
         />
 
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">

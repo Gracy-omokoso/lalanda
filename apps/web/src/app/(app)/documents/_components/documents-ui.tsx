@@ -4,7 +4,7 @@
 // des stocks et des RH ; la liste des membres de l'organisation (droits des
 // dossiers, auteurs) ; une carte de document entièrement cliquable.
 
-import { Badge } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import { FileText, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -13,7 +13,6 @@ import { api } from '@/lib/api';
 import type { LibraryDocumentView } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_NATURE,
@@ -42,17 +41,18 @@ export function EchecLecture({
   onReessayer?: () => void;
 }): React.ReactElement {
   return (
-    <Alerte
+    <Alert
+      tone="danger"
       action={
         onReessayer ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onReessayer}>
+          <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onReessayer}>
             Réessayer
           </button>
         ) : undefined
       }
     >
       <p>{messageDocuments(erreur, repli)}</p>
-    </Alerte>
+    </Alert>
   );
 }
 

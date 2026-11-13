@@ -19,7 +19,6 @@ import {
 } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { arbreDossiers, cheminDossier, resumeAcces, type NoeudDossier } from './arbre-model';
 import { DepotDocument } from './depot-document';
@@ -257,7 +256,7 @@ export function Bibliotheque(): React.ReactElement {
             gerer ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-haspopup="dialog"
                 aria-label="Nouveau dossier"
                 onClick={() => setEditionDossier('nouveau')}
@@ -284,7 +283,11 @@ export function Bibliotheque(): React.ReactElement {
             <div className="flex flex-col gap-2 text-sm text-[var(--foreground-muted)]">
               <p>Aucun dossier.</p>
               {gerer ? (
-                <button type="button" className={BOUTON_PETIT} onClick={() => void creerProposes()}>
+                <button
+                  type="button"
+                  className={buttonClasses('secondary', 'sm')}
+                  onClick={() => void creerProposes()}
+                >
                   Créer les dossiers proposés
                 </button>
               ) : null}
@@ -318,7 +321,7 @@ export function Bibliotheque(): React.ReactElement {
                 {gerer ? (
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setEditionDossier(dossier)}
                   >
@@ -359,7 +362,7 @@ export function Bibliotheque(): React.ReactElement {
           {suivante ? (
             <button
               type="button"
-              className={`${BOUTON_PETIT} self-center`}
+              className={buttonClasses('secondary', 'sm', 'self-center')}
               onClick={() => charger(filtres, courant, suivante)}
             >
               Afficher plus de documents

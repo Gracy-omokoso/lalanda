@@ -7,10 +7,12 @@
 // Réutilisé par la bibliothèque et par les panneaux « Documents » des fiches.
 
 import {
+  Alert,
   Button,
   Checkbox,
   DatePicker,
   Field,
+  FileInput,
   FormGrid,
   Modal,
   Select,
@@ -29,7 +31,6 @@ import {
 } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, CHAMP, aria } from '../../ventes/_components/form-ui';
 
 import { optionsDossiers } from './arbre-model';
 import {
@@ -241,14 +242,9 @@ function ModalDepot({
             size="full"
             error={champs['fichier'] || undefined}
           >
-            <input
-              id={`${id}-fichier`}
-              type="file"
+            <FileInput
               accept={ACCEPT_DOCUMENT}
-              className={`${CHAMP} max-sm:text-base`}
               onChange={(e) => choisirFichier(e.target.files?.[0] ?? null)}
-              aria-required="true"
-              {...aria(`${id}-fichier`, champs['fichier'] || undefined)}
             />
           </Field>
           <Field id={`${id}-titre`} label="Titre" required size="full" error={champs['title']}>
@@ -346,9 +342,9 @@ function ModalDepot({
           <p className="text-xs text-[var(--danger)]">{champs['sensitive']}</p>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">

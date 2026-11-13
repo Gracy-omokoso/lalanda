@@ -4,14 +4,12 @@
 // définitive avec confirmation (les fichiers sont effacés du stockage 30 jours plus
 // tard par `documents.purge`). Seul un rôle qui peut écrire le document agit.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Alert, Modal, buttonClasses } from '@lalanda/ui';
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { documentsApi, type LibraryDocumentView } from '@/lib/api-documents';
-
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   CORPS_CORBEILLE,
@@ -87,9 +85,9 @@ export function Corbeille(): React.ReactElement {
         sousTitre="Documents retirés de la bibliothèque : restaurez-les, ou supprimez-les pour de bon."
       />
       {erreur && aSupprimer === null ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {lecture === null ? (
         <Chargement />
@@ -113,7 +111,7 @@ export function Corbeille(): React.ReactElement {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={occupe === d.id}
                   onClick={() => void restaurer(d)}
                 >
@@ -122,7 +120,7 @@ export function Corbeille(): React.ReactElement {
                 </button>
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   aria-haspopup="dialog"
                   onClick={() => {
                     setErreur(null);
@@ -146,7 +144,11 @@ export function Corbeille(): React.ReactElement {
           size="sm"
           footer={
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" className={BOUTON_PETIT} onClick={() => setASupprimer(null)}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setASupprimer(null)}
+              >
                 Retour
               </button>
               <button
@@ -165,9 +167,9 @@ export function Corbeille(): React.ReactElement {
             30 jours plus tard. La suppression est journalisée.
           </p>
           {erreur ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           ) : null}
         </Modal>
       ) : null}
