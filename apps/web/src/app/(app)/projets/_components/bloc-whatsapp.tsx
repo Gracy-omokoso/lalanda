@@ -7,11 +7,18 @@
 // n'est montré qu'à son titulaire ; l'écran ne l'envoie qu'aux routes de l'appelant.
 
 import type { WhatsAppView } from '@lalanda/shared/work';
-import { Button, Field, OtpInput, PhoneInput, StatusPill, afficherTelephone } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  Field,
+  OtpInput,
+  PhoneInput,
+  StatusPill,
+  afficherTelephone,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
-import { Alerte } from './elements';
 import {
   NUMERO_WHATSAPP_INITIAL,
   etapeWhatsApp,
@@ -99,12 +106,12 @@ export function BlocWhatsApp({
       </header>
 
       {vue.quota.reached ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>
             Le plafond mensuel d’envois WhatsApp de votre organisation est atteint : plus aucun
             message WhatsApp ne part jusqu’au mois prochain. La cloche et l’e-mail continuent.
           </p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {etape === 'indisponible' ? (
@@ -254,9 +261,9 @@ export function BlocWhatsApp({
       ) : null}
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </section>
   );

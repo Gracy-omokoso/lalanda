@@ -8,12 +8,20 @@
 // tout le canal verra ses événements.
 
 import type { SlackChannelOption, WorkProjectSlackChannelView } from '@lalanda/shared/work';
-import { Button, Checkbox, Field, FormGrid, Select, StatusPill, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Field,
+  FormGrid,
+  Select,
+  StatusPill,
+  TextInput,
+} from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { Alerte } from './elements';
 import { etatCanalSlack, valeurCanalSaisi } from './canal-slack-model';
 import { messageWork } from './projets-model';
 
@@ -154,9 +162,9 @@ export function CanalSlack({ projectId }: { projectId: string }): React.ReactEle
         </>
       )}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </section>
   );

@@ -30,22 +30,17 @@ import {
   Tag,
   TextArea,
   TextInput,
+  ToggleChip,
+  buttonClasses,
   correspondRecherche,
+  describedBy,
 } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import {
-  AbsenceBadges,
-  Avatar,
-  CercleCoche,
-  DateEcheance,
-  BOUTON_DANGER,
-  BloqueeBadge,
-  aria,
-} from './elements';
+import { AbsenceBadges, Avatar, CercleCoche, DateEcheance, BloqueeBadge } from './elements';
 import { colonnesKanban, placer } from './kanban-model';
 import { COULEURS_CARTE, LIBELLES_COULEUR, numeroVisible } from './cartes-model';
 import { useProjet } from './project-context';
@@ -353,7 +348,8 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             }
           }}
           className={`field-sizing-content w-full resize-none rounded-[var(--radius-md)] border border-transparent bg-transparent px-1.5 py-1 font-[family-name:var(--font-heading,inherit)] text-xl font-semibold leading-snug outline-none transition-colors duration-[var(--motion-fast)] ${ecrire ? 'hover:border-[var(--border)] focus:border-[var(--accent)]' : ''} ${d.done ? 'text-[var(--foreground-muted)]' : ''}`}
-          {...aria('tache-t', champs['title'])}
+          aria-invalid={champs['title'] ? true : undefined}
+          aria-describedby={describedBy('tache-t', { error: champs['title'] })}
         />
         {champs['title'] ? (
           <p id="tache-t-erreur" className="text-xs text-[var(--danger)]">
@@ -605,27 +601,23 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                   {labels.map((l) => {
                     const pose = f.labelKeys.includes(l.key);
                     return (
-                      <label
+                      <ToggleChip
                         key={l.key}
-                        className={`inline-flex cursor-pointer items-center rounded-full transition-opacity duration-[var(--motion-fast)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[var(--focus)] ${pose ? '' : 'opacity-45 hover:opacity-80'}`}
+                        appearance="bare"
+                        checked={pose}
+                        onChange={(coche) =>
+                          void sauver({
+                            labelKeys: coche
+                              ? [...f.labelKeys, l.key]
+                              : f.labelKeys.filter((k) => k !== l.key),
+                          })
+                        }
                       >
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={pose}
-                          onChange={(e) =>
-                            void sauver({
-                              labelKeys: e.target.checked
-                                ? [...f.labelKeys, l.key]
-                                : f.labelKeys.filter((k) => k !== l.key),
-                            })
-                          }
-                        />
                         <Tag color={l.color}>
                           {pose ? <span aria-hidden="true">✓ </span> : null}
                           {l.label}
                         </Tag>
-                      </label>
+                      </ToggleChip>
                     );
                   })}
                 </fieldset>
@@ -779,7 +771,7 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
         {gerer && project.status !== 'archived' ? (
           <button
             type="button"
-            className={BOUTON_DANGER}
+            className={buttonClasses('danger', 'sm')}
             disabled={envoi}
             onClick={() => void supprimer()}
           >

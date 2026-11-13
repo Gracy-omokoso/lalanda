@@ -6,7 +6,7 @@
 // (membres du projet et visibilité, ADR-0060) ; une ligne de repères (client,
 // devis, responsable, dates) ; puis les onglets de `onglets-projet.ts`.
 
-import { Skeleton, StatusPill, TabsNav } from '@lalanda/ui';
+import { Alert, Skeleton, StatusPill, TabsNav, buttonClasses } from '@lalanda/ui';
 import { FolderKanban, Lock, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -16,7 +16,7 @@ import { renderNextLink } from '@/components/next-link';
 import { useShell } from '../../_components/shell-context';
 
 import { SANTE, phraseSante } from './apercu-model';
-import { Alerte, BOUTON_PETIT, PileAvatars } from './elements';
+import { PileAvatars } from './elements';
 import { teinteAvatar } from './liste-model';
 import { PropositionFacture } from './marge/proposition-facture';
 import { ONGLET_DEFAUT, ongletDuChemin, ongletsVisibles } from './onglets-projet';
@@ -58,15 +58,20 @@ export function EnteteProjet(): React.ReactElement {
           ← Tous les projets
         </Link>
         {erreur ? (
-          <Alerte
+          <Alert
+            tone="danger"
             action={
-              <button type="button" className={BOUTON_PETIT} onClick={recharger}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={recharger}
+              >
                 Réessayer
               </button>
             }
           >
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <Skeleton className="h-20 w-full" />
         )}
@@ -205,15 +210,20 @@ export function EnteteProjet(): React.ReactElement {
       />
 
       {erreur ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
-            <button type="button" className={BOUTON_PETIT} onClick={effacerErreur}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={effacerErreur}
+            >
               Fermer
             </button>
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {factureProposee ? (
         <PropositionFacture
@@ -238,7 +248,11 @@ export function EnteteProjet(): React.ReactElement {
                 </li>
               ))}
             </ul>
-            <button type="button" className={BOUTON_PETIT} onClick={effacerAvertissements}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={effacerAvertissements}
+            >
               Compris
             </button>
           </div>

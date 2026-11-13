@@ -18,6 +18,7 @@ import {
   type WorkProjectKind,
 } from '@lalanda/shared/work';
 import {
+  Alert,
   Button,
   DatePicker,
   EntityPicker,
@@ -29,6 +30,7 @@ import {
   Tag,
   TextArea,
   TextInput,
+  buttonClasses,
   correspondRecherche,
 } from '@lalanda/ui';
 import { useRouter } from 'next/navigation';
@@ -37,7 +39,6 @@ import { useState } from 'react';
 import { workApi, type WorkMemberOption } from '@/lib/work-api';
 
 import { CanalSlack } from './canal-slack';
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from './elements';
 import { useProjet } from './project-context';
 import {
   CATEGORIES_COLONNE,
@@ -314,7 +315,7 @@ function Colonnes(): React.ReactElement {
               />
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={i === 0}
                 aria-label={`Monter la colonne ${c.label}`}
                 onClick={() => deplacer(i, -1)}
@@ -323,7 +324,7 @@ function Colonnes(): React.ReactElement {
               </button>
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={i === cols.length - 1}
                 aria-label={`Descendre la colonne ${c.label}`}
                 onClick={() => deplacer(i, 1)}
@@ -332,7 +333,7 @@ function Colonnes(): React.ReactElement {
               </button>
               <button
                 type="button"
-                className={BOUTON_DANGER}
+                className={buttonClasses('danger', 'sm')}
                 disabled={occupee}
                 title={occupee ? 'Cette colonne porte des tâches' : undefined}
                 aria-label={`Retirer la colonne ${c.label}`}
@@ -372,15 +373,19 @@ function Colonnes(): React.ReactElement {
             placeholder="Nouvelle colonne"
             className="max-w-xs"
           />
-          <button type="submit" className={BOUTON_PETIT} disabled={!nouvelle.trim()}>
+          <button
+            type="submit"
+            className={buttonClasses('secondary', 'sm')}
+            disabled={!nouvelle.trim()}
+          >
             Ajouter
           </button>
         </form>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex gap-2">
         <Button
@@ -457,7 +462,7 @@ function Etiquettes(): React.ReactElement {
               />
               <button
                 type="button"
-                className={BOUTON_DANGER}
+                className={buttonClasses('danger', 'sm')}
                 aria-label={`Retirer l’étiquette ${l.label}`}
                 onClick={() => setLabels(labels.filter((x) => x.key !== l.key))}
               >
@@ -506,15 +511,15 @@ function Etiquettes(): React.ReactElement {
             searchable={false}
             className="w-36"
           />
-          <button type="submit" className={BOUTON_PETIT} disabled={!nom.trim()}>
+          <button type="submit" className={buttonClasses('secondary', 'sm')} disabled={!nom.trim()}>
             Ajouter
           </button>
         </form>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div>
         <Button

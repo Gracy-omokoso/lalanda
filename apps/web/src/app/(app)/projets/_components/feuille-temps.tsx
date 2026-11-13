@@ -7,7 +7,7 @@
 // temps depuis les tâches. Totaux et constats viennent du moteur (`weeklyTimesheet`).
 
 import type { WeeklyTimesheetView } from '@lalanda/shared/work';
-import { PageHeader, Select, buttonClasses } from '@lalanda/ui';
+import { Alert, PageHeader, Select, buttonClasses } from '@lalanda/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -17,7 +17,6 @@ import { workApi, type WorkMemberOption } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte, BOUTON_PETIT } from './elements';
 import { OngletsMesTaches } from './equipe-elements';
 import { PROJETS_BASE, messageWork, peutLire } from './projets-model';
 import {
@@ -103,7 +102,7 @@ export function FeuilleTemps(): React.ReactElement {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={!vue}
               onClick={() => vue && setSemaine(semaineVoisine(vue.week, -1))}
             >
@@ -111,7 +110,7 @@ export function FeuilleTemps(): React.ReactElement {
             </button>
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={!vue}
               onClick={() => vue && setSemaine(semaineVoisine(vue.week, 1))}
             >
@@ -119,7 +118,7 @@ export function FeuilleTemps(): React.ReactElement {
             </button>
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={semaine === undefined}
               onClick={() => setSemaine(undefined)}
             >
@@ -141,7 +140,7 @@ export function FeuilleTemps(): React.ReactElement {
           <p className="sr-only" aria-live="polite">
             {vue ? phraseSemaine(vue) : ''}
           </p>
-          {erreur ? <Alerte>{erreur}</Alerte> : null}
+          {erreur ? <Alert tone="danger">{erreur}</Alert> : null}
           {vue ? (
             <div className={`flex min-w-0 flex-col gap-4 ${chargement ? 'opacity-60' : ''}`}>
               <p className="text-sm font-medium">

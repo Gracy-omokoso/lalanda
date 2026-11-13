@@ -13,6 +13,7 @@ import type {
   WorkPortfolioView,
 } from '@lalanda/shared/work';
 import {
+  Alert,
   Button,
   DatePicker,
   EmptyState,
@@ -45,7 +46,6 @@ import { workPortfolioApi } from '@/lib/work-portfolio-api';
 import { useShell } from '../../_components/shell-context';
 import { CustomerForm } from '../../ventes/_components/customer-form';
 
-import { Alerte, BOUTON_PETIT } from './elements';
 import { PastilleProjet, PileAvatars } from './equipe-elements';
 import { ChoixCreation } from './import-entrees';
 import {
@@ -304,9 +304,9 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
         ajouter ou les réordonner dans les Réglages du projet.
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
         <SubmitButton busy={envoi} busyLabel="Création…" className="max-sm:h-11">
@@ -625,15 +625,16 @@ export function ListeProjets(): React.ReactElement {
       </div>
 
       {erreur ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
-            <button type="button" className={BOUTON_PETIT} onClick={charger}>
+            <button type="button" className={buttonClasses('secondary', 'sm')} onClick={charger}>
               Réessayer
             </button>
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {items === null ? (

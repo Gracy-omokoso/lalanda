@@ -22,7 +22,7 @@ import {
   type MyTasksView,
   type WorkMyTaskItem,
 } from '@lalanda/shared/work';
-import { PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
+import { Alert, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -36,7 +36,6 @@ import { useShell } from '../../_components/shell-context';
 import { bandeauxAbsence } from './absences-model';
 import { appliquerCorps } from './calendar-model';
 import { CalendrierTaches, type TacheCalendrierUI } from './calendar-vue';
-import { Alerte, BOUTON_PETIT } from './elements';
 import { OngletsMesTaches } from './equipe-elements';
 import {
   PASTILLE_APPROBATION,
@@ -253,15 +252,16 @@ export function CalendrierMesTaches(): React.ReactElement {
       />
       <OngletsMesTaches actif="calendrier" />
       {erreur ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
-            <button type="button" className={BOUTON_PETIT} onClick={charger}>
+            <button type="button" className={buttonClasses('secondary', 'sm')} onClick={charger}>
               Réessayer
             </button>
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {avertissements.length > 0 ? (
         <div

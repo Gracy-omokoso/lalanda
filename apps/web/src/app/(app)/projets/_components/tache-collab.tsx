@@ -20,14 +20,22 @@ import type {
   WorkMemberRef,
   WorkTaskDetail,
 } from '@lalanda/shared/work';
-import { Button, DatePicker, Field, FormGrid, TextArea, TextInput } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
 import { useProfil } from '../../_components/profile-context';
 
-import { Avatar, BOUTON_DANGER } from './elements';
+import { Avatar } from './elements';
 import { filTache } from './fil-model';
 import { useProjet } from './project-context';
 import {
@@ -513,7 +521,7 @@ function PiecesJointes({
               {travailler && (gerer || (profil !== null && a.uploadedBy.userId === profil.id)) ? (
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   disabled={envoi}
                   aria-label={`Retirer ${a.fileName}`}
                   onClick={() => {
@@ -648,7 +656,7 @@ function Temps({
               {travailler && (gerer || (profil !== null && t.user.userId === profil.id)) ? (
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   disabled={envoi}
                   aria-label={`Supprimer la saisie de ${formatMinutes(t.minutes)} du ${formatJour(t.workedOn)}`}
                   onClick={() => {

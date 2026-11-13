@@ -21,6 +21,7 @@ import type {
   WorkProjectView,
 } from '@lalanda/shared/work';
 import {
+  Alert,
   Button,
   Checkbox,
   DatePicker,
@@ -45,7 +46,6 @@ import { workPlanApi } from '@/lib/work-plan-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte } from './elements';
 import {
   FORMATS_ACCEPTES,
   boutonImport,
@@ -238,11 +238,11 @@ function Apercu({ p }: { p: WorkImportPreview }): React.ReactElement {
         </p>
       ) : null}
       {fichier.length > 0 ? (
-        <Alerte>
+        <Alert tone="danger">
           {fichier.map((i, k) => (
             <p key={k}>{i.message}</p>
           ))}
-        </Alerte>
+        </Alert>
       ) : null}
       {p.rows.length > 0 ? (
         <>
@@ -629,9 +629,9 @@ export function ImportFichier(): React.ReactElement {
                 />
               ) : null}
               {erreur ? (
-                <Alerte>
+                <Alert tone="danger">
                   <p>{erreur}</p>
-                </Alerte>
+                </Alert>
               ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -646,9 +646,9 @@ export function ImportFichier(): React.ReactElement {
               </div>
             </Etape>
           ) : erreur ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           ) : null}
         </>
       )}

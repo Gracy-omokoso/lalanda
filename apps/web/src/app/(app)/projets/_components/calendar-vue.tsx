@@ -15,10 +15,9 @@
 //   Sur bureau, la même liste est proposée par le bouton « Liste ».
 
 import { addDays } from '@lalanda/shared/work';
-import { Select } from '@lalanda/ui';
+import { Select, buttonClasses } from '@lalanda/ui';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { BOUTON_PETIT } from './elements';
 import {
   JOURS_COURTS,
   agenda,
@@ -221,18 +220,22 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={() => setAncre(decaler(vue, ancre, -1))}
             >
               <span aria-hidden="true">‹ </span>
               {vue === 'mois' ? 'Mois précédent' : 'Semaine précédente'}
             </button>
-            <button type="button" className={BOUTON_PETIT} onClick={() => setAncre(today)}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setAncre(today)}
+            >
               Aujourd’hui
             </button>
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               onClick={() => setAncre(decaler(vue, ancre, 1))}
             >
               {vue === 'mois' ? 'Mois suivant' : 'Semaine suivante'}
@@ -254,7 +257,11 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
                   type="button"
                   aria-pressed={vue === v}
                   onClick={() => setVue(v)}
-                  className={`${BOUTON_PETIT} ${v === 'mois' ? 'rounded-r-none' : '-ml-px rounded-l-none'} aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
+                  className={buttonClasses(
+                    'secondary',
+                    'sm',
+                    `${v === 'mois' ? 'rounded-r-none' : '-ml-px rounded-l-none'} aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`,
+                  )}
                 >
                   {v === 'mois' ? 'Mois' : 'Semaine'}
                 </button>
@@ -264,7 +271,11 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
               type="button"
               aria-pressed={liste}
               onClick={() => setListe(!liste)}
-              className={`${BOUTON_PETIT} hidden md:inline-flex aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
+              className={buttonClasses(
+                'secondary',
+                'sm',
+                'hidden md:inline-flex aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]',
+              )}
             >
               Liste
             </button>

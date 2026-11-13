@@ -23,6 +23,7 @@ import {
   type WorkProjectSummary,
 } from '@lalanda/shared/work';
 import {
+  Alert,
   Checkbox,
   DatePicker,
   EmptyState,
@@ -44,14 +45,7 @@ import { workApi } from '@/lib/work-api';
 import { useShell } from '../../_components/shell-context';
 
 import { constatAbsentEcheance } from './absences-model';
-import {
-  AbsenceBadges,
-  Alerte,
-  BOUTON_PETIT,
-  BloqueeBadge,
-  Echeance,
-  PrioriteBadge,
-} from './elements';
+import { AbsenceBadges, BloqueeBadge, Echeance, PrioriteBadge } from './elements';
 import { CercleCocher, OngletsMesTaches, PastilleProjet } from './equipe-elements';
 import {
   SECTIONS_MES_TACHES,
@@ -148,15 +142,16 @@ export function MesTaches(): React.ReactElement {
         {annonce}
       </p>
       {erreur ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
-            <button type="button" className={BOUTON_PETIT} onClick={charger}>
+            <button type="button" className={buttonClasses('secondary', 'sm')} onClick={charger}>
               Réessayer
             </button>
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {travailler && moi ? <AjoutRapide moi={moi} onAjoute={charger} /> : null}
       {/* ADR-0045 — H5 (§ 6.2) : tâches que j'ai créées dont l'assigné sera absent à l'échéance. */}

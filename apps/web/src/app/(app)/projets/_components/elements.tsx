@@ -10,16 +10,6 @@ import { badgeAbsent, constatAbsentEcheance } from './absences-model';
 import { initiales, pileAvatars, teinteAvatar, tonDate, type TonDate } from './liste-model';
 import { LIBELLES_ECHEANCE, PRIORITES, etatEcheance, formatJour } from './projets-model';
 
-export {
-  Alerte,
-  BOUTON,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  aria,
-} from '../../ventes/_components/form-ui';
-
 export function Etiquettes({
   keys,
   labels,

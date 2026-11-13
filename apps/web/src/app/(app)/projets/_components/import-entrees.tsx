@@ -4,10 +4,10 @@
 // (ADR-0063) : en tête du formulaire « Nouveau projet », et dans la barre de la
 // Liste d'un projet (« Importer des tâches », `work.update`).
 
+import { buttonClasses } from '@lalanda/ui';
 import { FileSpreadsheet, Sparkles, Upload } from 'lucide-react';
 import Link from 'next/link';
 
-import { BOUTON_PETIT } from './elements';
 import { IA_HREF, IMPORT_HREF, hrefImportProjet } from './import-model';
 
 const CHOIX =
@@ -50,7 +50,7 @@ export function BoutonImporterTaches({ projectId }: { projectId: string }): Reac
   return (
     <Link
       href={hrefImportProjet(projectId)}
-      className={`${BOUTON_PETIT} inline-flex items-center gap-1.5`}
+      className={buttonClasses('secondary', 'sm', 'inline-flex items-center gap-1.5')}
     >
       <Upload aria-hidden="true" className="h-3.5 w-3.5" />
       Importer des tâches

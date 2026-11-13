@@ -23,6 +23,7 @@ import {
   type WorkWeekday,
 } from '@lalanda/shared/work';
 import {
+  Alert,
   Button,
   Checkbox,
   Field,
@@ -46,7 +47,6 @@ import { workApi } from '@/lib/work-api';
 import { useShell } from '../../_components/shell-context';
 
 import { BlocWhatsApp } from './bloc-whatsapp';
-import { Alerte } from './elements';
 import {
   HEURES_RESUME,
   JOURS,
@@ -153,9 +153,9 @@ function MesNotifications(): React.ReactElement {
 
   if (vue === null)
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <Skeleton className="h-64 w-full" />
     );
@@ -353,9 +353,9 @@ function MesNotifications(): React.ReactElement {
         {enregistre ? 'Enregistré.' : ' '}
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </div>
   );
@@ -392,9 +392,9 @@ function Comportement(): React.ReactElement {
 
   if (s === null)
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <Skeleton className="h-64 w-full" />
     );
@@ -555,9 +555,9 @@ function Comportement(): React.ReactElement {
         {enregistre ? 'Enregistré.' : ' '}
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </div>
   );
@@ -610,9 +610,9 @@ function OngletSlack({ retour }: { retour: string | null }): React.ReactElement 
 
   if (vue === null)
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <Skeleton className="h-48 w-full" />
     );
@@ -623,9 +623,9 @@ function OngletSlack({ retour }: { retour: string | null }): React.ReactElement 
     <div className="flex flex-col gap-4">
       {message ? (
         message.ton === 'erreur' ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{message.message}</p>
-          </Alerte>
+          </Alert>
         ) : (
           <p
             role="status"
@@ -725,9 +725,9 @@ function OngletSlack({ retour }: { retour: string | null }): React.ReactElement 
         )}
       </Carte>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </div>
   );

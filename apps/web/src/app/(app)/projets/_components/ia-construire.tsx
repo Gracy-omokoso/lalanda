@@ -13,6 +13,7 @@
 
 import type { WorkAiPlanDraft, WorkPlanTask } from '@lalanda/shared/work';
 import {
+  Alert,
   Button,
   DatePicker,
   EmptyState,
@@ -23,6 +24,7 @@ import {
   Select,
   TextArea,
   TextInput,
+  ToggleChip,
   buttonClasses,
 } from '@lalanda/ui';
 import { Flag, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
@@ -35,7 +37,6 @@ import { workPlanApi } from '@/lib/work-plan-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte } from './elements';
 import {
   NIVEAUX_DETAIL,
   corpsCreation,
@@ -208,19 +209,9 @@ function Formulaire({
           {membres.map((m) => {
             const choisi = f.memberUserIds.includes(m.userId);
             return (
-              <label
-                key={m.userId}
-                className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors ${choisi ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]' : 'border-[var(--border)]'}`}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={choisi}
-                  onChange={() => basculer(m.userId)}
-                />
-                <span aria-hidden="true">{choisi ? '✓' : '+'}</span>
+              <ToggleChip key={m.userId} checked={choisi} onChange={() => basculer(m.userId)}>
                 {m.name}
-              </label>
+              </ToggleChip>
             );
           })}
         </div>
@@ -502,9 +493,9 @@ export function IaConstruire(): React.ReactElement {
       )}
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {attente === 'proposer' ? (
         <p role="status" className="text-sm text-[var(--foreground-muted)]">

@@ -13,11 +13,13 @@ import type {
   WorkTeamRef,
 } from '@lalanda/shared/work';
 import {
+  Alert,
   Button,
   ChoiceCards,
   EntityPicker,
   Field,
   StatusPill,
+  buttonClasses,
   correspondRecherche,
 } from '@lalanda/ui';
 import { Building2, Lock, UserMinus, UserPlus, UsersRound } from 'lucide-react';
@@ -25,7 +27,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import { workApi, type WorkMemberOption } from '@/lib/work-api';
 
-import { Alerte, Avatar, BOUTON_PETIT, PileAvatars } from './elements';
+import { Avatar, PileAvatars } from './elements';
 import {
   VISIBILITES,
   equipesAjoutables,
@@ -124,9 +126,9 @@ export function MembresProjet(): React.ReactElement {
       </header>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <Field id={`${id}-visibilite`} label="Qui voit ce projet ?" group size="full">
@@ -261,7 +263,7 @@ export function MembresProjet(): React.ReactElement {
                   {modifiable ? (
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       disabled={envoi}
                       onClick={() =>
                         void agir(
@@ -303,7 +305,7 @@ export function MembresProjet(): React.ReactElement {
                       {modifiable ? (
                         <button
                           type="button"
-                          className={BOUTON_PETIT}
+                          className={buttonClasses('secondary', 'sm')}
                           disabled={envoi}
                           onClick={() =>
                             void agir(

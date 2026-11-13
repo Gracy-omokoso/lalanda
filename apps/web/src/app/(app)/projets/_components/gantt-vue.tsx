@@ -14,12 +14,11 @@
 // - Lecture seule sous 768 px (§ 8) : un toucher ouvre la tâche.
 
 import { ganttRows, type GanttRow, type WorkTaskView } from '@lalanda/shared/work';
-import { Skeleton } from '@lalanda/ui';
+import { Skeleton, buttonClasses } from '@lalanda/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { BOUTON_PETIT } from './elements';
 import {
   ECHELLES,
   HAUTEUR_BARRE,
@@ -241,7 +240,11 @@ export function VueChronologie(): React.ReactElement {
               type="button"
               aria-pressed={echelle === e.cle}
               onClick={() => setEchelle(e.cle)}
-              className={`${BOUTON_PETIT} ${i === 0 ? 'rounded-r-none' : i === ECHELLES.length - 1 ? '-ml-px rounded-l-none' : '-ml-px rounded-none'} aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
+              className={buttonClasses(
+                'secondary',
+                'sm',
+                `${i === 0 ? 'rounded-r-none' : i === ECHELLES.length - 1 ? '-ml-px rounded-l-none' : '-ml-px rounded-none'} aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`,
+              )}
             >
               {e.label}
             </button>
@@ -249,7 +252,7 @@ export function VueChronologie(): React.ReactElement {
         </div>
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           onClick={() => {
             const el = defile.current;
             if (el && xAuj !== null) el.scrollTo({ left: Math.max(0, xAuj - el.clientWidth / 3) });
