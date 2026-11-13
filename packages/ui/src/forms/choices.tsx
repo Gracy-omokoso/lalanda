@@ -2,7 +2,8 @@
 // - `SegmentedControl` : 2 à 5 options COURTES (TTC/HT, USD/CDF, mode de client) ;
 // - `ChoiceCards` : choix unique avec une phrase d'explication par option ;
 // - `Switch` : un réglage booléen « activer… » qui prend effet tel quel ;
-// - `Checkbox` : cases d'une liste à cocher, ou un accord explicite.
+// - `Checkbox` : cases d'une liste à cocher, ou un accord explicite ;
+// - `ToggleChip` : puce à cocher, choix multiple compact (membres, étiquettes).
 //
 // Les deux premiers suivent le modèle WAI-ARIA « radio group » : un seul arrêt
 // de tabulation (l'option choisie), les flèches déplacent ET choisissent.
@@ -450,5 +451,57 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
         ) : null}
       </span>
     </div>
+  );
+});
+
+export interface ToggleChipProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'onChange' | 'children'
+> {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: React.ReactNode;
+  /**
+   * `pill` : puce bordée, accentuée quand elle est cochée, repère « ✓ » / « + » ;
+   * `bare` : le contenu (une étiquette `Tag`, par exemple) porte le rendu, atténué
+   * tant qu'il n'est pas coché.
+   */
+  appearance?: 'pill' | 'bare';
+  className?: string;
+}
+
+/**
+ * Puce à cocher : choix multiple compact (membres d'une équipe, étiquettes d'une
+ * tâche). La case native reste dessous (`sr-only`) : clavier (Espace), lecteurs
+ * d'écran et formulaires inchangés ; le focus clavier entoure la puce.
+ */
+export const ToggleChip = forwardRef<HTMLInputElement, ToggleChipProps>(function ToggleChip(
+  { checked, onChange, children, appearance = 'pill', className, ...props },
+  ref,
+) {
+  return (
+    <label
+      className={cn(
+        'inline-flex cursor-pointer select-none items-center rounded-full transition-[color,background-color,border-color,opacity] duration-[var(--motion-fast)] ease-[var(--ease-standard)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50',
+        appearance === 'pill' && 'gap-2 border px-3 py-1 text-sm',
+        appearance === 'pill' &&
+          (checked
+            ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+            : 'border-[var(--border)] hover:border-[var(--border-strong)]'),
+        appearance === 'bare' && !checked && 'opacity-45 hover:opacity-80',
+        className,
+      )}
+    >
+      <input
+        ref={ref}
+        type="checkbox"
+        {...props}
+        className="sr-only"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {appearance === 'pill' ? <span aria-hidden="true">{checked ? '✓' : '+'}</span> : null}
+      {children}
+    </label>
   );
 });

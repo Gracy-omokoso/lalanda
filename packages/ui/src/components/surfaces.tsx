@@ -87,7 +87,9 @@ export function Alert({
     >
       <div className="flex flex-col gap-1">
         {title ? <p className="font-semibold">{title}</p> : null}
-        {children ? <div className="leading-6">{children}</div> : null}
+        {/* Plusieurs blocs (paragraphes, liste) : 8 px entre eux ; un texte
+            en ligne n'est pas touché (la marge ne suit qu'un bloc). */}
+        {children ? <div className="leading-6 [&>:is(p,ul,ol,div)+*]:mt-2">{children}</div> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

@@ -7,7 +7,9 @@ import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { ChoiceCards, Checkbox, SegmentedControl, Switch } from './forms/choices';
+import { buttonClasses } from './components/button';
+import { Alert, Badge } from './components/surfaces';
+import { ChoiceCards, Checkbox, SegmentedControl, Switch, ToggleChip } from './forms/choices';
 import {
   DateMarksProvider,
   DatePicker,
@@ -881,5 +883,58 @@ describe('modales empilées : un choix sans frappe compte comme une saisie', () 
     const picker = lire('entity-picker.tsx');
     expect(picker).toContain('createPortal(');
     expect(picker).toContain('onInput={(e) => e.stopPropagation()}');
+  });
+});
+
+describe('retrait de l’ancien kit (décision n° 5) : équivalents de @lalanda/ui', () => {
+  it('ToggleChip : case native sous la puce, cochée ou non, focus clavier visible', () => {
+    const coche = rendre(h(ToggleChip, { checked: true, onChange: () => undefined }, 'Awa'));
+    expect(coche).toContain('type="checkbox"');
+    expect(coche).toContain('class="sr-only"');
+    expect(coche).toContain('checked=""');
+    expect(coche).toContain('has-[:focus-visible]:outline');
+    expect(coche).toContain('border-[var(--accent)]');
+    expect(coche).toMatch(/<span aria-hidden="true">✓<\/span>Awa/);
+    const libre = rendre(h(ToggleChip, { checked: false, onChange: () => undefined }, 'Awa'));
+    expect(libre).not.toContain('checked=""');
+    expect(libre).toMatch(/<span aria-hidden="true">\+<\/span>Awa/);
+    // `bare` : le contenu porte le rendu, atténué tant qu'il n'est pas coché.
+    const nu = rendre(
+      h(
+        ToggleChip,
+        { checked: false, onChange: () => undefined, appearance: 'bare', disabled: true },
+        h('span', null, 'Urgent'),
+      ),
+    );
+    expect(nu).toContain('opacity-45');
+    expect(nu).toContain('disabled=""');
+    expect(nu).not.toContain('aria-hidden="true">+');
+  });
+
+  it('Alert « danger » remplace Alerte : role="alert", action, blocs espacés', () => {
+    const html = rendre(
+      h(
+        Alert,
+        { tone: 'danger', action: h('button', { type: 'button' }, 'Réessayer') },
+        h('p', null, 'Échec'),
+        h('p', null, 'Détail'),
+      ),
+    );
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Réessayer');
+    expect(html).toContain('[&amp;&gt;:is(p,ul,ol,div)+*]:mt-2');
+    expect(rendre(h(Alert, { tone: 'info' }, 'Note'))).toContain('role="status"');
+  });
+
+  it('Badge remplace Pastille ; buttonClasses remplace BOUTON*, ajouts gagnants', () => {
+    expect(rendre(h(Badge, { tone: 'warning' }, 'Expiré'))).toContain('text-[var(--warn)]');
+    expect(rendre(h(Badge, null, 'Brouillon'))).toContain('text-[var(--foreground-muted)]');
+    expect(buttonClasses('secondary', 'sm')).toContain('h-[var(--control-h-sm)]');
+    expect(buttonClasses('danger', 'sm')).toContain('text-[var(--danger)]');
+    // twMerge : une hauteur ajoutée remplace celle de la taille.
+    const carre = buttonClasses('secondary', 'sm', 'h-9 w-9 p-0');
+    expect(carre).toContain('h-9');
+    expect(carre).not.toContain('h-[var(--control-h-sm)]');
+    expect(carre).not.toContain('px-3');
   });
 });
