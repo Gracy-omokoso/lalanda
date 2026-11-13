@@ -6,12 +6,18 @@
 // d'emplacement, et un champ de quantité qui sélectionne son contenu au focus
 // (leçon de R3 : un nombre prérempli se remplace d'un geste, au téléphone aussi).
 
-import { EntityPicker, Select, TextInput, cn, type SelectOption } from '@lalanda/ui';
+import {
+  Alert,
+  EntityPicker,
+  Select,
+  TextInput,
+  buttonClasses,
+  cn,
+  type SelectOption,
+} from '@lalanda/ui';
 import { useCallback, useState } from 'react';
 
 import { stockApi, type StockItemView, type StockLocationView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { ArticleFormulaire } from './article-formulaire';
 import { useAccesStocks } from './stocks-access';
@@ -37,17 +43,18 @@ export function EchecLecture({
 }): React.ReactElement {
   if (statutDe(erreur) === 404) return <CarteVide>{PHRASE_PAS_ENCORE}</CarteVide>;
   return (
-    <Alerte
+    <Alert
+      tone="danger"
       action={
         onReessayer ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onReessayer}>
+          <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onReessayer}>
             Réessayer
           </button>
         ) : undefined
       }
     >
       <p>{messageStocks(erreur, repli)}</p>
-    </Alerte>
+    </Alert>
   );
 }
 

@@ -5,7 +5,7 @@
 // annuler avec motif). Numéros `BS`, `BT`, `BJ` : pièces internes, hors série
 // fiscale, attribués par l'API.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { FileStack, Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -13,8 +13,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { STOCK_VOUCHER_KINDS } from '@lalanda/shared/stock';
 
 import { stockApi, type StockVoucherKind, type StockVoucherView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { BonFormulaire } from './bon-formulaire';
 import {
@@ -108,9 +106,9 @@ function FicheBon({
         </p>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-wrap gap-2">
         {gestesBon(bon, actions).map((g) => (
@@ -234,7 +232,7 @@ export function Bons(): React.ReactElement {
             <button
               key={f.valeur}
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-pressed={filtre === f.valeur}
               onClick={() => setFiltre(f.valeur)}
             >
@@ -306,7 +304,7 @@ export function Bons(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtre, suivante)}
         >
           Afficher plus de bons

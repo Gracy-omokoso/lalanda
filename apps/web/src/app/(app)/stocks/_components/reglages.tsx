@@ -5,13 +5,20 @@
 // d'ajustement. Lecture `stock.read` ; modification `stock.manage`.
 
 import { STOCK_SALES_ISSUE_MODES } from '@lalanda/shared/stock';
-import { Button, ChoiceCards, Field, FormGrid, SubmitButton, Switch, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  ChoiceCards,
+  Field,
+  FormGrid,
+  SubmitButton,
+  Switch,
+  TextInput,
+} from '@lalanda/ui';
 import { Plus, Settings, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { stockApi, type StockSettingsView } from '@/lib/api-stock';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_MODE_VENTE,
@@ -205,9 +212,9 @@ export function Reglages(): React.ReactElement {
         </fieldset>
 
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {message ? (
           <p className="text-sm" role="status">

@@ -9,6 +9,7 @@
 // création rapide depuis le choix d'un article (`nomInitial`).
 
 import {
+  Alert,
   Button,
   Field,
   FormGrid,
@@ -28,7 +29,6 @@ import { api, type CatalogItemView } from '@/lib/api';
 import { stockApi, type StockItemView } from '@/lib/api-stock';
 
 import { ChoixFournisseur } from '../../achats/_components/commande-formulaire';
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { formulaireArticle, preparerArticle, type FormulaireArticle } from './articles-model';
 import { useAccesStocks } from './stocks-access';
@@ -346,9 +346,9 @@ export function ArticleFormulaire({
       </fieldset>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
         {article === null ? 'Créer l’article' : 'Enregistrer'}

@@ -4,10 +4,8 @@
 // ligne à traiter classée), reprise des achats avec les messages des stocks.
 // Le motif obligatoire est vérifié ici ; l'API le revérifie et reste juge.
 
-import { Button, Field, Modal, TextArea } from '@lalanda/ui';
+import { Alert, Button, Field, Modal, TextArea } from '@lalanda/ui';
 import { useId, useState } from 'react';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { messageStocks } from './stocks-model';
 
@@ -96,9 +94,9 @@ export function DialogueMotif({
           </Field>
         ) : null}
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </div>
     </Modal>

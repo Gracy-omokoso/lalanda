@@ -5,15 +5,13 @@
 // Ajout seul : une annulation apparaît comme un mouvement inverse. Coûts
 // d'entrée seulement pour un rôle qui voit les valeurs.
 
-import { Badge, DatePicker, Field, FormGrid, Select } from '@lalanda/ui';
+import { Alert, Badge, DatePicker, Field, FormGrid, Select, buttonClasses } from '@lalanda/ui';
 import { History } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { stockApi, type StockItemView, type StockLedgerEntryView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_VIDES,
@@ -153,9 +151,9 @@ export function Mouvements(): React.ReactElement {
       </Bandeau>
 
       {erreurFiltre ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreurFiltre}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {erreur ? <EchecLecture erreur={erreur} repli="Impossible de lire les mouvements." /> : null}
 
@@ -233,7 +231,7 @@ export function Mouvements(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(articleId, filtres, suivante)}
         >
           Afficher plus de mouvements

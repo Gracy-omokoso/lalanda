@@ -12,8 +12,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { stockApi, type StockItemView } from '@/lib/api-stock';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
-
 import { ArticleFormulaire } from './article-formulaire';
 import { FILTRES_ARTICLES, requeteArticles, type FiltreArticles } from './articles-model';
 import { useAccesStocks } from './stocks-access';
@@ -103,7 +101,7 @@ export function ArticlesListe(): React.ReactElement {
               <button
                 key={f.valeur}
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-pressed={filtre === f.valeur}
                 onClick={() => setFiltre(f.valeur)}
               >
@@ -175,7 +173,7 @@ export function ArticlesListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtre, q, suivante)}
         >
           Afficher plus d’articles

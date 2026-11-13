@@ -5,6 +5,7 @@
 // sélection (inventaire tournant), comptage à l'aveugle, compteurs désignés.
 
 import {
+  Alert,
   Badge,
   Checkbox,
   ChoiceCards,
@@ -21,8 +22,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { stockApi, type StockCountView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_INVENTAIRES,
@@ -143,7 +142,7 @@ function NouvelInventaire({
             <li key={i}>
               <button
                 type="button"
-                className={`${BOUTON_PETIT} inline-flex items-center gap-1`}
+                className={buttonClasses('secondary', 'sm', 'inline-flex items-center gap-1')}
                 aria-label={`Retirer ${noms[i] ?? 'l’article'}`}
                 onClick={() => maj({ itemIds: f.itemIds.filter((x) => x !== i) })}
               >
@@ -185,9 +184,9 @@ function NouvelInventaire({
         </fieldset>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <SubmitButton busy={envoi} busyLabel="Création…" className="self-start max-sm:w-full">
         Créer l’inventaire
@@ -257,7 +256,7 @@ export function InventairesListe(): React.ReactElement {
             <button
               key={f.valeur}
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-pressed={filtre === f.valeur}
               onClick={() => setFiltre(f.valeur)}
             >
@@ -314,7 +313,7 @@ export function InventairesListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtre, suivante)}
         >
           Afficher plus d’inventaires

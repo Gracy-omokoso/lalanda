@@ -4,6 +4,7 @@
 // Liste en cartes ; création et modification en fenêtre modale (`stock.manage`).
 
 import {
+  Alert,
   Badge,
   Field,
   FormGrid,
@@ -20,7 +21,6 @@ import { useId, useState } from 'react';
 import { stockApi, type StockLocationView } from '@/lib/api-stock';
 
 import { ChoixMembre } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   formulaireEmplacement,
@@ -126,9 +126,9 @@ function FormulaireEmplacementVue({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
         {emplacement === null ? 'Créer l’emplacement' : 'Enregistrer'}
@@ -208,7 +208,7 @@ export function Emplacements(): React.ReactElement {
                     >
                       <button
                         type="button"
-                        className={`${BOUTON_PETIT} self-start`}
+                        className={buttonClasses('secondary', 'sm', 'self-start')}
                         disabled={!g.actif}
                         onClick={() => void archiver(ouvert)}
                       >
@@ -221,9 +221,9 @@ export function Emplacements(): React.ReactElement {
                   ))
               : null}
             {erreur ? (
-              <Alerte>
+              <Alert tone="danger">
                 <p>{erreur}</p>
-              </Alerte>
+              </Alert>
             ) : null}
           </div>
         ) : null}

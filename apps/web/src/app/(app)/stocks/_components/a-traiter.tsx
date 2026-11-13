@@ -5,13 +5,11 @@
 // facture. Résolution en fenêtre modale ; « classer » avec motif. Une ligne ne
 // disparaît qu'une fois résolue ou classée.
 
-import { Badge, Field, FormGrid, Modal, SubmitButton, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Field, FormGrid, Modal, SubmitButton, buttonClasses } from '@lalanda/ui';
 import { Inbox } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { stockApi, type StockPendingLineView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_A_TRAITER,
@@ -182,9 +180,9 @@ function Resolution({
               ) : null}
             </FormGrid>
             {erreur ? (
-              <Alerte>
+              <Alert tone="danger">
                 <p>{erreur}</p>
-              </Alerte>
+              </Alert>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="max-sm:w-full">
@@ -263,7 +261,7 @@ export function ATraiter(): React.ReactElement {
             <button
               key={f.valeur}
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-pressed={filtre === f.valeur}
               onClick={() => setFiltre(f.valeur)}
             >
@@ -328,7 +326,7 @@ export function ATraiter(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtre, suivante)}
         >
           Afficher plus

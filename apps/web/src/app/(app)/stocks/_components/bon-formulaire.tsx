@@ -7,6 +7,7 @@
 
 import { STOCK_DEFAULT_ADJUSTMENT_REASONS } from '@lalanda/shared/stock';
 import {
+  Alert,
   Button,
   DatePicker,
   Field,
@@ -27,8 +28,6 @@ import {
   type StockVoucherView,
 } from '@/lib/api-stock';
 import { workApi } from '@/lib/work-api';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   emplacementsDuBon,
@@ -303,9 +302,9 @@ export function BonFormulaire({
       </fieldset>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-wrap gap-2">
         <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="max-sm:w-full">

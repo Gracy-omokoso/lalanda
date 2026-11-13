@@ -5,14 +5,12 @@
 // du moteur, derniers mouvements. Modification en fenêtre modale (`stock.manage`).
 // Article introuvable ou d'une autre organisation : l'API répond 404, l'écran le dit.
 
-import { Badge, Modal } from '@lalanda/ui';
+import { Alert, Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { ArrowLeft, History, MapPin, Package, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { stockApi, type StockItemView, type StockMovementView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { ArticleFormulaire } from './article-formulaire';
 import { gestesArticle, phraseSeuil } from './articles-model';
@@ -139,7 +137,7 @@ export function ArticleFiche({ itemId }: { itemId: string }): React.ReactElement
               <button
                 key={g.id}
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={!g.actif || occupe}
                 title={g.raison ?? undefined}
                 aria-describedby={g.raison ? `geste-${g.id}-raison` : undefined}
@@ -199,9 +197,9 @@ export function ArticleFiche({ itemId }: { itemId: string }): React.ReactElement
       </Bandeau>
 
       {erreurGeste ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreurGeste}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <Modal

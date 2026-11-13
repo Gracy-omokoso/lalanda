@@ -7,14 +7,12 @@
 // compté (bouton désactivé avec sa raison sinon). Comptage à l'aveugle : la
 // quantité théorique n'est jamais affichée au compteur.
 
-import { Badge, TextInput } from '@lalanda/ui';
+import { Alert, Badge, TextInput, buttonClasses } from '@lalanda/ui';
 import { ArrowLeft, Check, ClipboardCheck, Scale, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { stockApi, type StockCountLineView, type StockCountView } from '@/lib/api-stock';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { DialogueMotif } from './dialogue-motif';
 import {
@@ -255,7 +253,7 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
                   aria-describedby={g.raison ? `inv-${g.id}-raison` : undefined}
                   className={
                     g.id === 'annuler'
-                      ? BOUTON_PETIT
+                      ? buttonClasses('secondary', 'sm')
                       : 'rounded-[var(--radius-md)] bg-[var(--module-run)] px-4 py-2 text-sm font-semibold text-[var(--surface)] disabled:opacity-50'
                   }
                   onClick={() => (g.id === 'demarrer' ? void demarrer() : setDialogue(g.id))}
@@ -281,9 +279,9 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {c.status === 'draft' ? (
@@ -314,7 +312,7 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
                   <button
                     key={f.valeur}
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-pressed={filtre === f.valeur}
                     onClick={() => setFiltre(f.valeur)}
                   >
