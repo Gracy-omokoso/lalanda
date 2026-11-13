@@ -322,3 +322,32 @@ export const PasswordInput = forwardRef<
     </div>
   );
 });
+
+/**
+ * Classes du sélecteur de fichier natif : le bouton « Parcourir » du navigateur
+ * prend l'allure d'un bouton secondaire, le nom du fichier reste écrit à côté.
+ */
+export const FILE_INPUT_CLASSES =
+  'w-full min-w-0 text-sm text-[var(--foreground)] file:mr-3 file:cursor-pointer file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--foreground)] hover:file:border-[var(--accent)] hover:file:bg-[var(--surface-muted)] aria-[invalid=true]:file:border-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-60 max-sm:text-base max-sm:file:min-h-11';
+
+export type FileInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'>;
+
+/**
+ * Champ fichier relié à son `Field` (libellé, aide, erreur, obligatoire). Reste
+ * natif à dessein (ADR-0074) : dialogue du système, caméra sur téléphone.
+ */
+export const FileInput = forwardRef<HTMLInputElement, FileInputProps>(function FileInput(
+  { className, ...props },
+  ref,
+) {
+  const a11y = controlA11y(useField(), props);
+  return (
+    <input
+      ref={ref}
+      type="file"
+      {...props}
+      {...a11y}
+      className={cn(FILE_INPUT_CLASSES, className)}
+    />
+  );
+});

@@ -18,7 +18,14 @@ import {
   useDateMarks,
 } from './forms/date-picker';
 import { EntityPicker } from './forms/entity-picker';
-import { Field, FormGrid, PasswordInput, TextInput } from './forms/field';
+import {
+  Field,
+  FILE_INPUT_CLASSES,
+  FileInput,
+  FormGrid,
+  PasswordInput,
+  TextInput,
+} from './forms/field';
 import {
   ConfirmLeaveDialog,
   ErrorSummary,
@@ -936,5 +943,25 @@ describe('retrait de l’ancien kit (décision n° 5) : équivalents de @lalanda
     expect(carre).toContain('h-9');
     expect(carre).not.toContain('h-[var(--control-h-sm)]');
     expect(carre).not.toContain('px-3');
+  });
+});
+
+describe('champ fichier (FileInput) : remplace CHAMP sur les champs fichier', () => {
+  it('relié à son Field : id, erreur, obligatoire ; bouton du navigateur stylé', () => {
+    const html = rendre(
+      h(
+        Field,
+        { id: 'piece', label: 'Fichier', required: true, error: 'Trop lourd' },
+        h(FileInput, { accept: '.pdf' }),
+      ),
+    );
+    expect(html).toContain('type="file"');
+    expect(html).toContain('id="piece"');
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('aria-required="true"');
+    expect(html).toContain('aria-describedby="piece-erreur"');
+    expect(html).toContain('accept=".pdf"');
+    expect(FILE_INPUT_CLASSES).toContain('file:border-[var(--border-strong)]');
+    expect(FILE_INPUT_CLASSES).toContain('aria-[invalid=true]:file:border-[var(--danger)]');
   });
 });
