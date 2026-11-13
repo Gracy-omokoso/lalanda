@@ -6,7 +6,7 @@
 // encore livrée (404 : « bientôt disponible », jamais de donnée inventée) et les termes
 // comptables avec leur infobulle (glossaire).
 
-import { Badge, Field, MonthPicker } from '@lalanda/ui';
+import { Alert, Badge, Field, MonthPicker, buttonClasses } from '@lalanda/ui';
 import { FlaskConical, ShieldAlert } from 'lucide-react';
 import { useId } from 'react';
 
@@ -14,7 +14,6 @@ import { Infobulle } from '@/components/infobulle';
 import type { AccountingReserveView } from '@/lib/api-accounting';
 
 import { CarteVide } from '../../stocks/_components/stocks-ui';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   GLOSSAIRE,
@@ -105,17 +104,18 @@ export function EchecLecture({
 }): React.ReactElement {
   if (estBientot(erreur)) return <CarteVide>{PHRASE_BIENTOT}</CarteVide>;
   return (
-    <Alerte
+    <Alert
+      tone="danger"
       action={
         onReessayer ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onReessayer}>
+          <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onReessayer}>
             Réessayer
           </button>
         ) : undefined
       }
     >
       <p>{messageCompta(erreur, repli)}</p>
-    </Alerte>
+    </Alert>
   );
 }
 
