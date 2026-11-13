@@ -9,7 +9,7 @@
 // remboursement : motif, puis approbation par une seconde personne). Les factures sont
 // émises sans normalisation DGI tant que l'homologation n'est pas obtenue.
 
-import { Field, FormGrid, SubmitButton, TextInput } from '@lalanda/ui';
+import { Field, FormGrid, SubmitButton, TextInput, buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -30,8 +30,7 @@ import {
   motifValide,
 } from './factures-abonnements-model';
 
-const BOUTON =
-  'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
+const BOUTON = buttonClasses('secondary', 'md');
 
 type Retour = { ton: 'succes' | 'echec'; texte: string } | null;
 

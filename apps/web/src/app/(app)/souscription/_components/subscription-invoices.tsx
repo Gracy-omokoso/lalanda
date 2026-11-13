@@ -7,15 +7,14 @@
 // facture : raison sociale obligatoire, NIF et adresse facultatifs ; à défaut, la fiche
 // fiscale de l'organisation. Aucun montant n'est calculé ici : tout vient de l'API.
 
-import { Field, FormGrid, SubmitButton, TextInput } from '@lalanda/ui';
+import { Field, FormGrid, SubmitButton, TextInput, buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type SubscriptionBillingProfileView, type SubscriptionInvoiceView } from '@/lib/api';
 
 import { estRefusAutorisation, formatCents, formatDate, messageRefus } from './subscription-model';
 
-const BOUTON =
-  'inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-50';
+const BOUTON = buttonClasses('secondary', 'md');
 
 const SOURCES: Record<SubscriptionBillingProfileView['effective']['source'], string> = {
   billing_profile: 'votre fiche de facturation',

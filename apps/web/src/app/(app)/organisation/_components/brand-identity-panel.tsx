@@ -8,7 +8,7 @@
 // remplacé n'est pas effacé : les documents déjà émis le gardent (réimpression à
 // l'identique). Le 403 d'un rôle sans droit est un état expliqué, pas une panne.
 
-import { Field, Select, TextInput } from '@lalanda/ui';
+import { Field, Select, TextInput, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -27,8 +27,7 @@ import {
 } from './brand-model';
 import { estRefus, formatDateHeure, messageErreur } from './organization-model';
 
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
+const BOUTON = buttonClasses('secondary', 'md');
 const CARTE = 'flex flex-col gap-3 rounded-xl border border-[var(--border)] p-4';
 const CHOIX_ACTIF = 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30';
 

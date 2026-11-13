@@ -13,7 +13,7 @@
 // - pour une erreur venant de la DGI, son code et son libellé sont montrés
 //   tels quels.
 
-import { Field, Modal, TextArea } from '@lalanda/ui';
+import { Field, Modal, TextArea, buttonClasses } from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -127,10 +127,8 @@ function Bandeau({ ton, children }: { ton: TonEtat; children: React.ReactNode })
   );
 }
 
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
-const BOUTON_DANGER =
-  'rounded-md border border-[var(--danger)]/60 px-4 py-2 text-sm font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-50';
+const BOUTON = buttonClasses('secondary', 'md');
+const BOUTON_DANGER = buttonClasses('danger', 'md');
 
 /** Motif de 20 à 500 caractères, avec compteur annoncé. */
 function ChampMotif({

@@ -7,7 +7,7 @@
 // comptés sans montant ; revenu récurrent déclaré ; file des demandes manuelles.
 // L'export CSV (finance et super-administrateur) est journalisé par l'API.
 
-import { Field, MonthPicker } from '@lalanda/ui';
+import { Field, MonthPicker, buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAccesPlateforme } from './admin-access';
@@ -29,8 +29,7 @@ import {
   type MontantDevise,
 } from './finances-model';
 
-const BOUTON =
-  'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
+const BOUTON = buttonClasses('secondary', 'md');
 
 export function FinancesPanel(): React.ReactElement {
   const acces = useAccesPlateforme();

@@ -22,7 +22,7 @@
 // Réservé au super-administrateur (`platform.audit.export`), avec un motif : l'export
 // est lui-même inscrit au journal, et limité à dix par heure.
 
-import { DatePicker, Field, FormGrid, Select, TextInput } from '@lalanda/ui';
+import { DatePicker, Field, FormGrid, Select, TextInput, buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type PlatformAuditEventView } from '@/lib/api';
@@ -49,8 +49,7 @@ import {
 } from './journal-model';
 import { SecurityEventsPanel } from './security-events-panel';
 
-const BOUTON =
-  'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
+const BOUTON = buttonClasses('secondary', 'md');
 
 function telecharger(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

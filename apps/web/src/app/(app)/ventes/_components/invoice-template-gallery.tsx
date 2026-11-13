@@ -11,7 +11,7 @@
 // ADR-0074 : palette en segments, police en `Select`, champs dans `Field` ; le
 // nuancier natif (`type="color"`) reste tel quel. Même envoi (`versEnvoi`).
 
-import { Field, FormGrid, SegmentedControl, Select } from '@lalanda/ui';
+import { Field, FormGrid, SegmentedControl, Select, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -36,8 +36,7 @@ import {
   type SelectionModele,
 } from './template-model';
 
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
+const BOUTON = buttonClasses('secondary', 'md');
 
 function messageDe(err: unknown, repli: string): string {
   const d = (err as { detail?: unknown } | null)?.detail;

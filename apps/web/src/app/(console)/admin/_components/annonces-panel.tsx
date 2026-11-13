@@ -15,6 +15,7 @@ import {
   SubmitButton,
   TextArea,
   TextInput,
+  buttonClasses,
 } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -48,8 +49,7 @@ const REAUTH_ANNONCES =
 
 const ETIQUETTE =
   'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
-const BOUTON =
-  'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
+const BOUTON = buttonClasses('secondary', 'md');
 
 type Retour = { ton: 'succes' | 'echec'; texte: string } | null;
 
