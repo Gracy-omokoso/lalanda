@@ -274,4 +274,5 @@ Décideurs :
   du champ, résumé d'erreurs, Cmd/Ctrl+Entrée, barre d'actions collante, avertissement de
   modifications ; console en deux temps (mot de passe, puis code) avec le MÊME envoi unique ;
   phase 1 : connexion, console, facture, devis, fiche client, fiche collaborateur ; phase 2 listée
-  par module. API inchangée. Statut : **accepté** (11 nov. 2026).
+  par module. API inchangée. Ancien kit `form-ui.tsx` retiré le 13 nov. 2026 (décision 5,
+  tranchée par Gracy ; `FileInput` et `ToggleChip` ajoutés). Statut : **accepté** (11 nov. 2026).

@@ -513,24 +513,77 @@ Mêmes règles : aucun fichier de `apps/api` modifié, aucune route ajoutée, au
    de la session). Rien de bloquant vu sur les autres écrans : chevrons, espacements et largeurs
    conformes aux § 2 et 3.
 
+### Retrait de l'ancien kit (branche `feat/formulaires-retrait-form-ui`, 13 nov. 2026)
+
+Décision n° 5 tranchée par Gracy le 13 nov. 2026 : « j'aime les nouveaux formulaires,
+rassure-toi que toute la plateforme utilise le même, pas besoin de garder l'ancien. »
+Mêmes règles que les passes précédentes : aucun fichier de `apps/api` modifié, aucune route
+ajoutée, aucun `*-model.ts` ni aucune fonction `preparer*`/`valider*` touchés, un commit par
+domaine. **Seule suppression : `ventes/_components/form-ui.tsx`** (il n'avait pas de tests
+propres).
+
+| Ancien export (`form-ui.tsx`) | Remplacé par (`@lalanda/ui`) |
+|---|---|
+| `Alerte` (bandeau d'échec, `action`) | `Alert tone="danger"` (`role="alert"`, même `action`) |
+| `BOUTON` | `buttonClasses()` (secondaire, 36 px) |
+| `BOUTON_PETIT` | `buttonClasses('secondary', 'sm')` (32 px) |
+| `BOUTON_DANGER` | `buttonClasses('danger', 'sm')` |
+| `` `${BOUTON_X} classes…` `` | `buttonClasses(…, 'classes…')` : les ajouts passent par `twMerge` et l'emportent (carré `h-9 w-9 p-0`, `max-sm:h-11`) |
+| `Pastille ton="neutre"` / `"attention"` | `Badge tone="neutral"` / `"warning"` ; les tons calculés par les modèles (`'attention'`) sont traduits à l'affichage, modèles inchangés |
+| `CHAMP` + `Champ` + `aria` (champs texte) | `Field` + `TextInput` / `TextArea` (envoi d'un document par e-mail) |
+| `CHAMP` + `aria` (champs fichier) | **`FileInput`** (nouveau, voir ci-dessous) |
+| `aria` (titre de tâche, édition sur place) | `describedBy` (`forms/logic`) + `aria-invalid` |
+| `AideEtErreur` | `Field` (`hint`, `error`) — plus aucun usage |
+
+Ajouts à `@lalanda/ui`, testés (`forms.test.ts`) :
+
+- **`FileInput`** (`forms/field.tsx`) et `FILE_INPUT_CLASSES` : champ fichier relié à son `Field`
+  (id, aide, erreur, `aria-required`), bouton « Parcourir » du navigateur en bouton secondaire,
+  44 px sur téléphone. Reste natif à dessein (dialogue du système, caméra). Sert aux documents
+  (dépôt, nouvelle version), aux pièces des factures fournisseurs et des réceptions, et au PDF
+  signé d'un engagement (classes partagées).
+- **`ToggleChip`** (`forms/choices.tsx`) : puce à cocher pour un choix multiple compact, case
+  native `sr-only` dessous (Espace, lecteurs d'écran), focus clavier autour de la puce ;
+  `pill` (accent quand cochée, « ✓ »/« + ») ou `bare` (le contenu, une `Tag`, porte le rendu).
+  Remplace les deux dernières cases natives posées à la main : étiquettes d'une tâche
+  (`panneau-tache`) et membres proposés à l'IA (`ia-construire`, qui n'avait pas de focus
+  visible).
+- **`Alert`** : 8 px entre plusieurs blocs (paragraphes, liste), comme l'ancienne `Alerte` ; un
+  texte en ligne n'est pas touché.
+
+Aussi : réexport de l'ancien kit retiré de `projets/_components/elements.tsx` ; les dernières
+constantes `BOUTON` écrites à la main hors de l'ancien kit (modèles de facture, factures
+d'abonnement, facturation normalisée, identité visuelle, cinq panneaux de la console) prennent
+`buttonClasses`. Relevé des éléments natifs restants dans `apps/web` : plus aucun `<select>`,
+radio, `type="date"` ni `type="month"` ; plus aucune case native hors du kit ; restent natifs à
+dessein les heures (`type="time"`, présences et planning), le curseur d'intensité du motif
+(`type="range"`) et les champs fichier masqués derrière un bouton (`sr-only`).
+
+Écarts visuels assumés (alignement sur le système) : le bouton petit a désormais une hauteur
+fixe de 32 px et une bordure `--border-strong` ; les boutons ne passent plus à la ligne
+(`whitespace-nowrap` du bouton du kit) ; le bandeau d'erreur place son action à droite à partir
+de 640 px ; la pastille « attention » prend le texte `--warn` et un fond teinté (contraste
+contrôlé par `tokens.test.ts`). Contrôle visuel : application lancée en local (`.env`
+existant, compte et organisation de test sur la base locale, aucun appel DGI, IA, Slack, Meta
+ou e-mail), listes et bandeaux d'erreur de chaque domaine en 1 280 px et 375 px, captures
+avant/après hors dépôt.
+
 ### Reste à faire
 
-- **Écrans encore sur `Champ`/`CHAMP`** : envoi d'un document par e-mail
-  (`ventes/_components/apercu-document.tsx`, hors relevé de la phase 2), titre de tâche
-  (`panneau-tache.tsx`, `aria`), réexport de `projets/_components/elements.tsx` ; `CHAMP` ne
-  sert plus ailleurs qu'aux champs fichier (documents) et au mois de la comptabilité.
-- **`form-ui.tsx` reste importé** par environ 130 fichiers, presque tous pour `Alerte`,
-  `BOUTON*` et `Pastille` (pas des champs) : son retrait (décision ouverte n° 5) suppose de
-  déplacer ces briques (vers `@lalanda/ui` ou un module commun), hors du périmètre des
-  formulaires.
+- Pastilles et bandeaux **propres à un module**, hors de l'ancien kit et hors formulaires
+  (`Pastille` de la croissance, de la console, des membres, de la facturation normalisée et du
+  tableau de bord ; `Alerte` de la souscription ; boutons de ligne compacts `BOUTON_LIGNE` des
+  tableaux de bord ; bouton accentué de la double authentification de la console) : styles
+  distincts (capitales, chasse fixe), à rapprocher de `Badge`/`StatusPill` dans une passe de
+  design dédiée si on le souhaite.
 - La connexion des membres (`/login`, phase 1) passe par `Form`, donc `noValidate` : les
   contrôles natifs d'adresse y sont tombés (l'API juge) ; l'inscription les garde.
 
 ## Conséquences
 
 - Un écran ne relie plus à la main `aria-describedby`/`aria-invalid` : `Field` le fait.
-- `form-ui.tsx` (`CHAMP`, `Champ`, `aria`) reste en place pour les écrans de phase 2 ; il sera
-  retiré quand plus rien ne l'importe.
+- L'ancien kit `form-ui.tsx` est retiré (13 nov. 2026) : tout formulaire de la plateforme passe
+  par `@lalanda/ui` (champs, boutons, bandeaux, pastilles).
 - Le `<select>` natif garde un intérêt sur téléphone (roue du système) ; `Select` le remplace
   quand même par une feuille basse, pour un rendu et une recherche identiques partout.
 
@@ -563,11 +616,18 @@ Gracy a autorisé l'équipe à trancher ces points en proposant le meilleur ; ch
    champ texte nu), affichage français « nov. 2026 », clavier et feuille basse identiques au
    calendrier ; la valeur `AAAA-MM` ne change pas.
 
+## Décisions tranchées par Gracy (13 nov. 2026)
+
+4. **Second facteur pour les membres — tranchée par Gracy le 13 nov. 2026 : pas besoin pour les
+   membres pour le moment ; la 2FA reste réservée à la console.** La connexion des
+   organisations reste en un écran ; le jour où un second facteur y serait voulu, l'écran en
+   deux temps de la console est prêt (même composant).
+5. **Retrait de `form-ui.tsx` — tranchée par Gracy le 13 nov. 2026 : retrait, fait** (voir
+   « Retrait de l'ancien kit »).
+7. **Fournisseur d'une dépense directe (Trésorerie) — tranchée par Gracy le 13 nov. 2026 : oui,
+   voir ADR-0075** (lien dépense ↔ fiche fournisseur ; l'API recevait jusque-là un nom libre,
+   `supplierName`).
+
 ## Décisions ouvertes
 
-4. **Second facteur pour les membres** : la connexion des organisations n'en a pas ; le jour où il
-   existera, l'écran en deux temps est prêt (même composant).
-5. **Retrait de `form-ui.tsx`** à la fin de la phase 2 (après migration de tous ses usages).
-7. **Fournisseur d'une dépense directe** (Trésorerie) : l'API reçoit un **nom libre**
-   (`supplierName`), pas un identifiant ; le champ reste un texte avec suggestions. Faut-il lier
-   la dépense à la fiche fournisseur (changement d'API) ?
+Aucune.
