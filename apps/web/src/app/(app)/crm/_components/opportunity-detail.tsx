@@ -15,6 +15,7 @@
 // `preparerOpportunite`, `preparerLignes` et `preparerActivite` inchangés.
 
 import {
+  Alert,
   Badge,
   Checkbox,
   DatePicker,
@@ -40,7 +41,6 @@ import {
   type OpportunityView,
 } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 import { DEVIS_BASE, QUOTE_STATUS_LABELS } from '../../ventes/devis/_components/quote-model';
 
@@ -153,7 +153,7 @@ function EditeurLignes({
             {!desactive ? (
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-label={`Retirer la ligne ${i + 1}`}
                 onClick={() => setLignes(lignes.filter((_, n) => n !== i))}
               >
@@ -169,7 +169,7 @@ function EditeurLignes({
       {!desactive ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-start`}
+          className={buttonClasses('secondary', 'sm', 'self-start')}
           onClick={() => setLignes([...lignes, ligneVide()])}
         >
           Ajouter une ligne
@@ -251,9 +251,9 @@ export function OpportunityDetail({
 
   if (vue === null || settings === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
     );
@@ -373,9 +373,9 @@ export function OpportunityDetail({
       <CreerProjet opportunityId={v.id} status={v.status} actions={actions} />
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info.length > 0 ? (
         <div role="status" className="flex flex-col gap-1 text-sm">
@@ -396,7 +396,7 @@ export function OpportunityDetail({
           </Field>
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             onClick={() =>
               void agir(async () => {
                 if (!window.confirm('Supprimer cette opportunité et ses activités ?')) return;
@@ -541,9 +541,10 @@ export function OpportunityDetail({
           }
         >
           {sansLignes ? (
-            <Alerte
+            <Alert
+              tone="danger"
               action={
-                <Link href={devisVierge} className={BOUTON_PETIT}>
+                <Link href={devisVierge} className={buttonClasses('secondary', 'sm')}>
                   Devis vierge
                 </Link>
               }
@@ -552,7 +553,7 @@ export function OpportunityDetail({
                 Cette opportunité n’a pas de ligne d’articles : ajoutez-en pour préremplir le devis,
                 ou partez d’un devis vierge.
               </p>
-            </Alerte>
+            </Alert>
           ) : null}
           <ul className="flex flex-col gap-1 text-sm">
             {v.quotes.map((q) => (
@@ -611,7 +612,7 @@ export function OpportunityDetail({
           {gerer ? (
             <button
               type="button"
-              className={`${BOUTON} gap-2 self-start`}
+              className={buttonClasses('secondary', 'md', 'gap-2 self-start')}
               onClick={() => {
                 setChampsAct({});
                 setErreurAct(null);
@@ -698,9 +699,9 @@ export function OpportunityDetail({
                 ) : null}
               </FormGrid>
               {erreurAct ? (
-                <Alerte>
+                <Alert tone="danger">
                   <p>{erreurAct}</p>
-                </Alerte>
+                </Alert>
               ) : null}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <SubmitButton

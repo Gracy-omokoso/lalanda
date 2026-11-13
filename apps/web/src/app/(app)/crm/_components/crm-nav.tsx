@@ -3,11 +3,10 @@
 // Import/export CSV partagés du CRM (ADR-0035 § 5). La sous-navigation
 // (Pipeline, Contacts, Réglages) est dans la colonne de gauche (ADR-0038 § 3).
 
+import { Alert, buttonClasses } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { type ImportResult } from '@/lib/api-crm';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { erreursImport, messageCrm } from './crm-model';
 
@@ -63,7 +62,7 @@ export function CsvActions({
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           onClick={() =>
             void exporter()
               .then((r) => telecharger(r.blob, r.filename))
@@ -72,7 +71,7 @@ export function CsvActions({
         >
           Exporter en CSV
         </button>
-        <label className={`${BOUTON_PETIT} cursor-pointer`}>
+        <label className={buttonClasses('secondary', 'sm', 'cursor-pointer')}>
           Importer un CSV
           <input
             type="file"
@@ -92,7 +91,7 @@ export function CsvActions({
         </p>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
           {lignes.length > 0 ? (
             <ul className="list-disc pl-5">
@@ -101,7 +100,7 @@ export function CsvActions({
               ))}
             </ul>
           ) : null}
-        </Alerte>
+        </Alert>
       ) : null}
     </div>
   );

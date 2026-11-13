@@ -6,14 +6,12 @@
 // « Mes tâches » (`/projets/mes-taches`, lot C4) mène ici par
 // `?activite=<id>` : l'activité visée est mise en évidence.
 
-import { Badge, Checkbox } from '@lalanda/ui';
+import { Alert, Badge, Checkbox, buttonClasses } from '@lalanda/ui';
 import { CalendarCheck2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type ActivityView } from '@/lib/api-crm';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_ACTIVITES,
@@ -100,7 +98,7 @@ export function ActivitesListe(): React.ReactElement {
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filtres">
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             aria-pressed={filtres.miennes}
             onClick={() => setFiltres({ ...filtres, miennes: !filtres.miennes })}
           >
@@ -111,7 +109,7 @@ export function ActivitesListe(): React.ReactElement {
             <button
               key={f.valeur}
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-pressed={filtres.statut === f.valeur}
               onClick={() => setFiltres({ ...filtres, statut: f.valeur })}
             >
@@ -124,9 +122,9 @@ export function ActivitesListe(): React.ReactElement {
         {annonce}
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {items === null ? (
         <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
@@ -196,7 +194,7 @@ export function ActivitesListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtres, suivante)}
         >
           Afficher plus d’activités

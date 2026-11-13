@@ -9,6 +9,7 @@
 // archivés en interrupteur. `preparerCompte` inchangé.
 
 import {
+  Alert,
   Badge,
   Button,
   Field,
@@ -27,8 +28,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type CrmAccountListItem } from '@/lib/api-crm';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_COMPTES_INITIAUX,
@@ -132,9 +131,9 @@ export function NouveauProspect({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
         {onAnnuler ? (
@@ -231,9 +230,9 @@ export function ComptesListe(): React.ReactElement {
         </FormGrid>
       </Bandeau>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <Modal
         open={gerer && creation}
@@ -303,7 +302,7 @@ export function ComptesListe(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtres, suivante)}
         >
           Afficher plus de comptes

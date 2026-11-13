@@ -8,12 +8,10 @@
 // ADR-0074 : motif en `Select` (même valeur, `preparerMotif` inchangé : il
 // refuse toujours un motif manquant quand il est obligatoire), détail relié.
 
-import { Button, Field, FormGrid, Select, SubmitButton, TextArea } from '@lalanda/ui';
+import { Alert, Button, Field, FormGrid, Select, SubmitButton, TextArea } from '@lalanda/ui';
 import { useEffect, useRef, useState } from 'react';
 
 import type { CrmSettingsView } from '@/lib/api-crm';
-
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import { motifsActifs, preparerMotif } from './pipeline-model';
 
@@ -106,9 +104,9 @@ export function BoiteMotifPerte({
           </Field>
         </FormGrid>
         {motifs.length === 0 && settings.lostReasonRequired ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>Aucun motif actif : ajoutez-en dans les réglages du CRM.</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <Button variant="secondary" onClick={() => demande?.annuler()} className="max-sm:h-11">

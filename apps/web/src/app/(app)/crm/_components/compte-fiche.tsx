@@ -15,6 +15,7 @@
 
 import type { CrmOverview, CrmTimelineEvent } from '@lalanda/shared/crm';
 import {
+  Alert,
   Badge,
   Button,
   ChoiceCards,
@@ -48,7 +49,6 @@ import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { api, type CustomerType, type CustomerView } from '@/lib/api';
 import { crmApi, type CrmAccountListItem } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   CUSTOMER_TYPES,
   formatMontant,
@@ -270,9 +270,9 @@ function Conversion({
         </FormGrid>
       )}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <SubmitButton showShortcut={false} className="max-sm:h-11">
@@ -344,9 +344,9 @@ function Fusion({
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <SubmitButton showShortcut={false} disabled={cible === ''} className="max-sm:h-11">
@@ -443,9 +443,9 @@ function Edition({
         </p>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <SubmitButton showShortcut={false} className="max-sm:h-11">
@@ -613,7 +613,7 @@ function Fil({ accountId }: { accountId: string }): React.ReactElement {
       {suivant ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-start`}
+          className={buttonClasses('secondary', 'sm', 'self-start')}
           onClick={() => lire(suivant)}
         >
           Afficher les événements plus anciens
@@ -647,9 +647,9 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
 
   if (o === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
         Chargement du compte…
@@ -685,12 +685,20 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
           <>
             <Badge tone={a.kind === 'customer' ? 'success' : 'info'}>{libelleNature(a.kind)}</Badge>
             {gerer ? (
-              <button type="button" className={BOUTON_PETIT} onClick={() => setPanneau('edition')}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setPanneau('edition')}
+              >
                 Modifier
               </button>
             ) : null}
             {gerer && fusionPossible(a) ? (
-              <button type="button" className={BOUTON_PETIT} onClick={() => setPanneau('fusion')}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setPanneau('fusion')}
+              >
                 Fusionner
               </button>
             ) : null}
@@ -732,9 +740,9 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
       </Bandeau>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {panneau === 'conversion' && convertir ? (
         <Conversion overview={o} onFait={rafraichir} onFermer={() => setPanneau(null)} />

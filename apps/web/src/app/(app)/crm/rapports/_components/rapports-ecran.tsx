@@ -27,11 +27,10 @@ import {
 import { useEffect, useState } from 'react';
 
 import { CRM_REPORT_ESTIMATE_LABEL } from '@lalanda/shared/crm';
-import { Field, FormGrid, Select } from '@lalanda/ui';
+import { Alert, Field, FormGrid, Select } from '@lalanda/ui';
 
 import { crmReportsApi, type CrmReportsView } from '@/lib/api-crm-reports';
 
-import { Alerte } from '../../../ventes/_components/form-ui';
 import { jourKinshasa } from '../../_components/activites-model';
 import { useAccesCrm } from '../../_components/crm-access';
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../_components/crm-ui';
@@ -131,9 +130,9 @@ export function RapportsEcran(): React.ReactElement {
       </p>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {vue?.truncated ? (

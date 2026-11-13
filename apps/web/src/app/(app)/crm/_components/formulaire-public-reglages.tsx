@@ -15,6 +15,7 @@
 // public reste non cochée (`/f/…`), `corpsReglages` inchangé.
 
 import {
+  Alert,
   Button,
   Checkbox,
   EntityPicker,
@@ -34,7 +35,6 @@ import { useEffect, useId, useState } from 'react';
 import { leadFormsApi, type CrmLeadFormView } from '@/lib/api-lead-forms';
 import { LEAD_FORM_DEFAULT_CONSENT, type LeadFormFieldKey } from '@lalanda/shared/crm';
 
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { Dialogue } from '../../ventes/factures/_components/dialog-ui';
 
 import { useAccesCrm, type MembreCrm } from './crm-access';
@@ -129,9 +129,9 @@ function FenetreCreation({
           responsable choisi.
         </p>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field id={`${id}-titre`} label="Titre affiché" required size="lg">
@@ -272,9 +272,9 @@ export function FormulairePublicReglages(): React.ReactElement {
     return (
       <Panneau titre={titre} icone={Globe} id={`${id}-p`}>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <p className="text-sm text-[var(--foreground-muted)]">
           Une page publique, hébergée par Lalanda, où vos visiteurs laissent leurs coordonnées :
@@ -330,9 +330,9 @@ export function FormulairePublicReglages(): React.ReactElement {
       }
     >
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info ? (
         <p role="status" className="text-sm">
@@ -354,18 +354,26 @@ export function FormulairePublicReglages(): React.ReactElement {
         </label>
         <div className="flex flex-wrap items-center gap-2">
           <TextInput id={`${id}-url`} readOnly className="max-w-xl font-mono text-xs" value={url} />
-          <button type="button" className={BOUTON_PETIT} onClick={() => void copier(url, 'Lien')}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => void copier(url, 'Lien')}
+          >
             Copier le lien
           </button>
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             onClick={() => void copier(extraitHtml(url), 'Extrait HTML')}
           >
             Copier l’extrait HTML
           </button>
           {gerer ? (
-            <button type="button" className={BOUTON_PETIT} onClick={() => void nouveauLien()}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => void nouveauLien()}
+            >
               Générer un nouveau lien
             </button>
           ) : null}

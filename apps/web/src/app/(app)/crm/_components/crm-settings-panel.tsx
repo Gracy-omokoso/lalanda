@@ -10,13 +10,22 @@
 // ADR-0074 : libellés en `TextInput`, nature en `Select`, motif proposé en case
 // stylée, règles en interrupteurs, seuil en champ court ; même corps envoyé.
 
-import { Button, Checkbox, Field, FormGrid, Select, Switch, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Field,
+  FormGrid,
+  Select,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Settings2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { crmApi, type CrmSettingsView, type PipelineStage } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { useAccesCrm } from './crm-access';
 
 import { messageCrm, peutGererCrm } from './crm-model';
@@ -63,9 +72,9 @@ export function CrmSettingsPanel(): React.ReactElement {
 
   if (s === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
     );
@@ -113,9 +122,9 @@ export function CrmSettingsPanel(): React.ReactElement {
         }
       />
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info ? (
         <p role="status" className="text-sm">
@@ -160,7 +169,7 @@ export function CrmSettingsPanel(): React.ReactElement {
                 )}
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   onClick={() => deplacer(i, -1)}
                   aria-label="Monter"
                 >
@@ -168,7 +177,7 @@ export function CrmSettingsPanel(): React.ReactElement {
                 </button>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   onClick={() => deplacer(i, 1)}
                   aria-label="Descendre"
                 >
@@ -177,7 +186,7 @@ export function CrmSettingsPanel(): React.ReactElement {
                 {st.kind === 'open' ? (
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     onClick={() => setS({ ...s, stages: s.stages.filter((_, n) => n !== i) })}
                   >
                     Retirer
@@ -197,7 +206,7 @@ export function CrmSettingsPanel(): React.ReactElement {
             />
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={cleDepuis(nouvelle) === ''}
               onClick={() => {
                 const key = cleDepuis(nouvelle);
@@ -252,7 +261,7 @@ export function CrmSettingsPanel(): React.ReactElement {
                 {!motifsExistants.has(r.key) ? (
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     onClick={() =>
                       setS({ ...s, lostReasons: s.lostReasons.filter((_, n) => n !== i) })
                     }
@@ -275,7 +284,7 @@ export function CrmSettingsPanel(): React.ReactElement {
             />
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={ajouterMotif(s.lostReasons, nouveauMotif) === null}
               onClick={() => {
                 const lostReasons = ajouterMotif(s.lostReasons, nouveauMotif);

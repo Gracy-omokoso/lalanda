@@ -9,6 +9,7 @@
 // `POST /crm/accounts`). `preparerContact` inchangé.
 
 import {
+  Alert,
   Button,
   Field,
   FormGrid,
@@ -24,8 +25,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type ContactView } from '@/lib/api-crm';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { creationProspect } from './comptes-liste';
 import { useAccesCrm } from './crm-access';
@@ -68,11 +67,19 @@ function Rattachement({
   if (!ouvert) {
     return (
       <span className="flex flex-wrap gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={() => setOuvert(true)}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm')}
+          onClick={() => setOuvert(true)}
+        >
           {c.accountId ? 'Changer de compte' : 'Rattacher à un compte'}
         </button>
         {c.accountId ? (
-          <button type="button" className={BOUTON_PETIT} onClick={() => void enregistrer('')}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => void enregistrer('')}
+          >
             Détacher
           </button>
         ) : null}
@@ -94,10 +101,18 @@ function Rattachement({
         onChange={(id) => setAccountId(id)}
       />
       <span className="flex gap-2">
-        <button type="submit" className={BOUTON_PETIT} disabled={accountId === ''}>
+        <button
+          type="submit"
+          className={buttonClasses('secondary', 'sm')}
+          disabled={accountId === ''}
+        >
           Rattacher
         </button>
-        <button type="button" className={BOUTON_PETIT} onClick={() => setOuvert(false)}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm')}
+          onClick={() => setOuvert(false)}
+        >
           Annuler
         </button>
       </span>
@@ -187,9 +202,9 @@ export function ContactsPanel(): React.ReactElement {
         </FormGrid>
       </Bandeau>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <Modal open={gerer && creation} onClose={fermerCreation} title="Nouveau contact" size="md">
@@ -241,9 +256,9 @@ export function ContactsPanel(): React.ReactElement {
             </Field>
           </FormGrid>
           {erreurCreation ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreurCreation}</p>
-            </Alerte>
+            </Alert>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button onClick={fermerCreation} className="max-sm:h-11">
@@ -281,7 +296,7 @@ export function ContactsPanel(): React.ReactElement {
                   <Rattachement c={c} onFait={charger} onErreur={setErreur} />
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     onClick={() => {
                       if (!window.confirm(`Supprimer le contact « ${c.name} » ?`)) return;
                       void crmApi

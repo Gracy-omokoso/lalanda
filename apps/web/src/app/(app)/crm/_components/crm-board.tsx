@@ -15,6 +15,7 @@
 // `DatePicker`) ; filtres et vue en segments ; « Déplacer vers… » en `Select`.
 
 import {
+  Alert,
   Badge,
   DatePicker,
   Field,
@@ -32,8 +33,6 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type OpportunitySummary, type PipelineView } from '@/lib/api-crm';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { creationProspect } from './comptes-liste';
 import { useAccesCrm } from './crm-access';
@@ -249,9 +248,9 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
         </Field>
       </FormGrid>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row">
         <SubmitButton
@@ -373,7 +372,11 @@ function Orphelines({
                     onChange={setCible}
                   />
                 </div>
-                <button type="submit" className={BOUTON_PETIT} disabled={cible === ''}>
+                <button
+                  type="submit"
+                  className={buttonClasses('secondary', 'sm')}
+                  disabled={cible === ''}
+                >
                   Réassigner
                 </button>
               </div>
@@ -544,9 +547,9 @@ export function CrmBoard(): React.ReactElement {
       </p>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <Modal
         open={gerer && creation}
@@ -571,7 +574,11 @@ export function CrmBoard(): React.ReactElement {
             <Link href={lienOpportunite(gagnee.id)} className={buttonClasses('primary', 'sm')}>
               Ouvrir la fiche
             </Link>
-            <button type="button" className={BOUTON_PETIT} onClick={() => setGagnee(null)}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setGagnee(null)}
+            >
               Fermer
             </button>
           </div>
