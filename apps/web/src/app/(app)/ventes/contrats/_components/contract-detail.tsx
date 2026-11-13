@@ -9,6 +9,8 @@
 
 import { SALES_CONTRACT_SETTINGS_DEFAULTS } from '@lalanda/shared/sales-contracts';
 import {
+  Alert,
+  Badge,
   DatePicker,
   Field,
   FormGrid,
@@ -24,7 +26,6 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { salesContractsApi, type SalesContractView } from '@/lib/api-sales-contracts';
 
 import { useProfil } from '../../../_components/profile-context';
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -127,9 +128,9 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
 
   if (vue === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
         Chargement du contrat…
@@ -159,10 +160,12 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
         <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
           <span className="font-mono">{vue.number}</span>
           <span className="text-sm text-[var(--foreground-muted)]">version {vue.version}</span>
-          <Pastille ton={tonContrat(vue.status, vue.derivedStatus)}>
+          <Badge
+            tone={tonContrat(vue.status, vue.derivedStatus) === 'attention' ? 'warning' : 'neutral'}
+          >
             {libelleStatutContrat(vue)}
-          </Pastille>
-          <Pastille ton="neutre">{FACTURATION_LABELS[vue.billingKind]}</Pastille>
+          </Badge>
+          <Badge tone="neutral">{FACTURATION_LABELS[vue.billingKind]}</Badge>
         </h2>
         <p className="text-base font-medium">{vue.title}</p>
         <p className="text-sm">
@@ -194,9 +197,9 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
       </p>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info.length > 0 ? (
         <ul role="status" className="list-disc pl-5 text-sm">
@@ -215,7 +218,11 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
 
       <div className="flex flex-wrap gap-2">
         {preparer && a.edit ? (
-          <button type="button" className={BOUTON_PETIT} onClick={() => setFenetre('modifier')}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => setFenetre('modifier')}
+          >
             Modifier le brouillon
           </button>
         ) : null}
@@ -238,7 +245,11 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
             >
               Approuver
             </button>
-            <button type="button" className={BOUTON_PETIT} onClick={() => setFenetre('rejeter')}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setFenetre('rejeter')}
+            >
               Rejeter
             </button>
           </>
@@ -262,22 +273,38 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
           </button>
         ) : null}
         {preparer && a.newVersion ? (
-          <button type="button" className={BOUTON_PETIT} onClick={() => setFenetre('version')}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => setFenetre('version')}
+          >
             Nouvelle version
           </button>
         ) : null}
         {peutApprouverContrat(actions) && a.terminate ? (
-          <button type="button" className={BOUTON_DANGER} onClick={() => setFenetre('resilier')}>
+          <button
+            type="button"
+            className={buttonClasses('danger', 'sm')}
+            onClick={() => setFenetre('resilier')}
+          >
             Résilier
           </button>
         ) : null}
         {preparer && a.cancel ? (
-          <button type="button" className={BOUTON_DANGER} onClick={() => setFenetre('annuler')}>
+          <button
+            type="button"
+            className={buttonClasses('danger', 'sm')}
+            onClick={() => setFenetre('annuler')}
+          >
             Annuler le contrat
           </button>
         ) : null}
         {preparer && a.delete ? (
-          <button type="button" className={BOUTON_DANGER} onClick={() => setFenetre('supprimer')}>
+          <button
+            type="button"
+            className={buttonClasses('danger', 'sm')}
+            onClick={() => setFenetre('supprimer')}
+          >
             Supprimer le brouillon
           </button>
         ) : null}
@@ -699,7 +726,7 @@ function FenetreResiliation({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Retour
           </button>
           <button
@@ -715,9 +742,9 @@ function FenetreResiliation({
     >
       <div className="flex flex-col gap-4">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field id={`${id}-par`} label="Qui résilie ?" group size="full">

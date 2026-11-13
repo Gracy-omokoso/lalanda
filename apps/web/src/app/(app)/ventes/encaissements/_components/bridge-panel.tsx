@@ -7,7 +7,7 @@
 // ADR-0074 : initiative et ligne en `Select` ; le mois reste un champ mois natif
 // (pas de sélecteur de mois dans `@lalanda/ui`), au style commun.
 
-import { Field, FormGrid, MonthPicker, Select } from '@lalanda/ui';
+import { Alert, Badge, Field, FormGrid, MonthPicker, Select, buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -18,7 +18,6 @@ import {
   type ActualsSyncReport,
 } from '@/lib/api';
 
-import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { messageVentes } from '../../_components/sales-model';
 
@@ -108,9 +107,9 @@ export function BridgePanel(): React.ReactElement {
       </div>
       {vue ? (
         <p className="flex flex-wrap items-center gap-2 text-sm">
-          <Pastille ton={vue.state === 'not_configured' ? 'attention' : 'neutre'}>
+          <Badge tone={vue.state === 'not_configured' ? 'warning' : 'neutral'}>
             {BRIDGE_STATE_LABELS[vue.state]}
-          </Pastille>
+          </Badge>
           {vue.projectName ? <span>Initiative : {vue.projectName}</span> : null}
           {vue.lastSync ? (
             <span className="text-xs text-[var(--foreground-muted)]">
@@ -121,9 +120,9 @@ export function BridgePanel(): React.ReactElement {
         </p>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {importerRealise ? (
@@ -183,7 +182,7 @@ export function BridgePanel(): React.ReactElement {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={BOUTON}
+              className={buttonClasses()}
               disabled={occupe}
               onClick={() => void enregistrer(true)}
             >
@@ -192,7 +191,7 @@ export function BridgePanel(): React.ReactElement {
             {vue?.enabled ? (
               <button
                 type="button"
-                className={BOUTON}
+                className={buttonClasses()}
                 disabled={occupe}
                 onClick={() => void enregistrer(false)}
               >
@@ -203,7 +202,7 @@ export function BridgePanel(): React.ReactElement {
               <>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={occupe}
                   onClick={() => void synchroniser(true)}
                 >
@@ -211,7 +210,7 @@ export function BridgePanel(): React.ReactElement {
                 </button>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={buttonClasses('secondary', 'sm')}
                   disabled={occupe}
                   onClick={() => void synchroniser(false)}
                 >

@@ -14,6 +14,7 @@
 // du moteur. Lecture `sales.read` ; écriture `sales.receipt` ; échéance `sales.manage`.
 
 import {
+  Alert,
   buttonClasses,
   DatePicker,
   Field,
@@ -37,7 +38,6 @@ import {
   OngletsStatut,
   type EtatTableau,
 } from '../../_components/dashboard-ui';
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatMontant, messageVentes } from '../../_components/sales-model';
 
@@ -230,15 +230,16 @@ export function ReceiptsWorkspace(): React.ReactElement {
           Chargement des encaissements…
         </p>
       ) : etat === 'erreur' ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
-            <button type="button" onClick={() => void charger()} className={BOUTON}>
+            <button type="button" onClick={() => void charger()} className={buttonClasses()}>
               Réessayer
             </button>
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : (
         <>
           <section
@@ -377,7 +378,7 @@ export function ReceiptsWorkspace(): React.ReactElement {
                         </Field>
                         <button
                           type="button"
-                          className={`${BOUTON_PETIT} max-sm:h-11`}
+                          className={buttonClasses('secondary', 'sm', 'max-sm:h-11')}
                           onClick={() =>
                             setForm((f) => ({ ...f, lignes: f.lignes.filter((_, j) => j !== i) }))
                           }
@@ -639,13 +640,17 @@ export function ReceiptsWorkspace(): React.ReactElement {
                 </Field>
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   disabled={envoi || annulation.motif.trim().length < 3}
                   onClick={() => void annuler()}
                 >
                   Confirmer l’annulation
                 </button>
-                <button type="button" className={BOUTON_PETIT} onClick={() => setAnnulation(null)}>
+                <button
+                  type="button"
+                  className={buttonClasses('secondary', 'sm')}
+                  onClick={() => setAnnulation(null)}
+                >
                   Garder
                 </button>
               </div>

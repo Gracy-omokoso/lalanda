@@ -4,14 +4,13 @@
 // préparer, à venir, bloquées (motif affiché), calculées par le moteur. « Préparer
 // maintenant » crée un BROUILLON et l'ouvre ; rien n'est émis ici.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { salesContractsApi, type SalesContractScheduleView } from '@/lib/api-sales-contracts';
 
-import { Alerte, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { formatJour } from '../../devis/_components/quote-model';
 
@@ -65,9 +64,9 @@ export function SectionEcheancier({
 
   if (vue === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
         Calcul de l’échéancier…
@@ -78,9 +77,9 @@ export function SectionEcheancier({
   return (
     <div className="flex flex-col gap-3">
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <p className="text-xs text-[var(--foreground-muted)]">
         Du {formatJour(vue.window.from)} au {formatJour(vue.window.to)}
@@ -108,9 +107,9 @@ export function SectionEcheancier({
             >
               <span className="flex flex-wrap items-center gap-2">
                 <span className="font-mono">{formatJour(e.date)}</span>
-                <Pastille ton={tonEcheance(e.state)}>
+                <Badge tone={tonEcheance(e.state) === 'attention' ? 'warning' : 'neutral'}>
                   {e.stateLabel || ECHEANCE_LABELS[e.state]}
-                </Pastille>
+                </Badge>
               </span>
               {e.label ? <span>{e.label}</span> : null}
               {e.periodStart && e.periodEnd ? (

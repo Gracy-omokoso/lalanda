@@ -9,11 +9,10 @@
 // Chargé à l'ouverture seulement : la plupart des personnes n'en ont pas
 // besoin.
 
+import { Alert, buttonClasses } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api } from '@/lib/api';
-
-import { Alerte, BOUTON_PETIT } from '../../_components/form-ui';
 
 import { formatInstant, type LigneEchange, lignesEchanges, messageFacture } from './invoice-model';
 
@@ -54,15 +53,16 @@ export function DgiExchanges({ invoiceId }: { invoiceId: string }): React.ReactE
           <p className="text-sm text-[var(--foreground-muted)]">Lecture des échanges…</p>
         ) : null}
         {etat === 'erreur' ? (
-          <Alerte
+          <Alert
+            tone="danger"
             action={
-              <button type="button" className={BOUTON_PETIT} onClick={charger}>
+              <button type="button" className={buttonClasses('secondary', 'sm')} onClick={charger}>
                 Réessayer
               </button>
             }
           >
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {etat === 'pret' && lignes.length === 0 ? (
           <p className="text-sm">Aucun échange avec la DGI pour ce document.</p>
@@ -102,7 +102,11 @@ export function DgiExchanges({ invoiceId }: { invoiceId: string }): React.ReactE
                 </li>
               ))}
             </ol>
-            <button type="button" className={`${BOUTON_PETIT} self-start`} onClick={charger}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm', 'self-start')}
+              onClick={charger}
+            >
               Actualiser
             </button>
           </>

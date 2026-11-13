@@ -7,13 +7,13 @@
 // En mode normalisé, l'état de la normalisation DGI (ADR-0024 § 9.3) et les
 // échanges avec la DGI s'affichent sous l'en-tête.
 
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { estRefus, formatDate, formatMontant } from '../../_components/sales-model';
 
@@ -78,12 +78,13 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }): React.React
         <Link href={FACTURES_BASE} className="text-sm text-[var(--foreground-muted)] underline">
           ← Documents de vente
         </Link>
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             etat === 'erreur' ? (
               <button
                 type="button"
-                className={`${BOUTON} text-[var(--foreground)]`}
+                className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
                 onClick={charger}
               >
                 Réessayer
@@ -92,7 +93,7 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }): React.React
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       </div>
     );
   }
@@ -146,9 +147,11 @@ function DocumentFige({
         </h2>
         <p className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-mono">{entete.reference}</span>
-          <Pastille ton={tonStatut(vue.status)}>{STATUS_LABELS[vue.status]}</Pastille>
+          <Badge tone={tonStatut(vue.status) === 'attention' ? 'warning' : 'neutral'}>
+            {STATUS_LABELS[vue.status]}
+          </Badge>
           <span className="text-xs text-[var(--foreground-muted)]">{TYPE_LABELS[vue.type]}</span>
-          {vue.environment === 'test' ? <Pastille ton="attention">Mode test</Pastille> : null}
+          {vue.environment === 'test' ? <Badge tone="warning">Mode test</Badge> : null}
         </p>
         {entete.mention ? (
           <p className="text-sm text-[var(--foreground-muted)]">{entete.mention}</p>
@@ -164,9 +167,9 @@ function DocumentFige({
         <NormalizationStatus vue={vue} onChange={onChange} />
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -322,14 +325,14 @@ function DocumentFige({
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {actions.includes('avoir') ? (
-          <button type="button" className={BOUTON} onClick={() => setAvoir(true)}>
+          <button type="button" className={buttonClasses()} onClick={() => setAvoir(true)}>
             Créer un avoir
           </button>
         ) : null}
         {actions.includes('reprendre') ? (
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={envoi}
             onClick={() => void reprendre()}
           >

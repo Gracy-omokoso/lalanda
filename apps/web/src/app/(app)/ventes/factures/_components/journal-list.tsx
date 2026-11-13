@@ -5,12 +5,12 @@
 // (`chainValid: false`), l'écran le dit en tête : une entrée a été altérée ou
 // supprimée.
 
+import { Alert, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, type JournalEntryView } from '@/lib/api';
 
-import { Alerte, BOUTON } from '../../_components/form-ui';
 import { estRefus, formatDate, formatMontant } from '../../_components/sales-model';
 
 import {
@@ -77,11 +77,12 @@ export function JournalList(): React.ReactElement {
       ) : etat === 'refus' ? (
         <p className="text-sm text-[var(--foreground-muted)]">{erreur}</p>
       ) : etat === 'erreur' ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             <button
               type="button"
-              className={`${BOUTON} text-[var(--foreground)]`}
+              className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
               onClick={() => charger(null)}
             >
               Réessayer
@@ -89,7 +90,7 @@ export function JournalList(): React.ReactElement {
           }
         >
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : (
         <>
           {chaineValide ? (
@@ -97,12 +98,12 @@ export function JournalList(): React.ReactElement {
               Chaînage vérifié par le serveur : intact.
             </p>
           ) : (
-            <Alerte>
+            <Alert tone="danger">
               <p>
                 Le chaînage du journal est rompu : une entrée a été modifiée ou supprimée. Prévenez
                 le Propriétaire de l’organisation et le support.
               </p>
-            </Alerte>
+            </Alert>
           )}
           {items.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-sm text-[var(--foreground-muted)]">
@@ -161,7 +162,7 @@ export function JournalList(): React.ReactElement {
           {curseur ? (
             <button
               type="button"
-              className={`${BOUTON} self-center`}
+              className={buttonClasses('secondary', 'md', 'self-center')}
               disabled={suite}
               onClick={() => charger(curseur)}
             >

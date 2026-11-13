@@ -19,11 +19,10 @@ import {
   Switch,
   TextArea,
   TextInput,
+  buttonClasses,
 } from '@lalanda/ui';
 
 import type { InvoiceLineBody } from '@/lib/api';
-
-import { BOUTON_PETIT } from '../../_components/form-ui';
 
 import {
   FREQUENCE_LABELS,
@@ -273,7 +272,7 @@ export function ChampsClauses({
                     <span className="text-sm font-medium">Échéance {i + 1}</span>
                     <button
                       type="button"
-                      className={`${BOUTON_PETIT} max-sm:h-11`}
+                      className={buttonClasses('secondary', 'sm', 'max-sm:h-11')}
                       onClick={() =>
                         setF((x) => ({
                           ...x,
@@ -351,7 +350,7 @@ export function ChampsClauses({
               ))}
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-start max-sm:h-11`}
+                className={buttonClasses('secondary', 'sm', 'self-start max-sm:h-11')}
                 onClick={() =>
                   setF((x) => ({
                     ...x,

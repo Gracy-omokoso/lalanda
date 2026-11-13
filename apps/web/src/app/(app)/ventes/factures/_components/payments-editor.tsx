@@ -14,13 +14,12 @@
 // diffère entre le rendu serveur et le navigateur et faisait échouer
 // l'hydratation quand elle servait d'identifiant.
 
-import { Field, FormGrid, MoneyInput, Select } from '@lalanda/ui';
+import { Field, FormGrid, MoneyInput, Select, buttonClasses } from '@lalanda/ui';
 import { Trash2 } from 'lucide-react';
 import { useId } from 'react';
 
 import type { InvoicePaymentMethod, InvoiceView } from '@/lib/api';
 
-import { BOUTON_DANGER, BOUTON_PETIT } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 
 import {
@@ -97,7 +96,11 @@ export function PaymentsEditor({
               </FormGrid>
               <button
                 type="button"
-                className={`${BOUTON_DANGER} mt-[1.625rem] inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11`}
+                className={buttonClasses(
+                  'danger',
+                  'sm',
+                  'mt-[1.625rem] inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11',
+                )}
                 disabled={desactive || form.paiements.length <= 1}
                 onClick={() =>
                   setForm((f) => ({ ...f, paiements: f.paiements.filter((_, n) => n !== i) }))
@@ -117,7 +120,7 @@ export function PaymentsEditor({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={`${BOUTON_PETIT} max-sm:h-11`}
+          className={buttonClasses('secondary', 'sm', 'max-sm:h-11')}
           disabled={desactive}
           onClick={() =>
             setForm((f) => ({
@@ -131,7 +134,7 @@ export function PaymentsEditor({
         {vue && total !== null ? (
           <button
             type="button"
-            className={`${BOUTON_PETIT} max-sm:h-11`}
+            className={buttonClasses('secondary', 'sm', 'max-sm:h-11')}
             disabled={desactive}
             onClick={() => {
               const p = paiementUnique(vue, form.paiements[0]?.method ?? 'ESPECES');

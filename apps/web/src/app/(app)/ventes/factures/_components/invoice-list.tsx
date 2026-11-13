@@ -12,7 +12,7 @@
 // référence `PF…`, jamais comme une facture (§ S25e.1). Les compteurs des onglets
 // et les graphiques viennent du même calcul serveur : ils concordent avec la liste.
 
-import { buttonClasses, Select, StatusPill, TextInput } from '@lalanda/ui';
+import { Alert, buttonClasses, Select, StatusPill, TextInput } from '@lalanda/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,7 +26,6 @@ import {
 } from '@/lib/api';
 
 import { BoutonApercu } from '../../_components/apercu-document';
-import { Alerte } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { useSalesList } from '../../_components/use-sales-list';
 import { facturesAReglement } from '../../encaissements/_components/receipts-model';
@@ -269,7 +268,8 @@ export function InvoiceList(): React.ReactElement {
           </div>
         ) : liste.etat === 'erreur' ? (
           <div className="p-3">
-            <Alerte
+            <Alert
+              tone="danger"
               action={
                 <button
                   type="button"
@@ -281,7 +281,7 @@ export function InvoiceList(): React.ReactElement {
               }
             >
               <p>{liste.erreur}</p>
-            </Alerte>
+            </Alert>
           </div>
         ) : liste.items.length === 0 ? (
           <div className="px-4 py-10 text-center">
@@ -315,9 +315,9 @@ export function InvoiceList(): React.ReactElement {
             <ListeTelephone items={liste.items} reglements={reglements} facturer={facturer} />
             {liste.erreurSuite ? (
               <div className="p-3">
-                <Alerte>
+                <Alert tone="danger">
                   <p>{liste.erreurSuite}</p>
-                </Alerte>
+                </Alert>
               </div>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs text-[var(--foreground-muted)]">

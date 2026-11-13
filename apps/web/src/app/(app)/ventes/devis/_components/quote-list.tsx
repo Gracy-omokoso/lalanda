@@ -11,7 +11,7 @@
 // par curseur (« Afficher plus »). Les compteurs des onglets et les graphiques
 // viennent du même calcul serveur : ils concordent avec la liste.
 
-import { buttonClasses, Select, StatusPill, TextInput } from '@lalanda/ui';
+import { Alert, buttonClasses, Select, StatusPill, TextInput } from '@lalanda/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -26,7 +26,6 @@ import {
   OngletsStatut,
   type EtatTableau,
 } from '../../_components/dashboard-ui';
-import { Alerte } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatMontant } from '../../_components/sales-model';
 import { aujourdhuiKinshasa } from '../../encaissements/_components/receipts-model';
@@ -209,9 +208,9 @@ export function QuoteList(): React.ReactElement {
 
         {erreur ? (
           <div className="p-3">
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           </div>
         ) : null}
         {items === null ? (

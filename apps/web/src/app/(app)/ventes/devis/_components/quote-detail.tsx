@@ -4,14 +4,13 @@
 // (accepté, refusé, expiré, nouvelle version), PDF au modèle de l'organisation,
 // conversion en brouillon de facture qui ouvre la facture créée.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type QuoteView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { BoutonApercu } from '../../_components/apercu-document';
 import { useAccesVentes } from '../../_components/sales-access';
@@ -89,9 +88,9 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
 
   if (vue === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
         Chargement du devis…
@@ -114,7 +113,9 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
           <span className="font-mono">{vue.number}</span>
           <span className="text-sm text-[var(--foreground-muted)]">version {vue.version}</span>
-          <Pastille ton={tonDevis(vue.status)}>{QUOTE_STATUS_LABELS[vue.status]}</Pastille>
+          <Badge tone={tonDevis(vue.status) === 'attention' ? 'warning' : 'neutral'}>
+            {QUOTE_STATUS_LABELS[vue.status]}
+          </Badge>
         </h2>
         <p className="text-sm">
           {vue.customerName ?? 'Client sans fiche'} · valable jusqu’au {formatJour(vue.validUntil)}
@@ -134,9 +135,9 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
       </header>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info ? (
         <p role="status" className="text-sm">
@@ -146,7 +147,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
 
       <div className="flex flex-wrap gap-2">
         <BoutonApercu
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           libelle="Aperçu et envoi"
           document={{
             genre: 'devis',
@@ -158,7 +159,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         />
         <button
           type="button"
-          className={BOUTON_PETIT}
+          className={buttonClasses('secondary', 'sm')}
           disabled={envoi}
           onClick={() =>
             void agir(async () => {
@@ -172,7 +173,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         {gerer && a.send ? (
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             disabled={envoi || vue.blockers.length > 0}
             onClick={() =>
               void agir(
@@ -187,7 +188,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         {gerer && a.accept ? (
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             disabled={envoi}
             onClick={() =>
               void agir(async () => {
@@ -203,7 +204,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         {gerer && a.refuse ? (
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             disabled={envoi}
             onClick={() => {
               const motif = window.prompt('Motif du refus (facultatif)') ?? null;
@@ -216,7 +217,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         {gerer && a.newVersion ? (
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             disabled={envoi}
             onClick={() => void agir(() => crmApi.quoteAction(vue.id, 'new-version', vue.revision))}
           >
@@ -244,7 +245,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         {gerer && a.delete && vue.version === 1 ? (
           <button
             type="button"
-            className={BOUTON_PETIT}
+            className={buttonClasses('secondary', 'sm')}
             disabled={envoi}
             onClick={() =>
               void agir(async () => {

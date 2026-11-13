@@ -25,6 +25,7 @@ import {
   MoneyInput,
   Select,
   TextInput,
+  buttonClasses,
 } from '@lalanda/ui';
 import { Trash2 } from 'lucide-react';
 import { useId } from 'react';
@@ -40,7 +41,6 @@ import {
 } from '@/lib/api';
 
 import { CatalogItemForm } from '../../_components/catalog-item-form';
-import { BOUTON_DANGER, BOUTON_PETIT } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import {
   formatMontant,
@@ -230,7 +230,11 @@ export function InvoiceLines({
                   ) : null}
                   <button
                     type="button"
-                    className={`${BOUTON_DANGER} inline-flex h-8 w-8 items-center justify-center p-0 max-sm:h-10 max-sm:w-10`}
+                    className={buttonClasses(
+                      'danger',
+                      'sm',
+                      'inline-flex h-8 w-8 items-center justify-center p-0 max-sm:h-10 max-sm:w-10',
+                    )}
                     disabled={desactive}
                     onClick={() => retirer(i)}
                     aria-label={`Retirer la ligne ${i + 1}`}
@@ -483,7 +487,7 @@ export function InvoiceLines({
                   </span>
                   <button
                     type="button"
-                    className={`${BOUTON_PETIT} max-sm:h-11`}
+                    className={buttonClasses('secondary', 'sm', 'max-sm:h-11')}
                     disabled={desactive}
                     onClick={() => ajouter(ligneDepuisOrigine(o))}
                   >
@@ -512,7 +516,7 @@ export function InvoiceLines({
           />
           <button
             type="button"
-            className={`${BOUTON_PETIT} self-start max-sm:h-11`}
+            className={buttonClasses('secondary', 'sm', 'self-start max-sm:h-11')}
             disabled={desactive}
             onClick={() => ajouter(ligneVide('free'))}
           >

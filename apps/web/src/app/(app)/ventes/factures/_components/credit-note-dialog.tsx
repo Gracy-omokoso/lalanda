@@ -6,12 +6,10 @@
 //
 // ADR-0074 : nature et étendue en cartes de choix (`ChoiceCards`) ; même appel.
 
-import { ChoiceCards, Field, FormGrid } from '@lalanda/ui';
+import { Alert, ChoiceCards, Field, FormGrid, buttonClasses } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api, type CreditNoteNature, type CreditNoteScope, type InvoiceView } from '@/lib/api';
-
-import { Alerte, BOUTON } from '../../_components/form-ui';
 
 import { Dialogue } from './dialog-ui';
 import { messageFacture, NATURE_LABELS, NATURES } from './invoice-model';
@@ -101,18 +99,18 @@ export function CreditNoteDialog({
       </FormGrid>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+        <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
           Annuler
         </button>
         <button
           type="button"
-          className={`${BOUTON} border-[var(--accent)] font-semibold`}
+          className={buttonClasses('secondary', 'md', 'border-[var(--accent)] font-semibold')}
           onClick={() => void creer()}
           disabled={envoi}
         >

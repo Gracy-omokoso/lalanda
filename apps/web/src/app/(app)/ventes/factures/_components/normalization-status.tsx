@@ -14,12 +14,12 @@
 // - « Relancer » et « Vérifier maintenant » ne sont JAMAIS rejoués après une
 //   coupure : on relit le document, comme pour « Normaliser ».
 
+import { Alert, Badge, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { api, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON, Pastille } from '../../_components/form-ui';
 import { formatDate } from '../../_components/sales-model';
 
 import { DeclareNotNormalizedDialog } from './declare-not-normalized-dialog';
@@ -167,7 +167,7 @@ export function NormalizationStatus({
         <h3 id={titreId} className="text-base font-semibold">
           {enCours ? 'Transmission à la DGI…' : p.titre}
         </h3>
-        {vue.environment === 'test' ? <Pastille ton="attention">Mode test</Pastille> : null}
+        {vue.environment === 'test' ? <Badge tone="warning">Mode test</Badge> : null}
       </div>
 
       <div aria-live="polite" className="flex flex-col gap-2 text-sm">
@@ -297,16 +297,16 @@ export function NormalizationStatus({
       ) : null}
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {p.boutons.includes('relancer') ? (
           <button
             type="button"
-            className={`${BOUTON} border-[var(--accent)] font-semibold`}
+            className={buttonClasses('secondary', 'md', 'border-[var(--accent)] font-semibold')}
             disabled={occupe !== null}
             onClick={() => void agir('relancer', () => api.retryNormalization(vue.id))}
           >
@@ -316,7 +316,7 @@ export function NormalizationStatus({
         {p.boutons.includes('verifier') ? (
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={occupe !== null}
             onClick={() => void agir('verifier', () => api.checkNormalization(vue.id))}
           >
@@ -326,7 +326,7 @@ export function NormalizationStatus({
         {p.boutons.includes('declarer') ? (
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={occupe !== null}
             onClick={() => setDeclarer(true)}
           >
@@ -336,7 +336,7 @@ export function NormalizationStatus({
         {p.phase !== 'done' && p.phase !== 'failed' && !relecture ? (
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={occupe !== null}
             onClick={() => void agir('actualiser', () => api.getInvoice(vue.id))}
           >

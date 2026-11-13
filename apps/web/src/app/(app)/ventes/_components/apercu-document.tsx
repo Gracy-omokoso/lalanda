@@ -13,7 +13,7 @@
 // un message est en cours de saisie, aucune fermeture pendant l'envoi, plein
 // écran sur téléphone.
 
-import { Modal } from '@lalanda/ui';
+import { Alert, Field, FormGrid, Modal, TextArea, TextInput, buttonClasses } from '@lalanda/ui';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import {
@@ -37,7 +37,6 @@ import {
   type FormulaireEnvoi,
   type GenreDocument,
 } from './apercu-document-model';
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ, aria } from './form-ui';
 
 export interface DocumentApercu {
   genre: GenreDocument;
@@ -113,7 +112,7 @@ export function BoutonApercu({
     <>
       <button
         type="button"
-        className={className ?? BOUTON}
+        className={className ?? buttonClasses()}
         aria-haspopup="dialog"
         aria-label={libelle === 'Aperçu' ? `Aperçu — ${doc.titre}` : undefined}
         onClick={() => setOuvert(true)}
@@ -200,7 +199,7 @@ export function ApercuDocument({
           <div className="flex flex-col gap-1">
             <button
               type="button"
-              className={BOUTON}
+              className={buttonClasses()}
               disabled={!doc.peutEnvoyer || envoi}
               aria-describedby={doc.peutEnvoyer ? undefined : `${id}-sans-droit`}
               aria-expanded={envoi}
@@ -219,13 +218,13 @@ export function ApercuDocument({
           </div>
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={!pdf}
             onClick={() => pdf && enregistrer(pdf.blob, pdf.filename)}
           >
             Télécharger
           </button>
-          <button type="button" className={BOUTON} disabled={!pdf} onClick={imprimer}>
+          <button type="button" className={buttonClasses()} disabled={!pdf} onClick={imprimer}>
             Imprimer
           </button>
           {pdf ? (
@@ -258,9 +257,9 @@ export function ApercuDocument({
           <div className="flex min-h-[50vh] flex-1 flex-col bg-[var(--surface-muted)]">
             {erreur ? (
               <div className="p-4">
-                <Alerte>
+                <Alert tone="danger">
                   <p>{erreur}</p>
-                </Alerte>
+                </Alert>
               </div>
             ) : !pdf ? (
               <p className="m-auto p-6 text-sm text-[var(--foreground-muted)]" aria-live="polite">
@@ -276,7 +275,7 @@ export function ApercuDocument({
             ) : (
               <div className="m-auto flex max-w-sm flex-col items-center gap-3 p-6 text-center">
                 <p className="text-sm">Ce navigateur n’affiche pas les PDF dans la page.</p>
-                <button type="button" className={BOUTON} onClick={ouvrirOnglet}>
+                <button type="button" className={buttonClasses()} onClick={ouvrirOnglet}>
                   Ouvrir le PDF
                 </button>
               </div>
@@ -369,10 +368,14 @@ function FormulaireEmail({
     return (
       <section aria-labelledby={`${id}-titre`} className={cadre}>
         {titre}
-        <Alerte>
+        <Alert tone="danger">
           <p>{etape.message}</p>
-        </Alerte>
-        <button type="button" className={`${BOUTON_PETIT} self-start`} onClick={onFermer}>
+        </Alert>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm', 'self-start')}
+          onClick={onFermer}
+        >
           Fermer
         </button>
       </section>
@@ -382,10 +385,14 @@ function FormulaireEmail({
     return (
       <section aria-labelledby={`${id}-titre`} className={cadre}>
         {titre}
-        <Alerte>
+        <Alert tone="danger">
           <p>{etape.brouillon.reason ?? 'Ce document ne peut pas être envoyé.'}</p>
-        </Alerte>
-        <button type="button" className={`${BOUTON_PETIT} self-start`} onClick={onFermer}>
+        </Alert>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm', 'self-start')}
+          onClick={onFermer}
+        >
           Fermer
         </button>
       </section>
@@ -401,11 +408,15 @@ function FormulaireEmail({
             {m.texte}
           </p>
         ) : (
-          <Alerte>
+          <Alert tone="danger">
             <p>{m.texte}</p>
-          </Alerte>
+          </Alert>
         )}
-        <button type="button" className={`${BOUTON_PETIT} self-start`} onClick={onFermer}>
+        <button
+          type="button"
+          className={buttonClasses('secondary', 'sm', 'self-start')}
+          onClick={onFermer}
+        >
           Fermer
         </button>
       </section>
@@ -422,7 +433,7 @@ function FormulaireEmail({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={etape.nom === 'envoi'}
             onClick={() => void envoyer(brouillon, corps)}
             autoFocus
@@ -431,7 +442,7 @@ function FormulaireEmail({
           </button>
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={etape.nom === 'envoi'}
             onClick={() => setEtape({ nom: 'saisie', brouillon })}
           >
@@ -456,72 +467,60 @@ function FormulaireEmail({
           if (v.corps) setEtape({ nom: 'confirmation', brouillon, corps: v.corps });
         }}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id={`${id}-to`} label="Destinataire" requis erreur={erreurs.to}>
-            <input
-              id={`${id}-to`}
+        <FormGrid>
+          <Field id={`${id}-to`} label="Destinataire" required error={erreurs.to}>
+            <TextInput
               type="email"
               autoComplete="email"
-              className={CHAMP}
               value={f.to}
               maxLength={254}
               onChange={(e) => champ('to')(e.target.value)}
-              {...aria(`${id}-to`, erreurs.to)}
             />
-          </Champ>
-          <Champ
+          </Field>
+          <Field
             id={`${id}-cc`}
             label="Copie (facultatif)"
-            aide="Jusqu’à cinq adresses, séparées par des virgules."
-            erreur={erreurs.cc}
+            hint="Jusqu’à cinq adresses, séparées par des virgules."
+            error={erreurs.cc}
           >
-            <input
-              id={`${id}-cc`}
+            <TextInput
               type="text"
               inputMode="email"
-              className={CHAMP}
               value={f.cc}
               onChange={(e) => champ('cc')(e.target.value)}
-              {...aria(`${id}-cc`, erreurs.cc, true)}
             />
-          </Champ>
-        </div>
-        <Champ id={`${id}-objet`} label="Objet" requis erreur={erreurs.subject}>
-          <input
-            id={`${id}-objet`}
-            type="text"
-            className={CHAMP}
-            value={f.subject}
-            maxLength={200}
-            onChange={(e) => champ('subject')(e.target.value)}
-            {...aria(`${id}-objet`, erreurs.subject)}
-          />
-        </Champ>
-        <Champ id={`${id}-message`} label="Message" erreur={erreurs.message}>
-          <textarea
-            id={`${id}-message`}
-            rows={6}
-            className={CHAMP}
-            value={f.message}
-            maxLength={5000}
-            onChange={(e) => champ('message')(e.target.value)}
-            {...aria(`${id}-message`, erreurs.message)}
-          />
-        </Champ>
+          </Field>
+          <Field id={`${id}-objet`} label="Objet" required size="full" error={erreurs.subject}>
+            <TextInput
+              type="text"
+              value={f.subject}
+              maxLength={200}
+              onChange={(e) => champ('subject')(e.target.value)}
+            />
+          </Field>
+          <Field id={`${id}-message`} label="Message" size="full" error={erreurs.message}>
+            <TextArea
+              rows={6}
+              value={f.message}
+              maxLength={5000}
+              onChange={(e) => champ('message')(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           Pièce jointe : {fichier ?? brouillon.attachmentName ?? 'le PDF du document'}.{' '}
           {destinataireDocument(doc.genre)} pourra vous répondre directement.
         </p>
         {erreurEnvoi ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreurEnvoi}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <button type="submit" className={BOUTON}>
+          <button type="submit" className={buttonClasses()}>
             Continuer
           </button>
-          <button type="button" className={BOUTON} onClick={onFermer}>
+          <button type="button" className={buttonClasses()} onClick={onFermer}>
             Annuler
           </button>
         </div>

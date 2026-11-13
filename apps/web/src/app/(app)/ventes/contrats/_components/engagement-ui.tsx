@@ -11,7 +11,10 @@
 // - Factures liées : lien vers la facture ; aucune émission ici.
 
 import {
+  Alert,
+  Badge,
   EntityPicker,
+  FILE_INPUT_CLASSES,
   Field,
   FormGrid,
   Modal,
@@ -33,7 +36,6 @@ import {
 } from '@/lib/api-sales-contracts';
 
 import { lecteurPdfIntegre } from '../../_components/apercu-document-model';
-import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { CustomerForm } from '../../_components/customer-form';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatMontant } from '../../_components/sales-model';
@@ -131,13 +133,13 @@ export function ApercuPiece({
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={!pdf}
             onClick={() => pdf && enregistrer(pdf.blob, pdf.filename)}
           >
             Télécharger
           </button>
-          <button type="button" className={BOUTON} disabled={!pdf} onClick={imprimer}>
+          <button type="button" className={buttonClasses()} disabled={!pdf} onClick={imprimer}>
             Imprimer
           </button>
           {pdf ? (
@@ -159,9 +161,9 @@ export function ApercuPiece({
         <div className="flex min-h-[50vh] flex-1 flex-col bg-[var(--surface-muted)]">
           {erreur ? (
             <div className="p-4">
-              <Alerte>
+              <Alert tone="danger">
                 <p>{erreur}</p>
-              </Alerte>
+              </Alert>
             </div>
           ) : !pdf ? (
             <p className="m-auto p-6 text-sm text-[var(--foreground-muted)]" aria-live="polite">
@@ -177,7 +179,7 @@ export function ApercuPiece({
           ) : (
             <div className="m-auto flex max-w-sm flex-col items-center gap-3 p-6 text-center">
               <p className="text-sm">Ce navigateur n’affiche pas les PDF dans la page.</p>
-              <button type="button" className={BOUTON} onClick={ouvrirOnglet}>
+              <button type="button" className={buttonClasses()} onClick={ouvrirOnglet}>
                 Ouvrir le PDF
               </button>
             </div>
@@ -232,7 +234,7 @@ export function ListePieces({
       {televerser ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-start`}
+          className={buttonClasses('secondary', 'sm', 'self-start')}
           onClick={() => setAjout(true)}
         >
           + {libelleAjout}
@@ -302,7 +304,7 @@ function FenetreTeleversement({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -318,9 +320,9 @@ function FenetreTeleversement({
     >
       <div className="flex flex-col gap-3">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <label htmlFor={`${id}-f`} className="text-sm font-medium">
           Fichier PDF
@@ -330,7 +332,7 @@ function FenetreTeleversement({
           type="file"
           accept="application/pdf,.pdf"
           onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
-          className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
+          className={FILE_INPUT_CLASSES}
         />
       </div>
     </Modal>
@@ -391,7 +393,7 @@ export function FenetreMotif({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Retour
           </button>
           <button
@@ -407,9 +409,9 @@ export function FenetreMotif({
     >
       <div className="flex flex-col gap-3">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <Field
           id={`${id}-m`}
@@ -455,7 +457,7 @@ export function FenetreConfirmation({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Retour
           </button>
           <button
@@ -478,9 +480,9 @@ export function FenetreConfirmation({
     >
       <div className="flex flex-col gap-3 text-sm">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {children}
       </div>
@@ -602,9 +604,9 @@ export function FacturesLiees({
           >
             <span className="flex flex-wrap items-center gap-2">
               <span className="font-mono">{f.reference ?? 'Brouillon'}</span>
-              <Pastille ton={f.state === 'draft' ? 'attention' : 'neutre'}>
+              <Badge tone={f.state === 'draft' ? 'warning' : 'neutral'}>
                 {f.state === 'draft' ? 'Brouillon à émettre' : 'Émise'}
-              </Pastille>
+              </Badge>
             </span>
             <span className="text-xs text-[var(--foreground-muted)]">
               {TYPE_LABELS[f.type] ?? f.type}
@@ -660,9 +662,9 @@ export function SectionAcomptes({
   return (
     <div className="flex flex-col gap-3">
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info.length > 0 ? (
         <ul role="status" className="list-disc pl-5 text-sm">
@@ -718,12 +720,12 @@ export function SectionAcomptes({
                       <span className="font-mono underline underline-offset-2">
                         {d.reference ?? 'Brouillon'}
                       </span>
-                      <Pastille ton={d.state === 'draft' ? 'attention' : 'neutre'}>
+                      <Badge tone={d.state === 'draft' ? 'warning' : 'neutral'}>
                         {d.state === 'draft' ? 'Brouillon à émettre' : 'Émise'}
-                      </Pastille>
-                      {d.resolved ? <Pastille ton="neutre">Marqué traité</Pastille> : null}
+                      </Badge>
+                      {d.resolved ? <Badge tone="neutral">Marqué traité</Badge> : null}
                       {vue.unresolved.includes(d.invoiceId) ? (
-                        <Pastille ton="attention">À traiter sur la facture finale</Pastille>
+                        <Badge tone="warning">À traiter sur la facture finale</Badge>
                       ) : null}
                     </span>
                     <span className="text-xs text-[var(--foreground-muted)]">
@@ -746,7 +748,7 @@ export function SectionAcomptes({
                   {peutPreparer && d.state === 'issued' && !d.resolved ? (
                     <button
                       type="button"
-                      className={BOUTON_PETIT}
+                      className={buttonClasses('secondary', 'sm')}
                       onClick={() => setTraiter(d.invoiceId)}
                     >
                       Marquer traité
@@ -759,7 +761,7 @@ export function SectionAcomptes({
           {peutPreparer && ouvert ? (
             <button
               type="button"
-              className={`${BOUTON_PETIT} self-start`}
+              className={buttonClasses('secondary', 'sm', 'self-start')}
               onClick={() => setAjout(true)}
             >
               + Facture d’acompte
@@ -856,7 +858,7 @@ function FenetreAcompte({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -872,9 +874,9 @@ function FenetreAcompte({
     >
       <div className="flex flex-col gap-4">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field id={`${id}-type`} label="Type de facture" size="lg">

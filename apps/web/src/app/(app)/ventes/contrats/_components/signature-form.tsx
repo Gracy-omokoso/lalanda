@@ -5,6 +5,7 @@
 // copie signée (PDF), puis on déclare la date et les signataires.
 
 import {
+  Alert,
   DatePicker,
   Field,
   FormGrid,
@@ -22,7 +23,6 @@ import {
   type SignatureBody,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, BOUTON_PETIT } from '../../_components/form-ui';
 import { formatJour } from '../../devis/_components/quote-model';
 
 import {
@@ -106,7 +106,7 @@ export function FenetreSignature({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -122,9 +122,9 @@ export function FenetreSignature({
     >
       <div className="flex flex-col gap-4">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field
@@ -211,7 +211,7 @@ export function FenetreSignature({
               </FormGrid>
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-end max-sm:h-11`}
+                className={buttonClasses('secondary', 'sm', 'self-end max-sm:h-11')}
                 aria-label={`Retirer le signataire ${i + 1}`}
                 onClick={() => setSignataires((x) => x.filter((y) => y.cle !== s.cle))}
               >
@@ -221,7 +221,7 @@ export function FenetreSignature({
           ))}
           <button
             type="button"
-            className={`${BOUTON_PETIT} self-start max-sm:h-11`}
+            className={buttonClasses('secondary', 'sm', 'self-start max-sm:h-11')}
             onClick={() => setSignataires((x) => [...x, signataireVide('customer')])}
           >
             + Signataire

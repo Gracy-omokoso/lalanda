@@ -6,12 +6,20 @@
 // ADR-0074 : dates en `DatePicker`, référence et notes en champs de
 // `@lalanda/ui`, largeurs sémantiques. Mêmes champs envoyés (`preparerCommande`).
 
-import { Button, DatePicker, Field, FormGrid, Modal, TextArea, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { salesContractsApi, type SalesOrderView } from '@/lib/api-sales-contracts';
 
-import { Alerte } from '../../_components/form-ui';
 import type { FormulaireDocument } from '../../factures/_components/invoice-model';
 import { ChampsDocument } from '../../contrats/_components/engagement-document-fields';
 import {
@@ -105,9 +113,9 @@ export function FenetreCommande({
     >
       <div className="flex flex-col gap-5">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field

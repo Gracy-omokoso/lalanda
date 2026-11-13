@@ -5,6 +5,8 @@
 // conditions en vigueur sont calculées par le moteur (`termsAt`), jamais par l'écran.
 
 import {
+  Alert,
+  Badge,
   DatePicker,
   Field,
   FormGrid,
@@ -23,7 +25,6 @@ import {
   type SalesContractView,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { formatJour } from '../../devis/_components/quote-model';
 import {
@@ -90,9 +91,9 @@ export function SectionAvenants({
   return (
     <div className="flex flex-col gap-3">
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {items === null ? null : items.length === 0 ? (
         <p className="text-sm text-[var(--foreground-muted)]">Aucun avenant.</p>
@@ -108,11 +109,11 @@ export function SectionAvenants({
               >
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-mono">{x.number}</span>
-                  <Pastille
-                    ton={x.status === 'signed' || x.status === 'cancelled' ? 'neutre' : 'attention'}
+                  <Badge
+                    tone={x.status === 'signed' || x.status === 'cancelled' ? 'neutral' : 'warning'}
                   >
                     {x.statusLabel}
-                  </Pastille>
+                  </Badge>
                 </span>
                 <span className="text-xs text-[var(--foreground-muted)]">
                   {x.purpose === 'renewal' ? 'Renouvellement' : 'Modification'} · effet le{' '}
@@ -126,7 +127,7 @@ export function SectionAvenants({
       {preparer && contrat.actions.addAmendment ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-start`}
+          className={buttonClasses('secondary', 'sm', 'self-start')}
           aria-haspopup="dialog"
           onClick={() => setSaisie('nouveau')}
         >
@@ -222,12 +223,12 @@ function FenetreAvenant({
     <Modal open onClose={onFermer} title={`Avenant ${v.number}`} size="lg" busy={envoi}>
       <div className="flex flex-col gap-4 text-sm">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <p className="flex flex-wrap items-center gap-2">
-          <Pastille ton="neutre">{v.statusLabel}</Pastille>
+          <Badge tone="neutral">{v.statusLabel}</Badge>
           {v.purpose === 'renewal' ? 'Renouvellement exprès' : 'Modification'} · effet le{' '}
           {formatJour(v.effectiveDate)}
         </p>
@@ -303,14 +304,14 @@ function FenetreAvenant({
         ) : null}
         <div className="flex flex-wrap gap-2">
           {preparer && v.actions.edit ? (
-            <button type="button" className={BOUTON_PETIT} onClick={onModifier}>
+            <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onModifier}>
               Modifier
             </button>
           ) : null}
           {preparer && v.actions.submit ? (
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               disabled={envoi}
               onClick={() =>
                 void agir(() => salesContractsApi.submitAmendment(contrat.id, v.id, v.revision))
@@ -331,7 +332,7 @@ function FenetreAvenant({
               </button>
               <button
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 disabled={envoi}
                 onClick={() => setGeste('rejeter')}
               >
@@ -340,12 +341,20 @@ function FenetreAvenant({
             </>
           ) : null}
           {preparer && v.actions.declareSignature ? (
-            <button type="button" className={BOUTON_PETIT} onClick={() => setGeste('signer')}>
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => setGeste('signer')}
+            >
               Déclarer la signature
             </button>
           ) : null}
           {preparer && v.actions.cancel ? (
-            <button type="button" className={BOUTON_DANGER} onClick={() => setGeste('annuler')}>
+            <button
+              type="button"
+              className={buttonClasses('danger', 'sm')}
+              onClick={() => setGeste('annuler')}
+            >
               Annuler l’avenant
             </button>
           ) : null}
@@ -531,7 +540,7 @@ function FenetreSaisieAvenant({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -547,9 +556,9 @@ function FenetreSaisieAvenant({
     >
       <div className="flex flex-col gap-5">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field

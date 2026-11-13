@@ -21,6 +21,8 @@
 // de fenêtre de création rapide depuis une ligne de facture (`nomInitial`).
 
 import {
+  Alert,
+  Badge,
   Button,
   Checkbox,
   ErrorSummary,
@@ -32,6 +34,7 @@ import {
   Select,
   SubmitButton,
   TextInput,
+  buttonClasses,
   resumerErreurs,
   useBlurValidation,
 } from '@lalanda/ui';
@@ -47,7 +50,6 @@ import {
   type TaxGroupList,
 } from '@/lib/api';
 
-import { Alerte, BOUTON, Pastille } from './form-ui';
 import {
   appliquerGroupe,
   bandeauGroupes,
@@ -237,20 +239,21 @@ export function CatalogItemForm({
 
   if (erreurChargement && vue === null) {
     return (
-      <Alerte
+      <Alert
+        tone="danger"
         action={
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void charger()} className={BOUTON}>
+            <button type="button" onClick={() => void charger()} className={buttonClasses()}>
               Réessayer
             </button>
-            <button type="button" onClick={() => onFermer()} className={BOUTON}>
+            <button type="button" onClick={() => onFermer()} className={buttonClasses()}>
               Retour au catalogue
             </button>
           </div>
         }
       >
         <p>{erreurChargement}</p>
-      </Alerte>
+      </Alert>
     );
   }
 
@@ -295,9 +298,9 @@ export function CatalogItemForm({
         {vue ? (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {!vue.active ? (
-              <Pastille ton="attention">Désactivé le {formatDate(vue.deactivatedAt)}</Pastille>
+              <Badge tone="warning">Désactivé le {formatDate(vue.deactivatedAt)}</Badge>
             ) : null}
-            {vue.invoiced ? <Pastille ton="neutre">Déjà facturé</Pastille> : null}
+            {vue.invoiced ? <Badge tone="neutral">Déjà facturé</Badge> : null}
           </div>
         ) : null}
         {lectureSeule ? (
@@ -308,19 +311,20 @@ export function CatalogItemForm({
       </div>
 
       {erreurGroupes ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             <button
               type="button"
               onClick={onRechargerGroupes}
-              className={`${BOUTON} text-[var(--foreground)]`}
+              className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
             >
               Réessayer
             </button>
           }
         >
           <p>Les groupes de taxation n’ont pas pu être chargés : {erreurGroupes}</p>
-        </Alerte>
+        </Alert>
       ) : groupes ? (
         <BandeauGroupes liste={groupes} />
       ) : null}
@@ -338,7 +342,8 @@ export function CatalogItemForm({
         className="flex max-w-3xl flex-col gap-5"
       >
         {erreur ? (
-          <Alerte
+          <Alert
+            tone="danger"
             action={
               perimee || existant ? (
                 <div className="flex flex-wrap gap-2">
@@ -346,7 +351,7 @@ export function CatalogItemForm({
                     <button
                       type="button"
                       onClick={() => void charger()}
-                      className={`${BOUTON} text-[var(--foreground)]`}
+                      className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
                     >
                       Recharger l’article (vos modifications seront perdues)
                     </button>
@@ -354,7 +359,7 @@ export function CatalogItemForm({
                   {existant ? (
                     <Link
                       href={`${base}?fiche=${encodeURIComponent(existant)}`}
-                      className={`${BOUTON} text-[var(--foreground)]`}
+                      className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
                     >
                       Ouvrir l’article existant
                     </Link>
@@ -371,7 +376,7 @@ export function CatalogItemForm({
                 ))}
               </ul>
             ) : null}
-          </Alerte>
+          </Alert>
         ) : null}
 
         <ErrorSummary errors={resumerErreurs(affiches, RESUME)} submitCount={soumissions} />

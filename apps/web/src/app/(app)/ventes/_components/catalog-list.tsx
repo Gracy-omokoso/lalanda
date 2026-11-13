@@ -11,7 +11,16 @@
 // à la française (`1 234,50 CDF TTC`, `40,00 USD HT`) ; aucun n'est converti ni
 // recalculé (ADR-0023 E4).
 
-import { Field, FormGrid, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
+import {
+  Alert,
+  Badge,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,7 +35,6 @@ import {
 } from '@/lib/api';
 
 import { BandeauGroupes, CatalogItemForm } from './catalog-item-form';
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from './form-ui';
 import { useAccesVentes } from './sales-access';
 import {
   actionsLigne,
@@ -258,9 +266,9 @@ export function CatalogList(): React.ReactElement {
         {notice ?? ''}
       </p>
       {erreurAction ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreurAction}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {liste.etat === 'chargement' ? (
@@ -273,19 +281,20 @@ export function CatalogList(): React.ReactElement {
           <p className="mt-1 text-sm text-[var(--foreground-muted)]">{liste.erreur}</p>
         </div>
       ) : liste.etat === 'erreur' ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             <button
               type="button"
               onClick={liste.recharger}
-              className={`${BOUTON} text-[var(--foreground)]`}
+              className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
             >
               Réessayer
             </button>
           }
         >
           <p>{liste.erreur}</p>
-        </Alerte>
+        </Alert>
       ) : liste.items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center sm:p-8">
           {filtre ? (
@@ -316,15 +325,13 @@ export function CatalogList(): React.ReactElement {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="break-words font-medium">{a.name}</span>
                       {!a.active ? (
-                        <Pastille ton="attention">
-                          Désactivé le {formatDate(a.deactivatedAt)}
-                        </Pastille>
+                        <Badge tone="warning">Désactivé le {formatDate(a.deactivatedAt)}</Badge>
                       ) : null}
-                      {a.invoiced ? <Pastille ton="neutre">Déjà facturé</Pastille> : null}
+                      {a.invoiced ? <Badge tone="neutral">Déjà facturé</Badge> : null}
                       {!a.taxGroupAvailable ? (
-                        <Pastille ton="attention">Groupe {a.taxGroup} plus proposé</Pastille>
+                        <Badge tone="warning">Groupe {a.taxGroup} plus proposé</Badge>
                       ) : null}
-                      {a.outOfScope ? <Pastille ton="neutre">Hors champ</Pastille> : null}
+                      {a.outOfScope ? <Badge tone="neutral">Hors champ</Badge> : null}
                     </div>
                     <p className="fig text-sm">
                       {libellePrix(a)}
@@ -360,14 +367,14 @@ export function CatalogList(): React.ReactElement {
                           type="button"
                           disabled={occupe === a.id}
                           onClick={() => void agir(a, 'supprimer')}
-                          className={BOUTON_DANGER}
+                          className={buttonClasses('danger', 'sm')}
                         >
                           Supprimer
                         </button>
                         <button
                           type="button"
                           onClick={() => setASupprimer(null)}
-                          className={BOUTON_PETIT}
+                          className={buttonClasses('secondary', 'sm')}
                         >
                           Annuler
                         </button>
@@ -383,7 +390,11 @@ export function CatalogList(): React.ReactElement {
                             else if (act === 'supprimer') setASupprimer(a.id);
                             else void agir(a, act);
                           }}
-                          className={act === 'supprimer' ? BOUTON_DANGER : BOUTON_PETIT}
+                          className={
+                            act === 'supprimer'
+                              ? buttonClasses('danger', 'sm')
+                              : buttonClasses('secondary', 'sm')
+                          }
                           aria-label={`${LIBELLES_ACTIONS[act]} — ${a.name}`}
                         >
                           {LIBELLES_ACTIONS[act]}
@@ -396,16 +407,16 @@ export function CatalogList(): React.ReactElement {
             })}
           </ul>
           {liste.erreurSuite ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{liste.erreurSuite}</p>
-            </Alerte>
+            </Alert>
           ) : null}
           {liste.suivante ? (
             <button
               type="button"
               onClick={liste.chargerSuite}
               disabled={liste.chargementSuite}
-              className={`${BOUTON} self-center`}
+              className={buttonClasses('secondary', 'md', 'self-center')}
             >
               {liste.chargementSuite ? 'Chargement…' : 'Afficher plus d’articles'}
             </button>

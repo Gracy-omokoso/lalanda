@@ -12,6 +12,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  Alert,
+  Badge,
   Field,
   FormGrid,
   SegmentedControl,
@@ -20,6 +22,7 @@ import {
   SubmitButton,
   Switch,
   TextInput,
+  buttonClasses,
   estRaccourciEnregistrer,
   useUnsavedChangesGuard,
 } from '@lalanda/ui';
@@ -36,7 +39,6 @@ import {
 } from '@/lib/api';
 
 import { ChoixClientDocument } from '../../_components/client-picker';
-import { Alerte, BOUTON, BOUTON_DANGER, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import {
   erreursFormulaire,
@@ -365,7 +367,7 @@ export function InvoiceEditor({
         {entete && vue ? (
           <p className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-mono">{entete.reference}</span>
-            <Pastille ton="neutre">{STATUS_LABELS[vue.status]}</Pastille>
+            <Badge tone="neutral">{STATUS_LABELS[vue.status]}</Badge>
             {vue.creditNote ? (
               <span className="text-xs text-[var(--foreground-muted)]">
                 Avoir · {NATURE_LABELS[vue.creditNote.nature].court}
@@ -391,12 +393,13 @@ export function InvoiceEditor({
         {notice ?? ''}
       </p>
       {erreur ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             perimee ? (
               <button
                 type="button"
-                className={`${BOUTON} text-[var(--foreground)]`}
+                className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
                 onClick={() => void relire()}
               >
                 Recharger le document
@@ -412,7 +415,7 @@ export function InvoiceEditor({
               ))}
             </ul>
           ) : null}
-        </Alerte>
+        </Alert>
       ) : null}
 
       <form
@@ -639,7 +642,7 @@ export function InvoiceEditor({
             {actions.includes('emettre') ? (
               <button
                 type="button"
-                className={`${BOUTON} border-[var(--accent)] font-semibold`}
+                className={buttonClasses('secondary', 'md', 'border-[var(--accent)] font-semibold')}
                 disabled={modifie || envoi || !vue.readiness.ready}
                 onClick={() => setDialogue('emettre')}
               >
@@ -649,7 +652,7 @@ export function InvoiceEditor({
             {actions.includes('normaliser') ? (
               <button
                 type="button"
-                className={`${BOUTON} border-[var(--accent)] font-semibold`}
+                className={buttonClasses('secondary', 'md', 'border-[var(--accent)] font-semibold')}
                 disabled={modifie || envoi || !vue.readiness.ready}
                 onClick={() => setDialogue('normaliser')}
               >
@@ -666,20 +669,24 @@ export function InvoiceEditor({
                   <span className="text-sm">Supprimer ce brouillon définitivement ?</span>
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     disabled={envoi}
                     onClick={() => void supprimer()}
                   >
                     Supprimer
                   </button>
-                  <button type="button" className={BOUTON} onClick={() => setDialogue(null)}>
+                  <button
+                    type="button"
+                    className={buttonClasses()}
+                    onClick={() => setDialogue(null)}
+                  >
                     Annuler
                   </button>
                 </div>
               ) : (
                 <button
                   type="button"
-                  className={BOUTON_DANGER}
+                  className={buttonClasses('danger', 'sm')}
                   disabled={envoi}
                   onClick={() => setDialogue('supprimer')}
                 >

@@ -12,6 +12,8 @@
 // propose de recharger — jamais d'écrasement silencieux.
 
 import {
+  Alert,
+  Badge,
   Button,
   ChoiceCards,
   ErrorSummary,
@@ -22,6 +24,7 @@ import {
   SubmitButton,
   TextArea,
   TextInput,
+  buttonClasses,
   resumerErreurs,
   useBlurValidation,
 } from '@lalanda/ui';
@@ -31,7 +34,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { api, type CustomerView } from '@/lib/api';
 
-import { Alerte, BOUTON, Pastille } from './form-ui';
 import {
   type ChampClient,
   CUSTOMER_TYPES,
@@ -213,20 +215,21 @@ export function CustomerForm({
   if (erreurChargement && vue === null) {
     return (
       <div className="flex flex-col gap-4">
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void charger()} className={BOUTON}>
+              <button type="button" onClick={() => void charger()} className={buttonClasses()}>
                 Réessayer
               </button>
-              <button type="button" onClick={() => onFermer()} className={BOUTON}>
+              <button type="button" onClick={() => onFermer()} className={buttonClasses()}>
                 Retour à la liste
               </button>
             </div>
           }
         >
           <p>{erreurChargement}</p>
-        </Alerte>
+        </Alert>
       </div>
     );
   }
@@ -260,9 +263,9 @@ export function CustomerForm({
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--foreground-muted)]">
             <span>{libelleTypeClient(vue.type)}</span>
             {!vue.active ? (
-              <Pastille ton="attention">Désactivé le {formatDate(vue.deactivatedAt)}</Pastille>
+              <Badge tone="warning">Désactivé le {formatDate(vue.deactivatedAt)}</Badge>
             ) : null}
-            {vue.invoiced ? <Pastille ton="neutre">Déjà facturé</Pastille> : null}
+            {vue.invoiced ? <Badge tone="neutral">Déjà facturé</Badge> : null}
           </div>
         ) : null}
         {lectureSeule ? (
@@ -279,7 +282,8 @@ export function CustomerForm({
         className="flex max-w-3xl flex-col gap-5"
       >
         {erreur ? (
-          <Alerte
+          <Alert
+            tone="danger"
             action={
               perimee || existant ? (
                 <div className="flex flex-wrap gap-2">
@@ -287,7 +291,7 @@ export function CustomerForm({
                     <button
                       type="button"
                       onClick={() => void charger()}
-                      className={`${BOUTON} text-[var(--foreground)]`}
+                      className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
                     >
                       Recharger la fiche (vos modifications seront perdues)
                     </button>
@@ -295,7 +299,7 @@ export function CustomerForm({
                   {existant ? (
                     <Link
                       href={`${base}?fiche=${encodeURIComponent(existant)}`}
-                      className={`${BOUTON} text-[var(--foreground)]`}
+                      className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
                     >
                       Ouvrir la fiche existante
                     </Link>
@@ -312,7 +316,7 @@ export function CustomerForm({
                 ))}
               </ul>
             ) : null}
-          </Alerte>
+          </Alert>
         ) : null}
 
         <ErrorSummary

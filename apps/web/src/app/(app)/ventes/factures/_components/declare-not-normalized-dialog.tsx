@@ -15,14 +15,13 @@
 // ADR-0074 : motif en `Field` + `TextArea` (aide, compteur et erreur reliés).
 // Même lecture du motif (`lireMotifDeclaration`), même requête.
 
-import { Field, FormGrid, TextArea } from '@lalanda/ui';
+import { Alert, Field, FormGrid, TextArea, buttonClasses } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api, type InvoiceView } from '@/lib/api';
 
 import { avecReauth } from '../../../organisation/_components/fiscal-model';
 import { useReauthDialog } from '../../../organisation/_components/reauth-dialog';
-import { Alerte, BOUTON } from '../../_components/form-ui';
 
 import { Dialogue } from './dialog-ui';
 import { lireMotifDeclaration, messageFacture, MOTIF_MAX, MOTIF_MIN } from './invoice-model';
@@ -122,18 +121,18 @@ export function DeclareNotNormalizedDialog({
         </FormGrid>
 
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
             type="submit"
-            className={`${BOUTON} border-[var(--danger)] font-semibold`}
+            className={buttonClasses('secondary', 'md', 'border-[var(--danger)] font-semibold')}
             disabled={envoi}
           >
             {envoi ? 'Déclaration…' : 'Déclarer non normalisée'}

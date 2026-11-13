@@ -7,7 +7,7 @@
 // la bibliothèque ; client, lignes et clauses viennent de leurs blocs déjà
 // migrés. Mêmes champs envoyés, mêmes validations.
 
-import { Button, Field, FormGrid, Modal, TextInput } from '@lalanda/ui';
+import { Alert, Button, Field, FormGrid, Modal, TextInput } from '@lalanda/ui';
 import { useId, useMemo, useState } from 'react';
 
 import {
@@ -16,7 +16,6 @@ import {
   type SalesContractView,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte } from '../../_components/form-ui';
 import {
   preparerDocument,
   type FormulaireDocument,
@@ -144,9 +143,9 @@ export function FenetreContrat({
     >
       <div className="flex flex-col gap-6">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field

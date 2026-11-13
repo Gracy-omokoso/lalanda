@@ -19,13 +19,21 @@
 // ADR-0074 : choix du taux en cartes, date du taux en `DatePicker`, taux saisi à
 // la largeur d'un taux (texte transmis tel quel ; le serveur le contrôle).
 
-import { ChoiceCards, DatePicker, Field, FormGrid, TextInput } from '@lalanda/ui';
+import {
+  Alert,
+  Badge,
+  ChoiceCards,
+  DatePicker,
+  Field,
+  FormGrid,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api, type ExchangeRateReference, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON, Pastille } from '../../_components/form-ui';
 import { formatDate } from '../../_components/sales-model';
 
 import { AmountsPanel } from './amounts-panel';
@@ -171,7 +179,7 @@ export function NormalizeDialog({
               </>
             )}
           </span>
-          {resultat.environment === 'test' ? <Pastille ton="attention">Mode test</Pastille> : null}
+          {resultat.environment === 'test' ? <Badge tone="warning">Mode test</Badge> : null}
         </p>
         {relu ? (
           <p className="text-sm text-[var(--foreground-muted)]">
@@ -182,7 +190,7 @@ export function NormalizeDialog({
         <NormalizationStatus vue={resultat} onChange={setResultat} />
         <AmountsPanel vue={resultat} />
         <div className="flex justify-end">
-          <button type="button" className={BOUTON} onClick={() => onNormalise(resultat)}>
+          <button type="button" className={buttonClasses()} onClick={() => onNormalise(resultat)}>
             Fermer
           </button>
         </div>
@@ -194,7 +202,7 @@ export function NormalizeDialog({
     return (
       <Dialogue titre="Transmission à la DGI…" onFermer={() => undefined}>
         <div aria-live="polite" className="flex flex-col gap-3 text-sm">
-          {environnementTest ? <Pastille ton="attention">Mode test</Pastille> : null}
+          {environnementTest ? <Badge tone="warning">Mode test</Badge> : null}
           <p>
             Lalanda fige le document, l’envoie à la DGI, compare les montants qu’elle calcule aux
             siens, puis demande sa confirmation. Cela prend d’habitude moins d’une seconde, une
@@ -286,7 +294,7 @@ export function NormalizeDialog({
               ) : null}
             </>
           ) : (
-            <Alerte>
+            <Alert tone="danger">
               <p>
                 {etatRef === 'indisponible'
                   ? 'Le taux officiel du jour n’est pas disponible.'
@@ -297,7 +305,7 @@ export function NormalizeDialog({
               <Link href="/organisation/fiscalite" className="underline">
                 Ouvrir Organisation › Fiscalité
               </Link>
-            </Alerte>
+            </Alert>
           )}
         </fieldset>
       ) : null}
@@ -308,7 +316,7 @@ export function NormalizeDialog({
       </p>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur.message}</p>
           {erreur.details.length > 0 ? (
             <ul className="list-disc pl-5">
@@ -322,16 +330,16 @@ export function NormalizeDialog({
               Ouvrir Organisation › Fiscalité
             </Link>
           ) : null}
-        </Alerte>
+        </Alert>
       ) : null}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+        <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
           Annuler
         </button>
         <button
           type="button"
-          className={`${BOUTON} border-[var(--accent)] font-semibold`}
+          className={buttonClasses('secondary', 'md', 'border-[var(--accent)] font-semibold')}
           onClick={() => void normaliser()}
           disabled={envoi || (besoinTaux && etatRef !== 'pret')}
         >

@@ -6,6 +6,7 @@
 // forme ; les montants viennent de l'API (moteur) après chaque enregistrement.
 
 import {
+  Alert,
   DatePicker,
   Field,
   Form,
@@ -22,7 +23,6 @@ import { api, type InvoiceView, type TaxGroupList } from '@/lib/api';
 import { crmApi, type QuoteView } from '@/lib/api-crm';
 
 import { ChoixClientDocument } from '../../_components/client-picker';
-import { Alerte } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { InvoiceLines } from '../../factures/_components/invoice-lines';
@@ -129,9 +129,9 @@ export function QuoteEditor({
       className="flex flex-col gap-6"
     >
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <FormGrid>
         <Field id="devis-titre" label="Objet du devis" size="lg" error={erreurs['title']}>

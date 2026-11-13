@@ -4,11 +4,11 @@
 // la série, contenu figé. Action irréversible : la boîte dit sa portée avant
 // de l'exécuter (docs/04, conventions). `sales.invoice` seulement.
 
+import { Alert, buttonClasses } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 
 import { Dialogue } from './dialog-ui';
@@ -56,7 +56,7 @@ export function IssueDialog({
         modifié ni supprimé. Une erreur se corrigera par un avoir.
       </p>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur.message}</p>
           {erreur.details.length > 0 ? (
             <ul className="list-disc pl-5">
@@ -65,15 +65,15 @@ export function IssueDialog({
               ))}
             </ul>
           ) : null}
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+        <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
           Annuler
         </button>
         <button
           type="button"
-          className={`${BOUTON} border-[var(--accent)] font-semibold`}
+          className={buttonClasses('secondary', 'md', 'border-[var(--accent)] font-semibold')}
           onClick={() => void emettre()}
           disabled={envoi}
         >

@@ -4,7 +4,7 @@
 // d'onglet de plus. « + Contrat » (`sales.contract`) et « Réglages »
 // (`sales.contract.approve`) ouvrent une fenêtre modale. Cartes entièrement cliquables.
 
-import { buttonClasses, Select, TextInput } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses, Select, TextInput } from '@lalanda/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,7 +17,6 @@ import {
   type SalesContractSummary,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -107,7 +106,7 @@ export function ContractList(): React.ReactElement {
           {approuver ? (
             <button
               type="button"
-              className={BOUTON_PETIT}
+              className={buttonClasses('secondary', 'sm')}
               aria-haspopup="dialog"
               onClick={() => setFenetre('reglages')}
             >
@@ -153,9 +152,9 @@ export function ContractList(): React.ReactElement {
         />
       </div>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {items === null ? (
         erreur ? null : (
@@ -178,10 +177,14 @@ export function ContractList(): React.ReactElement {
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-semibold">{c.number}</span>
                   <span className="text-xs text-[var(--foreground-muted)]">v{c.version}</span>
-                  <Pastille ton={tonContrat(c.status, c.derivedStatus)}>
+                  <Badge
+                    tone={
+                      tonContrat(c.status, c.derivedStatus) === 'attention' ? 'warning' : 'neutral'
+                    }
+                  >
                     {libelleStatutContrat(c)}
-                  </Pastille>
-                  <Pastille ton="neutre">{FACTURATION_LABELS[c.billingKind]}</Pastille>
+                  </Badge>
+                  <Badge tone="neutral">{FACTURATION_LABELS[c.billingKind]}</Badge>
                 </span>
                 <span className="text-sm font-medium">{c.title}</span>
                 <span className="text-sm">{c.customerName ?? 'Client'}</span>
@@ -199,7 +202,11 @@ export function ContractList(): React.ReactElement {
         </ul>
       )}
       {suivante ? (
-        <button type="button" onClick={() => void plus()} className={`${BOUTON} self-center`}>
+        <button
+          type="button"
+          onClick={() => void plus()}
+          className={buttonClasses('secondary', 'md', 'self-center')}
+        >
           Afficher plus de contrats
         </button>
       ) : null}

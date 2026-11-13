@@ -7,7 +7,7 @@
 // pas modifié. Chaque geste ouvre une fenêtre modale ; une commande déjà créée pour ce
 // devis est signalée et ouverte (`409 ORDER_EXISTS_FOR_QUOTE`).
 
-import { DatePicker, Field, FormGrid, Modal, TextInput, buttonClasses } from '@lalanda/ui';
+import { Alert, DatePicker, Field, FormGrid, Modal, TextInput, buttonClasses } from '@lalanda/ui';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 
@@ -15,7 +15,6 @@ import type { OrgAction } from '@/lib/api';
 import type { QuoteView } from '@/lib/api-crm';
 import { salesContractsApi } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON } from '../../../_components/form-ui';
 import { ChampsClauses } from '../../../contrats/_components/clauses-fields';
 import {
   COMMANDES_BASE,
@@ -50,7 +49,7 @@ export function QuoteEngagementBox({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={BOUTON}
+          className={buttonClasses()}
           aria-haspopup="dialog"
           onClick={() => setFenetre('commande')}
         >
@@ -58,7 +57,7 @@ export function QuoteEngagementBox({
         </button>
         <button
           type="button"
-          className={BOUTON}
+          className={buttonClasses()}
           aria-haspopup="dialog"
           onClick={() => setFenetre('contrat')}
         >
@@ -120,7 +119,7 @@ function FenetreVersCommande({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -136,12 +135,13 @@ function FenetreVersCommande({
     >
       <div className="flex flex-col gap-4">
         {erreur ? (
-          <Alerte
+          <Alert
+            tone="danger"
             action={
               existante ? (
                 <button
                   type="button"
-                  className={BOUTON}
+                  className={buttonClasses()}
                   onClick={() => router.push(`${COMMANDES_BASE}/${encodeURIComponent(existante)}`)}
                 >
                   Ouvrir la commande existante
@@ -150,7 +150,7 @@ function FenetreVersCommande({
             }
           >
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {quote.conversion?.alive ? (
           <p className="text-sm">
@@ -235,7 +235,7 @@ function FenetreVersContrat({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -251,9 +251,9 @@ function FenetreVersContrat({
     >
       <div className="flex flex-col gap-5">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           <Field

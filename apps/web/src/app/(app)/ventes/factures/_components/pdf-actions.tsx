@@ -5,11 +5,11 @@
 // une copie numérotée et journalisée d'une facture finale ; l'original se
 // retélécharge à l'identique autant que voulu.
 
+import { Alert, buttonClasses } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 
 import { enteteDocument, impressionsDocument, messageFacture } from './invoice-model';
@@ -62,7 +62,7 @@ export function PdfActions({ vue }: { vue: InvoiceView }): React.ReactElement {
       <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
-          className={BOUTON}
+          className={buttonClasses()}
           disabled={envoi !== null}
           onClick={() => void lancer('pdf')}
         >
@@ -71,7 +71,7 @@ export function PdfActions({ vue }: { vue: InvoiceView }): React.ReactElement {
         {libelles.duplicata ? (
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses()}
             disabled={envoi !== null}
             onClick={() => void lancer('duplicata')}
           >
@@ -85,9 +85,9 @@ export function PdfActions({ vue }: { vue: InvoiceView }): React.ReactElement {
         </p>
       ) : null}
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
     </div>
   );

@@ -3,7 +3,7 @@
 // Liste des commandes clients — ADR-0050 § 9, lot V7. Lecture `sales.read` ; « + Commande »
 // (`sales.contract`) ouvre une fenêtre modale. Cartes entièrement cliquables.
 
-import { buttonClasses, Select, TextInput } from '@lalanda/ui';
+import { Alert, Badge, buttonClasses, Select, TextInput } from '@lalanda/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -15,7 +15,6 @@ import {
   type SalesOrderSummary,
 } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -118,9 +117,9 @@ export function OrderList(): React.ReactElement {
         />
       </div>
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {items === null ? (
         erreur ? null : (
@@ -142,11 +141,17 @@ export function OrderList(): React.ReactElement {
               >
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-sm font-semibold">{c.number}</span>
-                  <Pastille ton={tonCommande(c.status, c.invoicingStatus)}>
+                  <Badge
+                    tone={
+                      tonCommande(c.status, c.invoicingStatus) === 'attention'
+                        ? 'warning'
+                        : 'neutral'
+                    }
+                  >
                     {c.statusLabel}
-                  </Pastille>
+                  </Badge>
                   {c.invoicingLabel && c.status !== 'draft' ? (
-                    <Pastille ton="neutre">{c.invoicingLabel}</Pastille>
+                    <Badge tone="neutral">{c.invoicingLabel}</Badge>
                   ) : null}
                 </span>
                 <span className="text-sm">{c.customerName ?? 'Client'}</span>
@@ -163,7 +168,11 @@ export function OrderList(): React.ReactElement {
         </ul>
       )}
       {suivante ? (
-        <button type="button" onClick={() => void plus()} className={`${BOUTON} self-center`}>
+        <button
+          type="button"
+          onClick={() => void plus()}
+          className={buttonClasses('secondary', 'md', 'self-center')}
+        >
           Afficher plus de commandes
         </button>
       ) : null}

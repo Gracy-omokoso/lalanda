@@ -7,12 +7,10 @@
 // ADR-0074 : délais à la largeur d'un nombre de jours, réglages en interrupteurs.
 
 import { SALES_CONTRACT_LIMITS as L } from '@lalanda/shared/sales-contracts';
-import { Field, FormGrid, Modal, Switch, TextInput, buttonClasses } from '@lalanda/ui';
+import { Alert, Field, FormGrid, Modal, Switch, TextInput, buttonClasses } from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { salesContractsApi, type SalesContractSettingsView } from '@/lib/api-sales-contracts';
-
-import { Alerte, BOUTON } from '../../_components/form-ui';
 
 import { messageEngagement } from './contract-model';
 
@@ -85,7 +83,7 @@ export function FenetreReglages({ onFermer }: { onFermer: () => void }): React.R
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -101,9 +99,9 @@ export function FenetreReglages({ onFermer }: { onFermer: () => void }): React.R
     >
       <div className="flex flex-col gap-4">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <FormGrid>
           {(

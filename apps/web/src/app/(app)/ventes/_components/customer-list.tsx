@@ -11,6 +11,8 @@
 // sinon, seule la désactivation le retire des propositions.
 
 import {
+  Alert,
+  Badge,
   Field,
   FormGrid,
   Modal,
@@ -26,7 +28,6 @@ import { useCallback, useState } from 'react';
 import { api, type CustomerType, type CustomerView, type SalesStatusFilter } from '@/lib/api';
 
 import { CustomerForm } from './customer-form';
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from './form-ui';
 import { useAccesVentes } from './sales-access';
 import {
   actionsLigne,
@@ -205,9 +206,9 @@ export function CustomerList(): React.ReactElement {
         {notice ?? ''}
       </p>
       {erreurAction ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreurAction}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       {liste.etat === 'chargement' ? (
@@ -220,19 +221,20 @@ export function CustomerList(): React.ReactElement {
           <p className="mt-1 text-sm text-[var(--foreground-muted)]">{liste.erreur}</p>
         </div>
       ) : liste.etat === 'erreur' ? (
-        <Alerte
+        <Alert
+          tone="danger"
           action={
             <button
               type="button"
               onClick={liste.recharger}
-              className={`${BOUTON} text-[var(--foreground)]`}
+              className={buttonClasses('secondary', 'md', 'text-[var(--foreground)]')}
             >
               Réessayer
             </button>
           }
         >
           <p>{liste.erreur}</p>
-        </Alerte>
+        </Alert>
       ) : liste.items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center sm:p-8">
           {filtre ? (
@@ -261,11 +263,9 @@ export function CustomerList(): React.ReactElement {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="break-words font-medium">{c.name}</span>
                       {!c.active ? (
-                        <Pastille ton="attention">
-                          Désactivé le {formatDate(c.deactivatedAt)}
-                        </Pastille>
+                        <Badge tone="warning">Désactivé le {formatDate(c.deactivatedAt)}</Badge>
                       ) : null}
-                      {c.invoiced ? <Pastille ton="neutre">Déjà facturé</Pastille> : null}
+                      {c.invoiced ? <Badge tone="neutral">Déjà facturé</Badge> : null}
                     </div>
                     <p className="text-xs text-[var(--foreground-muted)]">
                       {c.typeLabel}
@@ -294,14 +294,14 @@ export function CustomerList(): React.ReactElement {
                           type="button"
                           disabled={occupe === c.id}
                           onClick={() => void agir(c, 'supprimer')}
-                          className={BOUTON_DANGER}
+                          className={buttonClasses('danger', 'sm')}
                         >
                           Supprimer
                         </button>
                         <button
                           type="button"
                           onClick={() => setASupprimer(null)}
-                          className={BOUTON_PETIT}
+                          className={buttonClasses('secondary', 'sm')}
                         >
                           Annuler
                         </button>
@@ -317,7 +317,11 @@ export function CustomerList(): React.ReactElement {
                             else if (a === 'supprimer') setASupprimer(c.id);
                             else void agir(c, a);
                           }}
-                          className={a === 'supprimer' ? BOUTON_DANGER : BOUTON_PETIT}
+                          className={
+                            a === 'supprimer'
+                              ? buttonClasses('danger', 'sm')
+                              : buttonClasses('secondary', 'sm')
+                          }
                           aria-label={`${LIBELLES_ACTIONS[a]} — ${c.name}`}
                         >
                           {LIBELLES_ACTIONS[a]}
@@ -330,16 +334,16 @@ export function CustomerList(): React.ReactElement {
             })}
           </ul>
           {liste.erreurSuite ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{liste.erreurSuite}</p>
-            </Alerte>
+            </Alert>
           ) : null}
           {liste.suivante ? (
             <button
               type="button"
               onClick={liste.chargerSuite}
               disabled={liste.chargementSuite}
-              className={`${BOUTON} self-center`}
+              className={buttonClasses('secondary', 'md', 'self-center')}
             >
               {liste.chargementSuite ? 'Chargement…' : 'Afficher plus de clients'}
             </button>

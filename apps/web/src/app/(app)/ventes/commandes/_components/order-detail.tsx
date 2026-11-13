@@ -4,14 +4,21 @@
 // acomptes, factures liées, pièce du client. Préparer une facture crée un BROUILLON et
 // l'ouvre : « Émettre » reste dans l'écran des factures (`sales.invoice`).
 
-import { Field, Modal, SegmentedControl, TextInput, buttonClasses } from '@lalanda/ui';
+import {
+  Alert,
+  Badge,
+  Field,
+  Modal,
+  SegmentedControl,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { salesContractsApi, type SalesOrderView } from '@/lib/api-sales-contracts';
 
-import { Alerte, BOUTON, BOUTON_DANGER, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatJour } from '../../devis/_components/quote-model';
@@ -83,9 +90,9 @@ export function OrderDetail({ orderId }: { orderId: string }): React.ReactElemen
 
   if (vue === null) {
     return erreur ? (
-      <Alerte>
+      <Alert tone="danger">
         <p>{erreur}</p>
-      </Alerte>
+      </Alert>
     ) : (
       <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
         Chargement de la commande…
@@ -108,9 +115,15 @@ export function OrderDetail({ orderId }: { orderId: string }): React.ReactElemen
         </p>
         <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
           <span className="font-mono">{vue.number}</span>
-          <Pastille ton={tonCommande(vue.status, vue.invoicingStatus)}>{vue.statusLabel}</Pastille>
+          <Badge
+            tone={
+              tonCommande(vue.status, vue.invoicingStatus) === 'attention' ? 'warning' : 'neutral'
+            }
+          >
+            {vue.statusLabel}
+          </Badge>
           {vue.invoicing && vue.status !== 'draft' ? (
-            <Pastille ton="neutre">{FACTURATION_COMMANDE_LABELS[vue.invoicing.status]}</Pastille>
+            <Badge tone="neutral">{FACTURATION_COMMANDE_LABELS[vue.invoicing.status]}</Badge>
           ) : null}
         </h2>
         <p className="text-sm">
@@ -144,9 +157,9 @@ export function OrderDetail({ orderId }: { orderId: string }): React.ReactElemen
       </header>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {info.length > 0 ? (
         <ul role="status" className="list-disc pl-5 text-sm">
@@ -165,7 +178,11 @@ export function OrderDetail({ orderId }: { orderId: string }): React.ReactElemen
 
       <div className="flex flex-wrap gap-2">
         {preparer && a.edit ? (
-          <button type="button" className={BOUTON_PETIT} onClick={() => setFenetre('modifier')}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => setFenetre('modifier')}
+          >
             Modifier le brouillon
           </button>
         ) : null}
@@ -189,17 +206,29 @@ export function OrderDetail({ orderId }: { orderId: string }): React.ReactElemen
           </button>
         ) : null}
         {preparer && a.close ? (
-          <button type="button" className={BOUTON_PETIT} onClick={() => setFenetre('clore')}>
+          <button
+            type="button"
+            className={buttonClasses('secondary', 'sm')}
+            onClick={() => setFenetre('clore')}
+          >
             {a.closeSuggested ? 'Clore (tout est facturé)' : 'Clore'}
           </button>
         ) : null}
         {preparer && a.cancel ? (
-          <button type="button" className={BOUTON_DANGER} onClick={() => setFenetre('annuler')}>
+          <button
+            type="button"
+            className={buttonClasses('danger', 'sm')}
+            onClick={() => setFenetre('annuler')}
+          >
             Annuler la commande
           </button>
         ) : null}
         {preparer && a.delete ? (
-          <button type="button" className={BOUTON_DANGER} onClick={() => setFenetre('supprimer')}>
+          <button
+            type="button"
+            className={buttonClasses('danger', 'sm')}
+            onClick={() => setFenetre('supprimer')}
+          >
             Supprimer le brouillon
           </button>
         ) : null}
@@ -471,7 +500,7 @@ function FenetreFacturer({
       busy={envoi}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className={BOUTON} onClick={onFermer} disabled={envoi}>
+          <button type="button" className={buttonClasses()} onClick={onFermer} disabled={envoi}>
             Annuler
           </button>
           <button
@@ -487,9 +516,9 @@ function FenetreFacturer({
     >
       <div className="flex flex-col gap-4">
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         {/* ADR-0074 : type en segments, quantités à la largeur d'une quantité. */}
         {champs['lines'] ? <p className="text-sm text-[var(--danger)]">{champs['lines']}</p> : null}
