@@ -5,6 +5,7 @@
 // l'estimation de gestion. Lecture `assets.read`, écriture `assets.manage`.
 
 import {
+  Alert,
   Badge,
   Field,
   FormGrid,
@@ -20,7 +21,6 @@ import { useEffect, useId, useState } from 'react';
 import { assetsApi, type AssetCategoryView, type AssetSettingsView } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formulaireReglages, preparerReglages, type FormulaireReglages } from './echeances-model';
 import { lire, messageEquipements, peutGererEquipements, type Lecture } from './equipements-model';
@@ -61,9 +61,9 @@ export function Reglages(): React.ReactElement {
         sousTitre="Les catégories rangent le registre ; elles ne portent aucune durée d’amortissement."
       />
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <div className="grid gap-5 lg:grid-cols-2">
         <Panneau
@@ -102,7 +102,7 @@ export function Reglages(): React.ReactElement {
                     <>
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         aria-haspopup="dialog"
                         onClick={() => setEdition(c)}
                       >
@@ -110,7 +110,7 @@ export function Reglages(): React.ReactElement {
                       </button>
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
+                        className={buttonClasses('secondary', 'sm')}
                         onClick={() => void basculer(c)}
                       >
                         {c.active ? 'Désactiver' : 'Réactiver'}
@@ -196,9 +196,9 @@ function DialogueCategorie({
           />
         </Field>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
           Enregistrer
@@ -300,9 +300,9 @@ function PanneauReglages({ gerer }: { gerer: boolean }): React.ReactElement {
                 {message.texte}
               </p>
             ) : (
-              <Alerte>
+              <Alert tone="danger">
                 <p>{message.texte}</p>
-              </Alerte>
+              </Alert>
             )
           ) : null}
           {gerer ? (

@@ -5,7 +5,7 @@
 // en fenêtre modale (`assets.manage`, `?nouveau=1`), export du registre si
 // `report.export`. Les coûts n'apparaissent qu'aux rôles qui les voient.
 
-import { Badge, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
+import { Alert, Badge, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
 import { Download, Laptop, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -14,7 +14,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { assetsApi, type AssetView } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { EquipementFormulaire } from './equipement-formulaire';
 import {
@@ -165,7 +164,7 @@ export function Registre(): React.ReactElement {
               <button
                 key={f.valeur}
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-pressed={filtres.statut === f.valeur}
                 onClick={() => setFiltres({ ...filtres, statut: f.valeur })}
               >
@@ -177,9 +176,9 @@ export function Registre(): React.ReactElement {
       </Bandeau>
 
       {erreurExport ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreurExport}</p>
-        </Alerte>
+        </Alert>
       ) : null}
 
       <Modal
@@ -254,7 +253,7 @@ export function Registre(): React.ReactElement {
       {suivante ? (
         <button
           type="button"
-          className={`${BOUTON_PETIT} self-center`}
+          className={buttonClasses('secondary', 'sm', 'self-center')}
           onClick={() => charger(filtres, suivante)}
         >
           Afficher plus d’équipements

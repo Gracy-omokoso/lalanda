@@ -11,6 +11,7 @@
 // la bibliothèque).
 
 import {
+  Alert,
   Badge,
   DatePicker,
   EntityPicker,
@@ -39,7 +40,6 @@ import {
 import { documentsApi, type LibraryDocumentView } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_COUVERTURE,
@@ -141,9 +141,9 @@ export function PanneauMaintenance({
       }
     >
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {lecture === null ? (
         <Chargement />
@@ -188,13 +188,17 @@ export function PanneauMaintenance({
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setAFaire(m)}
                   >
                     Marquer faite
                   </button>
-                  <button type="button" className={BOUTON_DANGER} onClick={() => void annuler(m)}>
+                  <button
+                    type="button"
+                    className={buttonClasses('danger', 'sm')}
+                    onClick={() => void annuler(m)}
+                  >
                     Annuler
                   </button>
                 </div>
@@ -392,9 +396,9 @@ function DialogueMaintenance({
           </Field>
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
           Enregistrer
@@ -495,9 +499,9 @@ function DialogueFait({
           </Field>
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
           Enregistrer
@@ -580,9 +584,9 @@ export function PanneauCouvertures({
       }
     >
       {erreur && aSupprimer === null ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       {lecture === null ? (
         <Chargement />
@@ -624,7 +628,7 @@ export function PanneauCouvertures({
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className={BOUTON_PETIT}
+                    className={buttonClasses('secondary', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => setEdition(c)}
                   >
@@ -632,7 +636,7 @@ export function PanneauCouvertures({
                   </button>
                   <button
                     type="button"
-                    className={BOUTON_DANGER}
+                    className={buttonClasses('danger', 'sm')}
                     aria-haspopup="dialog"
                     onClick={() => {
                       setErreur(null);
@@ -671,7 +675,11 @@ export function PanneauCouvertures({
           size="sm"
           footer={
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" className={BOUTON_PETIT} onClick={() => setASupprimer(null)}>
+              <button
+                type="button"
+                className={buttonClasses('secondary', 'sm')}
+                onClick={() => setASupprimer(null)}
+              >
                 Retour
               </button>
               <button
@@ -690,9 +698,9 @@ export function PanneauCouvertures({
             disparaissent.
           </p>
           {erreur ? (
-            <Alerte>
+            <Alert tone="danger">
               <p>{erreur}</p>
-            </Alerte>
+            </Alert>
           ) : null}
         </Modal>
       ) : null}
@@ -893,9 +901,9 @@ function DialogueCouverture({
           ) : null}
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
         <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
           Enregistrer

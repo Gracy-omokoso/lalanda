@@ -7,7 +7,7 @@
 // les droits l'autorisent, documents liés. Introuvable ou d'une autre organisation :
 // l'API répond 404, l'écran le dit.
 
-import { Badge, Modal } from '@lalanda/ui';
+import { Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { ArrowLeft, Calculator, History, Laptop, TriangleAlert, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -16,7 +16,6 @@ import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { assetsApi, type AssetAssignmentsView, type AssetDetailView } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { EquipementFormulaire } from './equipement-formulaire';
 import {
@@ -137,7 +136,7 @@ export function EquipementFiche({ assetId }: { assetId: string }): React.ReactEl
               <button
                 key={g.id}
                 type="button"
-                className={BOUTON_PETIT}
+                className={buttonClasses('secondary', 'sm')}
                 aria-haspopup="dialog"
                 onClick={() => {
                   setSale(false);

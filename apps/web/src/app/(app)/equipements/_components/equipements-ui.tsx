@@ -5,12 +5,10 @@
 // champ de montant qui sélectionne son contenu au focus, et la liste des
 // catégories partagée par les écrans.
 
-import { TextInput, cn } from '@lalanda/ui';
+import { Alert, TextInput, buttonClasses, cn } from '@lalanda/ui';
 import { useEffect, useState } from 'react';
 
 import { assetsApi, type AssetCategoryView } from '@/lib/api-assets';
-
-import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { lire, messageEquipements, type Lecture } from './equipements-model';
 
@@ -43,17 +41,18 @@ export function EchecLecture({
   onReessayer?: () => void;
 }): React.ReactElement {
   return (
-    <Alerte
+    <Alert
+      tone="danger"
       action={
         onReessayer ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onReessayer}>
+          <button type="button" className={buttonClasses('secondary', 'sm')} onClick={onReessayer}>
             Réessayer
           </button>
         ) : undefined
       }
     >
       <p>{messageEquipements(erreur, repli)}</p>
-    </Alerte>
+    </Alert>
   );
 }
 

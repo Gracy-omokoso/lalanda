@@ -9,6 +9,7 @@
 // en segments, confirmation de cession en case stylée (jamais cochée d'office).
 
 import {
+  Alert,
   Button,
   Checkbox,
   DatePicker,
@@ -32,7 +33,6 @@ import {
 } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_CESSION,
@@ -199,7 +199,7 @@ export function DialogueAffectation({
           </Field>
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             {erreur.chevauchement ? (
               <p className="flex items-start gap-2 font-medium">
                 <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
@@ -207,7 +207,7 @@ export function DialogueAffectation({
               </p>
             ) : null}
             <p>{erreur.texte}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </form>
     </Modal>
@@ -294,9 +294,9 @@ export function DialogueRetour({
           </Field>
         </FormGrid>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </form>
     </Modal>
@@ -452,9 +452,9 @@ export function DialogueCession({
           ) : null}
         </div>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </form>
     </Modal>
@@ -524,9 +524,9 @@ export function DialogueReintegration({
           />
         </Field>
         {erreur ? (
-          <Alerte>
+          <Alert tone="danger">
             <p>{erreur}</p>
-          </Alerte>
+          </Alert>
         ) : null}
       </form>
     </Modal>

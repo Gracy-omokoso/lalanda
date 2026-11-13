@@ -9,6 +9,7 @@
 // sous `purchase.manage`, déjà migré en phase 2a).
 
 import {
+  Alert,
   DatePicker,
   Field,
   FormGrid,
@@ -25,7 +26,6 @@ import { assetsApi, type AssetDetailView } from '@/lib/api-assets';
 
 import { ChoixFournisseur } from '../../achats/_components/commande-formulaire';
 import { useShell } from '../../_components/shell-context';
-import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_STATUT,
@@ -270,9 +270,9 @@ export function EquipementFormulaire({
       </FormGrid>
 
       {erreur ? (
-        <Alerte>
+        <Alert tone="danger">
           <p>{erreur}</p>
-        </Alerte>
+        </Alert>
       ) : null}
       <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
         {equipement === null ? 'Enregistrer l’équipement' : 'Enregistrer'}
