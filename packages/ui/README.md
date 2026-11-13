@@ -23,7 +23,9 @@ Tailwind lit leurs classes grâce à `@source` dans `globals.css`.
 
 ## Ajouts prévus
 
-- `Field` / `Input` / `Select` pour remplacer les classes locales (`form-ui.tsx`…).
-- Composants métier partagés : `MoneyInput`, `DriverField`, `SectorPicker`.
+- Composants métier partagés : `DriverField`, `SectorPicker`.
+
+Le système de formulaires (`Field`, `Select`, `MoneyInput`… ADR-0074) a remplacé
+l'ancien kit de l'application web, retiré le 13 nov. 2026 (décision n° 5).
 
 Les composants strictement propres à `apps/web` restent dans `apps/web/src/components/`.
