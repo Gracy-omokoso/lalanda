@@ -3,6 +3,7 @@
 // Tous les schémas sont `.strict()` : un champ inconnu est refusé (400), il
 // n'est jamais ignoré en silence.
 
+import { storedPhone } from '@lalanda/shared/phone';
 import { z } from 'zod';
 
 import { LEGAL_FORMS, type LegalForm } from './fiscal-profile.schema.js';
@@ -78,7 +79,9 @@ export const PutFiscalProfileSchema = z
     phone: z
       .string()
       .trim()
-      .regex(/^\+?[0-9][0-9 .-]{6,19}$/, 'numéro de téléphone invalide'),
+      .regex(/^\+?[0-9][0-9 .-]{6,19}$/, 'numéro de téléphone invalide')
+      // ADR-0075 : E.164 quand le numéro est reconnaissable, sinon tel quel.
+      .transform(storedPhone),
     email: z.string().trim().max(254).email('adresse e-mail invalide'),
   })
   .strict()

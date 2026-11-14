@@ -17,6 +17,7 @@ import {
   type InvoiceTotals,
   type LineTotals,
 } from '@lalanda/engine';
+import { formatPhoneE123 } from '@lalanda/shared/phone';
 
 import { CUSTOMER_TYPE_LABELS } from '../sales.dto.js';
 import type { CreditNoteNature, DocumentKind, InvoiceType } from '../invoices/invoice.contract.js';
@@ -255,6 +256,30 @@ function stateMentionsOf(doc: InvoiceLean, kind: DocumentKind): string[] {
   return [];
 }
 
+/**
+ * ADR-0075 : numéros imprimés au format international UIT-T E.123 quand le
+ * document porte `phoneFormat: 'e123'` — figé au gel depuis le 13 nov. 2026, ou
+ * posé en mémoire pour un brouillon et un aperçu (`withPrintedPhoneFormat`). Un
+ * document gelé avant (sans `phoneFormat`) imprime ses numéros tels qu'ils ont été
+ * figés : re-télécharger un original rend le même contenu, et le contenu imprimé
+ * de ce modèle pur ne change pour aucun document qui n'a pas ce champ.
+ */
+function printedPhone(
+  doc: InvoiceLean,
+): (phone: string | null | undefined) => string | null | undefined {
+  const e123 = doc.phoneFormat === 'e123';
+  return (phone) => (e123 && nonEmpty(phone) ? formatPhoneE123(phone) : phone);
+}
+
+/**
+ * Document à imprimer (ADR-0075) : un BROUILLON imprime ses numéros comme il les
+ * figera au gel (E.123) ; un document gelé reste tel qu'il est. En mémoire
+ * seulement, rien n'est écrit.
+ */
+export function withPrintedPhoneFormat(doc: InvoiceLean): InvoiceLean {
+  return doc.status === 'draft' && !doc.phoneFormat ? { ...doc, phoneFormat: 'e123' } : doc;
+}
+
 function sellerParty(doc: InvoiceLean, ctx: InvoiceDocumentContext): DocumentParty {
   const s = doc.seller ?? ctx.draftSeller;
   if (!s) return { title: ctx.organizationName, lines: [] };
@@ -263,7 +288,7 @@ function sellerParty(doc: InvoiceLean, ctx: InvoiceDocumentContext): DocumentPar
   lines.push(`NIF : ${s.nif}`);
   if (nonEmpty(s.rccm)) lines.push(`RCCM : ${s.rccm}`);
   if (nonEmpty(s.address)) lines.push(s.address);
-  const contacts = [s.phone, s.email].filter(nonEmpty);
+  const contacts = [printedPhone(doc)(s.phone), s.email].filter(nonEmpty);
   if (contacts.length > 0) lines.push(contacts.join(' · '));
   return { title: s.legalName, lines };
 }
@@ -277,7 +302,7 @@ function customerParty(doc: InvoiceLean): DocumentParty {
   }
   if (c.printContactDetails) {
     if (nonEmpty(c.address)) lines.push(c.address);
-    const contacts = [c.phone, c.email].filter(nonEmpty);
+    const contacts = [printedPhone(doc)(c.phone), c.email].filter(nonEmpty);
     if (contacts.length > 0) lines.push(contacts.join(' · '));
   }
   return { title: nonEmpty(c.name) ? c.name : 'Client comptant', lines };

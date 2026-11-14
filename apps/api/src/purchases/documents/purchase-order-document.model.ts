@@ -12,6 +12,10 @@
 // coordonnées bancaires du fournisseur (elles ne sont même pas lues ici). Aucun
 // calcul : montants rendus par le moteur, seulement mis en forme.
 
+// Téléphones imprimés au format international UIT-T E.123 (ADR-0075).
+
+import { formatPhoneE123 } from '@lalanda/shared/phone';
+
 import { amountInWords } from '../../sales/documents/amount-in-words.js';
 import {
   DocumentNotPrintableError,
@@ -79,7 +83,7 @@ function buyerParty(ctx: PurchaseOrderDocumentContext): DocumentParty {
   lines.push(`NIF : ${s.nif}`);
   if (nonEmpty(s.rccm)) lines.push(`RCCM : ${s.rccm}`);
   if (nonEmpty(s.address)) lines.push(s.address);
-  const contacts = [s.phone, s.email].filter(nonEmpty);
+  const contacts = [formatPhoneE123(s.phone), s.email].filter(nonEmpty);
   if (contacts.length > 0) lines.push(contacts.join(' · '));
   return { title: s.legalName, lines };
 }
@@ -88,7 +92,7 @@ function supplierParty(s: PurchaseOrderSupplierInfo): DocumentParty {
   const lines: string[] = ['Fournisseur'];
   if (nonEmpty(s.nif)) lines.push(`NIF : ${s.nif}`);
   if (nonEmpty(s.address)) lines.push(s.address);
-  const contacts = [s.phone, s.email].filter(nonEmpty);
+  const contacts = [formatPhoneE123(s.phone), s.email].filter(nonEmpty);
   if (contacts.length > 0) lines.push(contacts.join(' · '));
   return { title: s.name, lines };
 }

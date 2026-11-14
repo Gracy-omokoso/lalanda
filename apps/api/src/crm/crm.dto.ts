@@ -5,6 +5,7 @@
 // `number` JSON est refusé avec `DECIMAL_MUST_BE_STRING` (docs/26). Aucune
 // opération arithmétique ici.
 
+import { storedPhone } from '@lalanda/shared/phone';
 import { z } from 'zod';
 
 import { parseDecimalInput } from '../sales/sales.dto.js';
@@ -88,7 +89,8 @@ export function phone(ctx: Ctx, path: (string | number)[], raw: unknown): string
   if (p !== null && !PHONE_PATTERN.test(p)) {
     issue(ctx, path, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
   }
-  return p;
+  // ADR-0075 : E.164 quand le numéro est reconnaissable, sinon tel quel.
+  return storedPhone(p);
 }
 
 /** Montant estimé : chaîne décimale > 0, 2 décimales au plus → canonique `"1500.00"`. */

@@ -33,6 +33,7 @@ import {
   type HrDocumentView,
   type PutGeneratedDocumentSettingsInput,
 } from '@lalanda/shared/hr';
+import { formatPhoneE123 } from '@lalanda/shared/phone';
 import { Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, type Connection, type Model } from 'mongoose';
@@ -128,7 +129,11 @@ export function organizationOf(
     : '';
   const contactLines: string[] = [];
   if (address) contactLines.push(address);
-  const reach = [fiscal?.phone, fiscal?.email].filter(present).map((s) => s.trim());
+  // ADR-0075 : téléphone imprimé au format international UIT-T E.123 ; une valeur
+  // non reconnaissable reste telle quelle. Une pièce déjà produite est conservée.
+  const reach = [formatPhoneE123(fiscal?.phone), fiscal?.email]
+    .filter(present)
+    .map((s) => s.trim());
   if (reach.length > 0) contactLines.push(reach.join(' · '));
   const legalIds: string[] = [];
   if (present(fiscal?.rccm)) legalIds.push(`RCCM : ${fiscal.rccm.trim()}`);

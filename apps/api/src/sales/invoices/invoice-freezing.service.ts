@@ -271,6 +271,7 @@ export class InvoiceFreezingService {
               operator: null,
               softwareVersion: null,
               presentation: null,
+              phoneFormat: null,
               frozenAt: null,
               frozenFromRevision: null,
               contentSha256: null,
@@ -557,6 +558,8 @@ export class InvoiceFreezingService {
         softwareVersion: APP_VERSION.version,
         // Absent (et hors empreinte) sans modèle choisi : document identique à avant.
         ...(presentation ? { presentation } : {}),
+        // ADR-0075 : les numéros de ce document s'impriment au format E.123.
+        phoneFormat: 'e123' as const,
         frozenFromRevision: expectedRevision,
         creditNote,
       };

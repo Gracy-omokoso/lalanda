@@ -9,6 +9,7 @@ import {
   TEST_BANNER,
   buildInvoiceDocument,
   formatAmount,
+  withPrintedPhoneFormat,
   type InvoiceDocumentContext,
 } from './invoice-document.model.js';
 import { renderInvoiceDocumentHtml, invoiceFooterTemplate } from './invoice-document-html.js';
@@ -354,5 +355,47 @@ describe('QR code et déterminisme', () => {
     });
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('téléphones — E.123 sans changer un document déjà gelé (ADR-0075)', () => {
+  const contacts = (lines: string[]) => lines.find((l) => l.includes('@')) ?? '';
+  const seller = issuedStandard().seller!;
+
+  it('document gelé AVANT : numéros imprimés tels qu’ils ont été figés', () => {
+    const doc = { ...issuedStandard(), seller: { ...seller, phone: '+243800000000' } };
+    expect(contacts(build(doc).seller.lines)).toContain('+243800000000');
+    expect(contacts(build(normalizedTest()).seller.lines)).toContain('+243 800 000 000');
+  });
+
+  it('document gelé avec phoneFormat « e123 » : format international E.123', () => {
+    const doc: InvoiceLean = {
+      ...issuedStandard(),
+      seller: { ...seller, phone: '+243800000000' },
+      phoneFormat: 'e123',
+    };
+    expect(contacts(build(doc).seller.lines)).toContain('+243 80 000 0000');
+  });
+
+  it('brouillon (withPrintedPhoneFormat) : E.123 ; valeur non reconnaissable telle quelle', () => {
+    const draft = draftUsd();
+    const doc = {
+      ...draft,
+      customer: { ...draft.customer, phone: '0812345678', printContactDetails: true },
+    };
+    expect(withPrintedPhoneFormat(doc).phoneFormat).toBe('e123');
+    const m = build(withPrintedPhoneFormat(doc), {
+      draftSeller: { ...seller, phone: 'Standard, poste 12' },
+    });
+    expect(contacts(m.customer.lines)).toContain('+243 81 234 5678');
+    expect(contacts(m.seller.lines)).toContain('Standard, poste 12');
+    // Le modèle pur ne change rien sans le champ : empreintes des modèles 1.0.0 intactes.
+    expect(contacts(build(doc).customer.lines)).toContain('0812345678');
+  });
+
+  it('withPrintedPhoneFormat ne touche jamais un document gelé', () => {
+    const frozen = issuedStandard();
+    expect(withPrintedPhoneFormat(frozen)).toBe(frozen);
+    expect(withPrintedPhoneFormat(normalizedTest()).phoneFormat).toBeUndefined();
   });
 });

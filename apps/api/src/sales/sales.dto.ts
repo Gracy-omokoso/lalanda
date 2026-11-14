@@ -22,6 +22,7 @@ import {
   type SpecificTax,
   type TaxGroupLetter,
 } from '@lalanda/engine';
+import { storedPhone } from '@lalanda/shared/phone';
 import { z } from 'zod';
 
 import { normalizeNif } from '../fiscal/fiscal.dto.js';
@@ -162,7 +163,8 @@ function normalizeCustomer(raw: RawCustomer, ctx: Ctx): CustomerInput {
     name: name ?? '',
     nif,
     exemptionReference: raw.type === 'AO' ? exemptionReference : null,
-    phone,
+    // ADR-0075 : E.164 quand le numéro est reconnaissable, sinon tel quel.
+    phone: storedPhone(phone),
     email,
     address,
   };

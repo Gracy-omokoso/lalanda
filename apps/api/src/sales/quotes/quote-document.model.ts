@@ -10,6 +10,7 @@
 // Aucun calcul : montants figés par le moteur, seulement mis en forme.
 
 import { invoiceHtTotal, type LineTotals } from '@lalanda/engine';
+import { formatPhoneE123 } from '@lalanda/shared/phone';
 
 import { amountInWords } from '../documents/amount-in-words.js';
 import {
@@ -57,7 +58,7 @@ function sellerParty(ctx: QuoteDocumentContext): DocumentParty {
   lines.push(`NIF : ${s.nif}`);
   if (nonEmpty(s.rccm)) lines.push(`RCCM : ${s.rccm}`);
   if (nonEmpty(s.address)) lines.push(s.address);
-  const contacts = [s.phone, s.email].filter(nonEmpty);
+  const contacts = [formatPhoneE123(s.phone), s.email].filter(nonEmpty);
   if (contacts.length > 0) lines.push(contacts.join(' · '));
   return { title: s.legalName, lines };
 }
@@ -68,7 +69,7 @@ function customerParty(q: QuoteLean): DocumentParty {
   if (nonEmpty(c.nif)) lines.push(`NIF : ${c.nif}`);
   if (c.printContactDetails) {
     if (nonEmpty(c.address)) lines.push(c.address);
-    const contacts = [c.phone, c.email].filter(nonEmpty);
+    const contacts = [formatPhoneE123(c.phone), c.email].filter(nonEmpty);
     if (contacts.length > 0) lines.push(contacts.join(' · '));
   }
   return { title: nonEmpty(c.name) ? c.name : 'Client', lines };

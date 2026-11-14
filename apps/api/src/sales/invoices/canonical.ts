@@ -46,9 +46,13 @@ export const FROZEN_CONTENT_FIELDS = [
  * Champs figés OPTIONNELS : n'entrent dans l'empreinte que s'ils ont une valeur.
  * Un document gelé avant leur apparition garde ainsi la même empreinte
  * (`softwareVersion`, ADR-0026 § 6.2, 20 oct. 2026 ; `presentation`, ADR-0028 § 6,
- * 21 oct. 2026).
+ * 21 oct. 2026 ; `phoneFormat`, ADR-0075, 13 nov. 2026).
  */
-export const OPTIONAL_FROZEN_CONTENT_FIELDS = ['softwareVersion', 'presentation'] as const;
+export const OPTIONAL_FROZEN_CONTENT_FIELDS = [
+  'softwareVersion',
+  'presentation',
+  'phoneFormat',
+] as const;
 
 /** Valeur JSON pure : les dates deviennent des chaînes ISO, `undefined` disparaît. */
 function plain(value: unknown): unknown {

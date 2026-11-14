@@ -37,6 +37,7 @@ import { invoiceNotFound } from '../invoices/invoices.errors.js';
 import {
   DocumentNotPrintableError,
   buildInvoiceDocument,
+  withPrintedPhoneFormat,
   type InvoiceDocumentModel,
 } from './invoice-document.model.js';
 import {
@@ -173,7 +174,8 @@ export class InvoiceDocumentsService {
       draftInTestEnvironment = settings.state === 'enabled' && settings.environment === 'test';
     }
     try {
-      return buildInvoiceDocument(doc, {
+      // ADR-0075 : un brouillon imprime ses numéros en E.123, comme au gel.
+      return buildInvoiceDocument(withPrintedPhoneFormat(doc), {
         duplicateNumber,
         draftSeller,
         organizationName,
@@ -300,7 +302,8 @@ export class InvoiceDocumentsService {
     const doc = sampleInvoice(organizationId);
     const seller = await this.currentSeller(organizationId);
     const model = buildInvoiceDocument(
-      { ...doc, seller: seller ?? doc.seller },
+      // ADR-0075 : l'aperçu imprime les numéros comme une facture gelée aujourd'hui.
+      { ...doc, seller: seller ?? doc.seller, phoneFormat: 'e123' },
       {
         duplicateNumber: null,
         draftSeller: null,

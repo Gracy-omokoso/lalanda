@@ -153,6 +153,15 @@ export class SalesInvoice {
   @Prop({ type: Object, required: false })
   presentation?: FrozenPresentation | null;
 
+  /**
+   * ADR-0075 : présentation des téléphones FIGÉE au gel. `'e123'` : le PDF imprime
+   * les numéros au format international UIT-T E.123 (`+243 81 234 5678`). Absente :
+   * document gelé avant le 13 nov. 2026, numéros imprimés tels qu'ils ont été figés
+   * — pas de migration, empreinte et PDF inchangés.
+   */
+  @Prop({ type: String, required: false })
+  phoneFormat?: 'e123' | null;
+
   @Prop({ type: Date, default: null })
   frozenAt!: Date | null;
 

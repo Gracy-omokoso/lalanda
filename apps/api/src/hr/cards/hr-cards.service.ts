@@ -35,6 +35,7 @@ import {
   type PutCardSettingsInput,
 } from '@lalanda/shared/hr';
 import { logoOrderFor } from '@lalanda/shared/branding';
+import { formatPhoneE123, storedPhone } from '@lalanda/shared/phone';
 import { employeeStatusOf } from '@lalanda/engine';
 import {
   ConflictException,
@@ -185,6 +186,11 @@ interface ResolvedTemplate {
   render(d: CardData, t: CardTheme, faces: readonly CardFace[]): RenderedCard;
   extraCss: string;
   extraFonts: FontId[];
+}
+
+/** Téléphone imprimé sur une carte (ADR-0075) : E.123, ou la valeur telle quelle. */
+function printedCardPhone(phone: string | null | undefined): string | null {
+  return phone ? formatPhoneE123(phone) || null : null;
 }
 
 @Injectable()
@@ -772,7 +778,8 @@ export class HrCardsService {
           lastName: e.lastName,
           organization: ctx.orgName,
           jobTitle: e.jobTitle,
-          workPhone: e.workPhone ?? s.phone,
+          // ADR-0075 : vCard en E.164 (forme recommandée pour `TEL`), sinon tel quel.
+          workPhone: storedPhone(e.workPhone ?? s.phone ?? null),
           workEmail: e.workEmail,
           website: s.website,
           address: s.address,
@@ -789,7 +796,8 @@ export class HrCardsService {
       department: e.departmentId ? (ctx.departments.get(e.departmentId) ?? null) : null,
       employeeNumber: s.showEmployeeNumber ? (e.employeeNumber ?? null) : null,
       workEmail: e.workEmail ?? null,
-      workPhone: e.workPhone ?? null,
+      // ADR-0075 : carte imprimée au format international UIT-T E.123.
+      workPhone: printedCardPhone(e.workPhone),
       photo,
       org: {
         name: ctx.orgName,
@@ -798,7 +806,7 @@ export class HrCardsService {
         logoLight: ctx.logoLight,
         address: s.address,
         website: s.website,
-        phone: s.phone,
+        phone: printedCardPhone(s.phone),
         slogan: s.slogan,
       },
       verifyQrSvg,
@@ -971,7 +979,7 @@ export class HrCardsService {
         lastName: 'Mbuyi Kabongo',
         organization: await this.orgName(organizationId),
         jobTitle: 'Responsable des opérations',
-        workPhone: '+243 81 000 00 00',
+        workPhone: '+243810000000',
         workEmail: 'aline.mbuyi@exemple.cd',
         website: settings.website,
         address: null,
@@ -985,7 +993,7 @@ export class HrCardsService {
         logoLight,
         address: settings.address,
         website: settings.website,
-        phone: settings.phone,
+        phone: printedCardPhone(settings.phone),
         slogan: settings.slogan,
       },
       { verify, vcard: settings.vcardQr ? vcard : null },

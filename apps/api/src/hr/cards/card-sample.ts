@@ -37,7 +37,7 @@ export function sampleCardData(
     department: 'Logistique et transport',
     employeeNumber: 'EX-0042',
     workEmail: 'aline.mbuyi@exemple.cd',
-    workPhone: '+243 81 000 00 00',
+    workPhone: '+243 81 000 0000',
     photo: null,
     org: {
       name: org.name,
@@ -46,7 +46,7 @@ export function sampleCardData(
       logoLight: org.logoLight,
       address: org.address ?? '12, avenue de l’Exemple, Gombe, Kinshasa',
       website: org.website ?? 'www.exemple.cd',
-      phone: org.phone ?? '+243 99 000 00 00',
+      phone: org.phone ?? '+243 99 000 0000',
       slogan: org.slogan ?? 'Votre partenaire au quotidien',
     },
     verifyQrSvg: kind === 'badge' ? qr.verify : null,
