@@ -276,3 +276,10 @@ Décideurs :
   phase 1 : connexion, console, facture, devis, fiche client, fiche collaborateur ; phase 2 listée
   par module. API inchangée. Ancien kit `form-ui.tsx` retiré le 13 nov. 2026 (décision 5,
   tranchée par Gracy ; `FileInput` et `ToggleChip` ajoutés). Statut : **accepté** (11 nov. 2026).
+- [ADR-0075](ADR-0075-depense-fournisseur-telephones.md) — Dépense directe reliée à la fiche
+  fournisseur (sélecteur fiche ou nom libre, « + » sous `purchase.manage`, nom courant de la fiche
+  à l'affichage, copie stockée et comptabilité inchangées) ; téléphones stockés en E.164 et
+  affichés ou imprimés en E.123 (`+243 81 234 5678`) par une seule paire de fonctions de
+  `@lalanda/shared/phone`, mêmes règles d'acceptation, mobile money exclu, factures gelées avant
+  le 13 nov. 2026 réimprimées à l'identique (champ figé facultatif `phoneFormat`). Statut :
+  **accepté** (13 nov. 2026, décision de Gracy).
