@@ -7,6 +7,7 @@
 import { CRM_PHONE_PATTERN } from '@lalanda/shared/crm';
 import { HR_PHONE_PATTERN } from '@lalanda/shared/hr';
 import { PURCHASE_PHONE_PATTERN } from '@lalanda/shared/purchases';
+import { formatPhoneE123, storedPhone } from '@lalanda/shared/phone';
 import { normalizeWhatsAppPhone } from '@lalanda/shared/work';
 import { afficherTelephone, ecrireTelephone, lireTelephone } from '@lalanda/ui';
 import { describe, expect, it } from 'vitest';
@@ -50,5 +51,13 @@ describe('téléphone transmis : E.164 sans espace, accepté partout', () => {
 
   it('affiché groupé dans les fiches et les listes', () => {
     expect(afficherTelephone(transmis('0812345678'))).toBe('+243 81 234 5678');
+  });
+
+  it('ADR-0075 : l’API enregistre tel quel ce que le web envoie ; affichage = impression E.123', () => {
+    for (const s of SAISIES) {
+      expect(storedPhone(transmis(s))).toBe(transmis(s));
+      expect(afficherTelephone(transmis(s))).toBe(formatPhoneE123(transmis(s)));
+    }
+    expect(formatPhoneE123(transmis('+33 6 12 34 56 78'))).toBe('+33 612 345 678');
   });
 });

@@ -96,6 +96,12 @@ export interface HrExpenseOrigin {
   settledByAdvanceId: string | null;
 }
 
+/** Fournisseur proposé à la saisie (ADR-0044 § 3.1) : fiche, ou nom libre déjà saisi. */
+export interface TreasurySupplierEntry {
+  name: string;
+  supplierId: string | null;
+}
+
 export interface ExpensePage {
   items: ExpenseView[];
   nextCursor: string | null;
@@ -108,6 +114,11 @@ export interface ExpenseBody {
   category: string;
   label: string;
   supplierName?: string | null;
+  /**
+   * ADR-0075 (A) : fiche fournisseur (l'API reprend alors son nom). `null` : sans
+   * fiche ; absent : nom libre, rattaché par l'API à une fiche par clé exacte.
+   */
+  supplierId?: string | null;
   accountId?: string | null;
   deductibleVat?: string | null;
   reference?: string | null;
@@ -421,7 +432,10 @@ export const treasuryApi = {
   }) => request<ExpensePage>(`/treasury/expenses${query(q)}`),
   expenseSummary: (q: { from?: string; to?: string }) =>
     request<ExpenseSummary>(`/treasury/expenses/summary${query(q)}`),
-  suppliers: (q: string) => request<{ items: string[] }>(`/treasury/suppliers${query({ q })}`),
+  suppliers: (q: string) =>
+    request<{ items: string[]; entries?: TreasurySupplierEntry[] }>(
+      `/treasury/suppliers${query({ q })}`,
+    ),
   createExpense: (body: ExpenseBody) =>
     request<ExpenseView>('/treasury/expenses', { method: 'POST', body }),
   updateExpense: (expenseId: string, expectedRevision: number, expense: ExpenseBody) =>

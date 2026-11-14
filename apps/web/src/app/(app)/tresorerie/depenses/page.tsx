@@ -9,6 +9,9 @@
 // (mise en forme seulement : `lireMontantSaisi` lit la valeur, point ou
 // virgule), devise en segments, catégorie, compte et fréquence en `Select`,
 // largeurs sémantiques. Mêmes champs envoyés, mêmes contrôles.
+//
+// ADR-0075 (A) : fournisseur en `EntityPicker` relié à la fiche fournisseur
+// (`supplierId`), nom libre toujours possible ; « + » sous `purchase.manage`.
 
 import {
   DatePicker,
@@ -70,6 +73,8 @@ import {
   messageDepensePossedee,
 } from './_components/depense-possedee';
 import { rappelPersonnel } from './_components/depense-personnel';
+import { ChoixFournisseurDepense } from './_components/choix-fournisseur-depense';
+import { champsFournisseur, type FournisseurDepense } from './_components/fournisseur-depense';
 import {
   FREQUENCY_LABELS,
   formatMontantSigne,
@@ -106,7 +111,8 @@ interface Formulaire {
   currency: TreasuryCurrency;
   category: string;
   label: string;
-  supplierName: string;
+  /** ADR-0075 (A) : fiche fournisseur ou nom libre ; `null` : aucun. */
+  fournisseur: FournisseurDepense | null;
   accountId: string;
   deductibleVat: string;
   reference: string;
@@ -120,7 +126,7 @@ const VIDE: Formulaire = {
   currency: 'USD',
   category: 'charges_diverses',
   label: '',
-  supplierName: '',
+  fournisseur: null,
   accountId: '',
   deductibleVat: '',
   reference: '',
@@ -146,7 +152,6 @@ export default function DepensesPage(): React.ReactElement {
   const [enCours, setEnCours] = useState(false);
   const [creation, setCreation] = useState(false);
   const [erreurCreation, setErreurCreation] = useState<string | null>(null);
-  const [fournisseurs, setFournisseurs] = useState<string[]>([]);
   const [apercu, setApercu] = useState<{ id: string; url: string } | null>(null);
 
   const charger = useCallback(async () => {
@@ -187,16 +192,6 @@ export default function DepensesPage(): React.ReactElement {
   useEffect(() => {
     void charger();
   }, [charger]);
-  useEffect(() => {
-    if (form.supplierName.trim().length < 2) return;
-    const t = setTimeout(() => {
-      void treasuryApi
-        .suppliers(form.supplierName)
-        .then((r) => setFournisseurs(r.items))
-        .catch(() => undefined);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [form.supplierName]);
   useEffect(() => () => (apercu ? URL.revokeObjectURL(apercu.url) : undefined), [apercu]);
 
   const comptesDevise = comptes.filter((c) => c.currency === form.currency);
@@ -242,7 +237,7 @@ export default function DepensesPage(): React.ReactElement {
         currency: form.currency,
         category: form.category,
         label: form.label,
-        supplierName: form.supplierName || null,
+        ...champsFournisseur(form.fournisseur),
         accountId: form.accountId || null,
         deductibleVat: tva,
         reference: form.reference || null,
@@ -555,20 +550,14 @@ export default function DepensesPage(): React.ReactElement {
                 optional
                 size="md"
                 newRow
-                hint="Nom libre ; les fournisseurs déjà saisis sont proposés."
+                hint="Choisissez la fiche fournisseur, ou tapez un nom libre pour un fournisseur de passage."
               >
-                <TextInput
-                  list="fournisseurs-connus"
-                  value={form.supplierName}
-                  maxLength={120}
-                  onChange={(e) => setForm({ ...form, supplierName: e.target.value })}
+                <ChoixFournisseurDepense
+                  id="dep-fournisseur"
+                  valeur={form.fournisseur}
+                  onChange={(f) => setForm({ ...form, fournisseur: f })}
                 />
               </Field>
-              <datalist id="fournisseurs-connus">
-                {fournisseurs.map((f) => (
-                  <option key={f} value={f} />
-                ))}
-              </datalist>
               <Field id="dep-compte" label="Payé depuis" optional size="md">
                 <Select<string>
                   value={form.accountId}
