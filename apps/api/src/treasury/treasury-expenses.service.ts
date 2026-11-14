@@ -264,7 +264,7 @@ export class TreasuryExpensesService {
     const page = docs.slice(0, query.limit);
     const last = page[page.length - 1];
     return {
-      items: page.map(expenseView),
+      items: await this.withCardNames(organizationId, page.map(expenseView)),
       nextCursor:
         docs.length > query.limit && last
           ? encodeExpenseCursor(last.spentOn, String(last._id))
@@ -273,7 +273,40 @@ export class TreasuryExpensesService {
   }
 
   async get(organizationId: string, expenseId: string): Promise<ExpenseView> {
-    return expenseView(await this.requireOwn(organizationId, expenseId));
+    const [view] = await this.withCardNames(organizationId, [
+      expenseView(await this.requireOwn(organizationId, expenseId)),
+    ]);
+    return view!;
+  }
+
+  /**
+   * ADR-0075 (A) : une dépense rattachée à une fiche affiche le nom COURANT de la
+   * fiche (renommée, ou cible d'une fusion), lu dans l'organisation. La copie
+   * stockée (`supplierName`) n'est pas réécrite : elle reste le nom au moment de
+   * l'écriture, celui que reprend la comptabilité. Fiche introuvable : copie stockée.
+   */
+  private async withCardNames(
+    organizationId: string,
+    views: ExpenseView[],
+  ): Promise<ExpenseView[]> {
+    const ids = [
+      ...new Set(
+        views.flatMap((v) => (v.supplierId && isMongoId(v.supplierId) ? [v.supplierId] : [])),
+      ),
+    ];
+    if (ids.length === 0) return views;
+    const cards = await this.connection
+      .collection(SUPPLIERS)
+      .find(
+        { organizationId, _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
+        { projection: { name: 1 } },
+      )
+      .toArray();
+    const names = new Map(cards.map((c) => [String(c._id), String(c['name'])]));
+    return views.map((v) => {
+      const name = v.supplierId ? names.get(v.supplierId) : undefined;
+      return name === undefined ? v : { ...v, supplierName: name };
+    });
   }
 
   /** Totaux par mois, devise et catégorie (moteur) — sans projet ni plan. */
@@ -399,6 +432,19 @@ export class TreasuryExpensesService {
       return { supplierId: id, supplierName: String(card['name']) };
     }
     if (current?.supplierId && input.supplierName === current.supplierName) return current;
+    // ADR-0075 (A) : la vue affiche le nom COURANT de la fiche ; un client qui le
+    // renvoie tel quel, sans `supplierId`, garde la fiche (et en reprend le nom).
+    if (current?.supplierId && input.supplierName !== null && isMongoId(current.supplierId)) {
+      const card = await this.connection
+        .collection(SUPPLIERS)
+        .findOne(
+          { _id: new Types.ObjectId(current.supplierId), organizationId },
+          { projection: { name: 1 } },
+        );
+      if (card && String(card['name']) === input.supplierName) {
+        return { supplierId: current.supplierId, supplierName: input.supplierName };
+      }
+    }
     if (input.supplierName === null) return { supplierId: null, supplierName: null };
     const card = await this.connection.collection(SUPPLIERS).findOne(
       {
@@ -458,6 +504,8 @@ export class TreasuryExpensesService {
         currency: input.currency,
         recurring: recurrence !== null,
         workProjectId: workProjectId ?? null,
+        // ADR-0075 (A) : fiche fournisseur rattachée (identifiant seulement, aucun nom).
+        supplierId: supplier.supplierId,
       },
     });
     return doc.toObject() as ExpenseLean;
@@ -523,6 +571,8 @@ export class TreasuryExpensesService {
         category: input.category,
         currency: input.currency,
         ...(workProjectId !== undefined ? { workProjectId } : {}),
+        // ADR-0075 (A) : fiche fournisseur après modification (identifiant seulement).
+        supplierId: supplier.supplierId,
       },
     });
     return expenseView(updated);

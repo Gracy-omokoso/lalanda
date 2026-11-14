@@ -230,7 +230,8 @@ e2eSuite('Fournisseurs (ADR-0044 P2)', () => {
           phone: '+243 99 000 0000',
         }),
       );
-      expect(maj['supplier']).toMatchObject({ revision: 2, phone: '+243 99 000 0000' });
+      // ADR-0075 : enregistré en E.164.
+      expect(maj['supplier']).toMatchObject({ revision: 2, phone: '+243990000000' });
       const archive = ok(
         await post(asN(), `/purchases/suppliers/${id}/archive`, { expectedRevision: 2 }),
       );
@@ -244,6 +245,18 @@ e2eSuite('Fournisseurs (ADR-0044 P2)', () => {
       const sup = await del(asN(), `/purchases/suppliers/${id}`);
       expect(sup.status).toBe(204);
       code(await get(asN(), `/purchases/suppliers/${id}`), 404, 'SUPPLIER_NOT_FOUND');
+    });
+
+    it('téléphone : E.164 si reconnaissable, sinon tel quel ; refus inchangé (ADR-0075)', async () => {
+      const { supplier } = await fournisseur(`Tel ${tag}`, { phone: '081 234 5678' });
+      expect(supplier['phone']).toBe('+243812345678');
+      const { supplier: autre } = await fournisseur(`Tel bis ${tag}`, { phone: '1234567' });
+      expect(autre['phone']).toBe('1234567');
+      code(
+        await post(asN(), '/purchases/suppliers', { name: `Tel ter ${tag}`, phone: 'abc' }),
+        400,
+        'INVALID_REQUEST',
+      );
     });
 
     it('suppression refusée quand une dépense vise la fiche', async () => {
@@ -606,6 +619,64 @@ e2eSuite('Fournisseurs (ADR-0044 P2)', () => {
       const libres = ok(await get(asN(), '/treasury/suppliers?q=passage'));
       expect(libres['entries']).toEqual([{ name: 'Station de passage', supplierId: null }]);
       expect(libres['items']).toEqual(['Station de passage']);
+    });
+
+    it('ADR-0075 : nom COURANT de la fiche à l’affichage, copie stockée intacte, audit', async () => {
+      const { supplier } = await fournisseur(`Ancien nom ${tag}`);
+      const d = ok(
+        await post(asN(), '/treasury/expenses', {
+          spentOn: '2026-03-03',
+          amount: '12.00',
+          currency: 'USD',
+          category: 'achats',
+          label: 'Fournitures',
+          supplierName: null,
+          supplierId: supplier['id'],
+        }),
+        201,
+      );
+      ok(
+        await put(asN(), `/purchases/suppliers/${supplier['id']}`, {
+          expectedRevision: 1,
+          name: `Nouveau nom ${tag}`,
+        }),
+      );
+      const lu = ok(await get(asN(), `/treasury/expenses/${d['id']}`));
+      expect(lu).toMatchObject({ supplierId: supplier['id'], supplierName: `Nouveau nom ${tag}` });
+      const liste = ok(await get(asN(), '/treasury/expenses?from=2026-03-03&to=2026-03-03'));
+      expect(
+        (liste['items'] as Record<string, unknown>[]).find((e) => e['id'] === d['id']),
+      ).toMatchObject({ supplierName: `Nouveau nom ${tag}` });
+      const brut = await db
+        .collection('treasury_expenses')
+        .findOne({ _id: new ObjectId(d['id'] as string) });
+      expect(brut?.['supplierName']).toBe(`Ancien nom ${tag}`);
+
+      // Un client qui renvoie le nom affiché, sans `supplierId`, garde la fiche.
+      const maj = ok(
+        await put(asN(), `/treasury/expenses/${d['id']}`, {
+          expectedRevision: d['revision'],
+          expense: {
+            spentOn: '2026-03-03',
+            amount: '13.00',
+            currency: 'USD',
+            category: 'achats',
+            label: 'Fournitures',
+            supplierName: `Nouveau nom ${tag}`,
+          },
+        }),
+      );
+      expect(maj).toMatchObject({ supplierId: supplier['id'], supplierName: `Nouveau nom ${tag}` });
+
+      const journal = await db
+        .collection('audit_events')
+        .find({ organizationId: orgN, targetId: d['id'] })
+        .sort({ _id: 1 })
+        .toArray();
+      expect(journal.map((j) => [j['action'], j['metadata']?.['supplierId']])).toEqual([
+        ['treasury.expense.recorded', supplier['id']],
+        ['treasury.expense.updated', supplier['id']],
+      ]);
     });
 
     it('fiche archivée refusée ; fiche d’une autre organisation : 404', async () => {
