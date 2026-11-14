@@ -6,6 +6,8 @@
 
 import { z } from 'zod';
 
+import { storedPhone } from '../phone/index.js';
+
 import { HrId, hrFr, hrOptionalText } from './common.js';
 
 /** Types de carte. */
@@ -88,7 +90,8 @@ export const PutCardSettingsBody = z
     vcardQr: z.boolean(),
     address: hrOptionalText(CARD_TEXT_MAX),
     website: hrOptionalText(CARD_TEXT_MAX),
-    phone: hrOptionalText(CARD_TEXT_MAX),
+    // ADR-0075 : texte libre accepté comme avant ; E.164 quand c'est un numéro reconnaissable.
+    phone: hrOptionalText(CARD_TEXT_MAX).transform(storedPhone),
     slogan: hrOptionalText(CARD_TEXT_MAX),
   })
   .strict();

@@ -10,6 +10,8 @@
 
 import { z } from 'zod';
 
+import { storedPhone } from '../phone/index.js';
+
 import {
   CRM_ACCOUNT_KINDS,
   CRM_ACCOUNT_LIMITS,
@@ -95,11 +97,14 @@ function optionalText(max: number) {
     .nullable();
 }
 
-const phone = optionalText(CRM_ACCOUNT_LIMITS.phone).superRefine((v, ctx) => {
-  if (v !== null && !CRM_PHONE_PATTERN.test(v)) {
-    issue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
-  }
-});
+// ADR-0075 : même règle d'acceptation, puis E.164 quand le numéro est reconnaissable.
+const phone = optionalText(CRM_ACCOUNT_LIMITS.phone)
+  .superRefine((v, ctx) => {
+    if (v !== null && !CRM_PHONE_PATTERN.test(v)) {
+      issue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
+    }
+  })
+  .transform(storedPhone);
 
 const email = optionalText(CRM_ACCOUNT_LIMITS.email).superRefine((v, ctx) => {
   if (v !== null && !z.email().safeParse(v).success) {

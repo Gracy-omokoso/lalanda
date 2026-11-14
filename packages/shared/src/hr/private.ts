@@ -10,6 +10,8 @@
 
 import { z } from 'zod';
 
+import { storedPhone } from '../phone/index.js';
+
 import {
   HrCalendarDay,
   HrCurrencySchema,
@@ -44,16 +46,23 @@ export function isHrPrivateField(value: unknown): value is HrPrivateField {
   return typeof value === 'string' && (HR_PRIVATE_FIELDS as readonly string[]).includes(value);
 }
 
-const phone = (what: string) =>
+const acceptedPhone = (what: string) =>
   hrRequiredText(L.workPhone, what).superRefine((v, ctx) => {
     if (!HR_PHONE_PATTERN.test(v)) hrIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
   });
 
-const optionalPhone = hrOptionalText(L.workPhone).superRefine((v, ctx) => {
-  if (v !== null && !HR_PHONE_PATTERN.test(v)) {
-    hrIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
-  }
-});
+// ADR-0075 : même règle d'acceptation, puis E.164 quand le numéro est reconnaissable.
+// Le numéro d'un compte mobile money reste tel quel (`acceptedPhone`) : c'est un
+// identifiant de compte, comme le mobile money d'un fournisseur.
+const phone = (what: string) => acceptedPhone(what).transform(storedPhone);
+
+const optionalPhone = hrOptionalText(L.workPhone)
+  .superRefine((v, ctx) => {
+    if (v !== null && !HR_PHONE_PATTERN.test(v)) {
+      hrIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
+    }
+  })
+  .transform(storedPhone);
 
 const optionalEmail = hrOptionalText(L.workEmail).superRefine((v, ctx) => {
   if (v !== null && !z.email().safeParse(v).success) {
@@ -121,7 +130,7 @@ const mobileMoneyAccount = z
     kind: z.literal('mobile_money'),
     operator: hrRequiredText(L.mobileOperator, 'Opérateur'),
     holderName: hrRequiredText(L.holderName, 'Titulaire'),
-    phoneNumber: phone('Numéro'),
+    phoneNumber: acceptedPhone('Numéro'),
   })
   .strict();
 

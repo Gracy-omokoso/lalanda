@@ -10,6 +10,8 @@
 
 import { z } from 'zod';
 
+import { storedPhone } from '../phone/index.js';
+
 import {
   HrCalendarDay,
   HrExpectedRevision,
@@ -81,11 +83,14 @@ export const HrUserId = z
   .min(1, { message: 'Identifiant de compte attendu.' })
   .max(64, { message: 'Identifiant de compte invalide.' });
 
-const workPhone = hrOptionalText(L.workPhone).superRefine((v, ctx) => {
-  if (v !== null && !HR_PHONE_PATTERN.test(v)) {
-    hrIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
-  }
-});
+// ADR-0075 : même règle d'acceptation, puis E.164 quand le numéro est reconnaissable.
+const workPhone = hrOptionalText(L.workPhone)
+  .superRefine((v, ctx) => {
+    if (v !== null && !HR_PHONE_PATTERN.test(v)) {
+      hrIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
+    }
+  })
+  .transform(storedPhone);
 
 const workEmail = hrOptionalText(L.workEmail).superRefine((v, ctx) => {
   if (v !== null && !z.email().safeParse(v).success) {

@@ -300,6 +300,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@lalanda/shared':
+        specifier: workspace:*
+        version: link:../shared
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

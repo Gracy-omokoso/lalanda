@@ -8,6 +8,8 @@
 
 import { z } from 'zod';
 
+import { storedPhone } from '../phone/index.js';
+
 import {
   PurchaseCurrencySchema,
   PurchaseExpectedRevision,
@@ -35,11 +37,14 @@ import {
 
 const L = PURCHASE_LIMITS;
 
-const phone = purchaseOptionalText(L.phone).superRefine((v, ctx) => {
-  if (v !== null && !PURCHASE_PHONE_PATTERN.test(v)) {
-    purchaseIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
-  }
-});
+// ADR-0075 : même règle d'acceptation, puis E.164 quand le numéro est reconnaissable.
+const phone = purchaseOptionalText(L.phone)
+  .superRefine((v, ctx) => {
+    if (v !== null && !PURCHASE_PHONE_PATTERN.test(v)) {
+      purchaseIssue(ctx, 'PHONE_INVALID', 'Numéro de téléphone invalide.');
+    }
+  })
+  .transform(storedPhone);
 
 const email = purchaseOptionalText(L.email).superRefine((v, ctx) => {
   if (v !== null && !z.email().safeParse(v).success) {

@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 
+import { storedPhone } from '../phone/index.js';
+
 import { CRM_PHONE_PATTERN } from './constants.js';
 
 /** Liste fermée des champs (ADR-0048 § 2.1), dans l'ordre d'affichage. */
@@ -430,7 +432,8 @@ export function validateLeadSubmission(
     if (key === 'phone' && !CRM_PHONE_PATTERN.test(raw)) {
       issues.push({ path: key, code: 'PHONE_INVALID', message: 'Numéro de téléphone invalide.' });
     }
-    values[key] = key === 'email' ? raw.toLowerCase() : raw;
+    // ADR-0075 : téléphone en E.164 quand il est reconnaissable, sinon tel quel.
+    values[key] = key === 'email' ? raw.toLowerCase() : key === 'phone' ? storedPhone(raw) : raw;
   }
   if (body.consent !== true) {
     issues.push({

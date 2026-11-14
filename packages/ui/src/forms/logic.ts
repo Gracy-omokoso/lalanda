@@ -8,6 +8,8 @@
 // AUCUN montant ici : la mise en forme des montants est dans `money.ts`, qui
 // ne fait que du texte (ADR-0025 : l'UI formate, le moteur calcule).
 
+import { formatPhoneE123 } from '@lalanda/shared/phone';
+
 // ─── Largeurs sémantiques ────────────────────────────────────────────────────
 
 /**
@@ -605,18 +607,15 @@ export function ecrireTelephone(indicatif: string, national: string): string {
 }
 
 /**
- * Forme lisible d'un numéro enregistré : `+243812345678` → `+243 81 234 5678`.
- * Un texte qui n'est pas un numéro (lettres, poste « ext. 12 »…) est rendu tel
- * quel : on n'efface jamais une saisie ancienne. Un numéro sans indicatif
- * (`0812…`) est aussi rendu tel quel : on ne devine pas son pays à l'affichage.
- * Affichage seulement.
+ * Forme lisible d'un numéro enregistré, au format international UIT-T E.123 :
+ * `+243812345678` → `+243 81 234 5678`. Délègue à `formatPhoneE123` de
+ * `@lalanda/shared` (ADR-0075), la même fonction que les PDF de l'API. Un texte
+ * qui n'est pas un numéro (lettres, poste « ext. 12 »…) est rendu tel quel : on
+ * n'efface jamais une saisie ancienne. Un numéro sans indicatif (`0812…`) est aussi
+ * rendu tel quel : on ne devine pas son pays à l'affichage. Affichage seulement.
  */
 export function afficherTelephone(valeur: string | null | undefined): string {
-  const v = (valeur ?? '').trim();
-  if (!/^(\+|00)[\d\s.()/-]+$/.test(v)) return v;
-  const { indicatif, national } = lireTelephone(v);
-  if (national === '') return v;
-  return `${indicatif} ${grouperNational(indicatif, national)}`;
+  return formatPhoneE123(valeur, { defaultCountryCode: null });
 }
 
 // ─── Jours marqués (fériés de l'organisation) ────────────────────────────────

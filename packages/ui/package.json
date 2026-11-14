@@ -25,6 +25,7 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
+    "@lalanda/shared": "workspace:*",
     "clsx": "^2.1.1",
     "lucide-react": "^1.64.0",
     "tailwind-merge": "^2.5.4"
