@@ -11,7 +11,7 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { WorkMemberRef } from '@lalanda/shared/work';
+import type { WorkMemberRef, WorkProjectRole } from '@lalanda/shared/work';
 import type { Model } from 'mongoose';
 
 import {
@@ -22,8 +22,6 @@ import {
 import { can, type Action, type OrgRole } from '../authz/permissions.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
-import type { WorkProjectRole } from '@lalanda/shared/work';
-
 import {
   isLeadEligibleRole,
   seesProjectAudience,
