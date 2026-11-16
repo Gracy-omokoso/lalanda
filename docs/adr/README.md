@@ -292,3 +292,14 @@ Décideurs :
   obligatoire, « À valider », brief du matin, brouillon de facture après approbation seulement) ;
   liste de contrôle (30 éléments) ; statut du projet déclaré à côté de la santé calculée.
   Statut : **accepté** (16 nov. 2026, décision de Gracy ; points « à revoir » listés).
+- [ADR-0077](ADR-0077-projets-synchronisation-contrats-depenses-temps.md) — Projets synchronisés :
+  contrat signé → projet (idempotent par `sales_contracts.projectId` et index unique partiel,
+  `409 WORK_PROJECT_EXISTS_FOR_CONTRACT`, projet du devis ou de l'opportunité relié plutôt que
+  doublonné, une tâche par ligne sans montant, un jalon par échéance d'un échéancier, marge qui lit
+  les factures du contrat sans doublon, préparation par jalon refusée quand le contrat facture
+  lui-même) ; dépenses récurrentes avec fournisseur (règles d'ADR-0075) et projet, hérités par les
+  occurrences ; filtres fournisseur et projet de la liste des dépenses, « Voir toutes ses dépenses »
+  depuis la fiche ; validation hebdomadaire des feuilles de temps (soumission, approbation ou
+  renvoi motivé par le manager ou `work.manage`, verrou `409 WORK_TIMESHEET_LOCKED`, réouverture
+  tracée), part de temps validé informative dans la marge, « Mes tâches » et brief (R21, 1.7.0) ;
+  paie non reliée (ADR-0070). Statut : **accepté** (16 nov. 2026).
