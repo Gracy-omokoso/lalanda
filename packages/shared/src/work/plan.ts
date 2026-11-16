@@ -282,6 +282,8 @@ export const WorkPlanProjectSchema = z
     description: optText(WORK_LIMITS.projectDescriptionMax),
     kind: z.enum(WORK_PROJECT_KINDS, { error: 'Nature : client ou internal.' }),
     ownerUserId: WorkId.nullable().optional(),
+    // ADR-0076 § 1 : Adjoint du chef de projet (mêmes règles que `POST /work/projects`).
+    deputyUserId: WorkId.nullable().optional(),
     startDate: WorkDay.nullable().optional(),
     dueDate: WorkDay.nullable().optional(),
   })
@@ -289,6 +291,14 @@ export const WorkPlanProjectSchema = z
   .superRefine((v, ctx) => {
     if (v.startDate && v.dueDate && v.dueDate < v.startDate) {
       issue(ctx, ['dueDate'], 'WORK_DATES_INVERTED', 'L’échéance précède la date de début.');
+    }
+    if (v.ownerUserId && v.deputyUserId && v.ownerUserId === v.deputyUserId) {
+      issue(
+        ctx,
+        ['deputyUserId'],
+        'WORK_PROJECT_LEAD_NOT_ELIGIBLE',
+        'L’adjoint doit être une autre personne que le chef de projet.',
+      );
     }
   });
 export type WorkPlanProject = z.output<typeof WorkPlanProjectSchema>;

@@ -305,6 +305,25 @@ export class WorkTasksService {
     return this.access.rightsOn(organizationId, project, actor);
   }
 
+  /**
+   * ADR-0076 § 1 : import et plans — aucun responsable Lecteur du projet, vérifié AVANT
+   * toute écriture (400 `WORK_ASSIGNEE_VIEWER`).
+   */
+  async assertPlanAssignees(
+    organizationId: string,
+    projectId: string,
+    assigneeUserIds: readonly (string | null)[],
+  ): Promise<void> {
+    const ids = [...new Set(assigneeUserIds.filter((u): u is string => !!u))];
+    await this.assertNotViewers(
+      organizationId,
+      projectId,
+      ids,
+      'assigneeUserId',
+      'WORK_ASSIGNEE_VIEWER',
+    );
+  }
+
   /** ADR-0076 § 1 : 403 si l'appelant est Lecteur du projet (import de tâches). */
   async assertCanCreateTasks(
     organizationId: string,
@@ -1974,10 +1993,16 @@ export class WorkTasksService {
    * Sinon : sous-tâches, commentaires, pièces jointes et saisies supprimées
    * partent avec elle ; elle est retirée des dépendances des autres.
    */
-  async remove(organizationId: string, taskId: string, actor: WorkActor): Promise<void> {
+  async remove(
+    organizationId: string,
+    taskId: string,
+    actor: WorkActor,
+    /** Annulation interne d'un import (`WorkPlanBuilder`) : la règle de gestion ne s'applique pas. */
+    opts: { trusted?: boolean } = {},
+  ): Promise<void> {
     const { task: current, project } = await this.requireWritable(organizationId, taskId);
     // ADR-0076 § 1 : suppression de tâches — chef, adjoint ou `work.manage`.
-    await this.access.assertManage(organizationId, project, actor);
+    if (!opts.trusted) await this.access.assertManage(organizationId, project, actor);
     const children = await this.tasks
       .find({ organizationId, parentTaskId: taskId }, { _id: 1, billing: 1 })
       .lean<{ _id: unknown; billing: unknown }[]>()

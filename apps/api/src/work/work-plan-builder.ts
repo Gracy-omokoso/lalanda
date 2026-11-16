@@ -176,8 +176,22 @@ export class WorkPlanBuilder {
       ...tasks.map((t) => t.assigneeUserId),
       project.ownerUserId,
     ]);
+    // ADR-0076 § 1 : chef et adjoint — ni Invité externe, ni Stagiaire, refusés AVANT
+    // toute écriture (même code que `POST /work/projects`).
+    if (project.ownerUserId) {
+      await this.members.requireLeadEligible(organizationId, project.ownerUserId, 'ownerUserId');
+    }
+    if (project.deputyUserId) {
+      await this.members.requireLeadEligible(organizationId, project.deputyUserId, 'deputyUserId');
+    }
     const defaults = await this.settings.get(organizationId);
-    const prepared = await this.prepare(organizationId, defaults.defaultColumns, tasks, actor);
+    const prepared = await this.prepare(
+      organizationId,
+      defaults.defaultColumns,
+      tasks,
+      actor,
+      true,
+    );
 
     let created: WorkProjectView | null = null;
     try {
@@ -189,6 +203,7 @@ export class WorkPlanBuilder {
           description: project.description ?? null,
           kind: project.kind,
           ownerUserId: project.ownerUserId ?? null,
+          deputyUserId: project.deputyUserId ?? null,
           startDate: project.startDate ?? null,
           dueDate: project.dueDate ?? null,
           columns: prepared.columns,
@@ -247,9 +262,30 @@ export class WorkPlanBuilder {
   ): Promise<WorkPlanApplyResult> {
     this.assertStructure(tasks);
     const project = await this.projects.requireWritable(organizationId, projectId);
+    // ADR-0076 § 1 : mêmes règles que la création unitaire, vérifiées AVANT toute écriture —
+    // le Lecteur ne crée rien ; seuls le chef, l'adjoint et `work.manage` posent des jalons ;
+    // un Lecteur du projet n'est pas responsable.
+    const rights = await this.tasks.projectRightsOf(organizationId, project, actor);
+    if (!rights.canCreateTasks) {
+      forbidden(
+        'WORK_TASK_CREATE_FORBIDDEN',
+        'Vous êtes Lecteur de ce projet : vous pouvez lire et commenter, pas y importer de tâches.',
+      );
+    }
+    if (tasks.some((t) => t.isMilestone) && !rights.canManage) {
+      forbidden(
+        'WORK_PROJECT_MANAGE_FORBIDDEN',
+        'Seuls le chef de projet, son adjoint et les gestionnaires posent les jalons : retirez les jalons du plan.',
+      );
+    }
     await this.assertAssignees(
       organizationId,
       tasks.map((t) => t.assigneeUserId),
+    );
+    await this.tasks.assertPlanAssignees(
+      organizationId,
+      projectId,
+      tasks.map((t) => t.assigneeUserId ?? null),
     );
     // Lecture seule (compte) : les écritures passent toutes par les services.
     const existing = await this.taskModel.countDocuments({ organizationId, projectId }).exec();
@@ -260,7 +296,13 @@ export class WorkPlanBuilder {
         { limit: WORK_LIMITS.tasksPerProject },
       );
     }
-    const prepared = await this.prepare(organizationId, project.columns, tasks, actor);
+    const prepared = await this.prepare(
+      organizationId,
+      project.columns,
+      tasks,
+      actor,
+      rights.canManage,
+    );
 
     const createdTop: string[] = [];
     let columnsChanged = false;
@@ -310,7 +352,8 @@ export class WorkPlanBuilder {
       return result;
     } catch (err) {
       for (const id of createdTop.reverse()) {
-        await this.safely(() => this.tasks.remove(organizationId, id, actor));
+        // Annulation d'un geste déjà autorisé : la règle « gestion du projet » ne s'applique pas.
+        await this.safely(() => this.tasks.remove(organizationId, id, actor, { trusted: true }));
       }
       if (columnsChanged) {
         await this.safely(async () => {
@@ -368,13 +411,15 @@ export class WorkPlanBuilder {
     baseColumns: readonly WorkColumn[],
     tasks: readonly WorkPlanTask[],
     actor: WorkActor,
+    /** ADR-0076 § 1 : le chef et l'adjoint ajoutent des sections (colonnes) à LEUR projet. */
+    managesProject: boolean,
   ): Promise<Prepared> {
     const manage = actorCan(actor, 'work.manage');
     const { columns, added: addedColumns } = columnsWithSections(
       baseColumns,
       distinctTexts(tasks.map((t) => t.section)),
     );
-    if (addedColumns.length > 0 && !manage) {
+    if (addedColumns.length > 0 && !manage && !managesProject) {
       forbidden(
         'WORK_PLAN_SECTION_FORBIDDEN',
         `Créer une section (${addedColumns.join(', ')}) demande le droit de gérer les projets.`,

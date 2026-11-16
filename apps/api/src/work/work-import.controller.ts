@@ -92,6 +92,8 @@ const NewProjectQuery = z
     kind: z.string().optional(),
     description: z.string().optional(),
     ownerUserId: z.string().optional(),
+    // ADR-0076 § 1 : adjoint du chef de projet.
+    deputyUserId: z.string().optional(),
     startDate: z.string().optional(),
     dueDate: z.string().optional(),
     skipInvalid: flag,
@@ -177,6 +179,7 @@ export class WorkImportController {
       kind: q.data.kind ?? 'internal',
       description: q.data.description,
       ownerUserId: blankToNull(q.data.ownerUserId),
+      deputyUserId: blankToNull(q.data.deputyUserId),
       startDate: blankToNull(q.data.startDate),
       dueDate: blankToNull(q.data.dueDate),
     });
