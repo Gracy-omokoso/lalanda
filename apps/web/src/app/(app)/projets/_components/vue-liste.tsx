@@ -19,7 +19,9 @@ import { BoutonImporterTaches } from './import-entrees';
 import {
   AbsenceBadges,
   Avatar,
+  AValiderBadge,
   BloqueeBadge,
+  ProgressionListe,
   DateEcheance,
   Etiquettes,
   PrioriteBadge,
@@ -196,6 +198,7 @@ function LigneTache({
               <span className="sr-only"> sous-tâches terminées</span>
             </span>
           ) : null}
+          <ProgressionListe t={t} />
           {commentaires > 0 ? (
             <span className="inline-flex items-center gap-0.5" title="Commentaires">
               <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
@@ -204,6 +207,7 @@ function LigneTache({
             </span>
           ) : null}
           {t.blocked ? <BloqueeBadge /> : null}
+          <AValiderBadge t={t} />
         </span>
         <button
           type="button"

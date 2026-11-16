@@ -25,7 +25,9 @@ import { AjoutEnLigne, BarreFiltres, CaseTerminee, useFiltres } from './barre-ta
 import {
   AbsenceBadges,
   Avatar,
+  AValiderBadge,
   BloqueeBadge,
+  ProgressionListe,
   DateEcheance,
   Etiquettes,
   PrioriteBadge,
@@ -266,9 +268,13 @@ function Carte({
           {t.title}
         </button>
       </div>
-      {t.blocked || t.priority !== 'none' || t.labelKeys.length > 0 ? (
+      {t.blocked ||
+      t.priority !== 'none' ||
+      t.labelKeys.length > 0 ||
+      t.approval?.state === 'pending' ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {t.blocked ? <BloqueeBadge /> : null}
+          <AValiderBadge t={t} />
           <PrioriteBadge priority={t.priority} />
           <Etiquettes keys={t.labelKeys} labels={labels} max={2} />
         </div>
@@ -286,6 +292,7 @@ function Carte({
               <span className="sr-only"> sous-tâches terminées</span>
             </span>
           ) : null}
+          <ProgressionListe t={t} />
           {commentaires > 0 ? (
             <span className="inline-flex items-center gap-0.5" title="Commentaires">
               <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />

@@ -7,6 +7,7 @@ import { Badge, Tag } from '@lalanda/ui';
 import type { WorkLabel, WorkPriority, WorkTaskView } from '@lalanda/shared/work';
 
 import { badgeAbsent, constatAbsentEcheance } from './absences-model';
+import { enAttenteDeValidation, progressionListe } from './collab-model';
 import { initiales, pileAvatars, teinteAvatar, tonDate, type TonDate } from './liste-model';
 import { LIBELLES_ECHEANCE, PRIORITES, etatEcheance, formatJour } from './projets-model';
 
@@ -72,6 +73,36 @@ export function Echeance({
       {etat ? ` · ${LIBELLES_ECHEANCE[etat]}` : null}
     </Badge>
   );
+}
+
+/** ADR-0076 § 4 : progression de la liste de contrôle (« ☑ 3/5 »), rien sans liste. */
+export function ProgressionListe({
+  t,
+}: {
+  t: Pick<WorkTaskView, 'checklistDone' | 'checklistTotal'>;
+}): React.ReactElement | null {
+  const p = progressionListe(t);
+  if (p === null) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 ${p.complet ? 'text-[var(--ok)]' : ''}`}
+      title="Liste de contrôle"
+    >
+      <span aria-hidden="true">☑</span>
+      {p.texte}
+      <span className="sr-only"> éléments de la liste de contrôle cochés</span>
+    </span>
+  );
+}
+
+/** ADR-0076 § 3 : tâche soumise, en attente de validation. */
+export function AValiderBadge({
+  t,
+}: {
+  t: Pick<WorkTaskView, 'approval'>;
+}): React.ReactElement | null {
+  if (!enAttenteDeValidation(t)) return null;
+  return <Badge tone="info">À valider</Badge>;
 }
 
 export function BloqueeBadge(): React.ReactElement {
