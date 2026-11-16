@@ -301,5 +301,5 @@ Décideurs :
   occurrences ; filtres fournisseur et projet de la liste des dépenses, « Voir toutes ses dépenses »
   depuis la fiche ; validation hebdomadaire des feuilles de temps (soumission, approbation ou
   renvoi motivé par le manager ou `work.manage`, verrou `409 WORK_TIMESHEET_LOCKED`, réouverture
-  tracée), part de temps validé informative dans la marge, « Mes tâches » et brief (R21, 1.7.0) ;
+  tracée), part de temps validé informative dans la marge, « Mes tâches » et brief (R21, 1.8.0) ;
   paie non reliée (ADR-0070). Statut : **accepté** (16 nov. 2026).

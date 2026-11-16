@@ -3,8 +3,8 @@
 Statut : **Accepted**
 Date : 2026-11-16
 Décideuse : Gracy Omokoso (fermeture des trous de synchronisation du module Projets, validée le
-16 nov. 2026) ; CTO Lalanda (contrat technique). Les choix marqués « **à revoir avec Gracy** » ont
-été tranchés par défaut et peuvent être changés sans casser le contrat.
+16 nov. 2026) ; CTO Lalanda (contrat technique). Les six choix marqués « **à revoir avec
+Gracy** » ont été **validés par Gracy le 16 nov. 2026** ; ils restent signalés pour mémoire.
 
 > **Tranche** [ADR-0050](ADR-0050-contrats-commandes-acomptes-abonnements.md) § 4.2 (« Créer le
 > projet » d'un contrat ; `projectId` du contrat, jusque-là « non posé par ce lot ») et
@@ -14,7 +14,7 @@ Décideuse : Gracy Omokoso (fermeture des trous de synchronisation du module Pro
 > `supplierId`). **Lève**, pour la validation seulement, l'écart d'[ADR-0045](ADR-0045-ressources-humaines.md)
 > O5 (option 2, « lot futur », décision ouverte n° 10) : soumission hebdomadaire, validation par le
 > manager, verrou. **Étend** [ADR-0033](ADR-0033-brief-du-matin.md) (un fait, une règle,
-> `MORNING_BRIEF_VERSION` 1.7.0) et « Mes tâches » (ADR-0040 § 5.2, un port de plus).
+> `MORNING_BRIEF_VERSION` 1.8.0, après la 1.7.0 d’ADR-0076) et « Mes tâches » (ADR-0040 § 5.2, un port de plus).
 > **Ne touche pas à la paie** ([ADR-0070](ADR-0070-paie-rdc.md), exclue tant que la dirigeante ne
 > la rouvre pas) ni à aucune règle fiscale, comptable ou DGI : aucune facture émise, aucun appel
 > e-MCF.
@@ -212,7 +212,7 @@ Index unique `{ organizationId, userId, week }` ; index `{ organizationId, statu
    détenteurs de `work.manage`. Un `work.manage` peut toujours suppléer depuis la feuille.
 7. **Brief du matin** : fait `mes_validations_temps.en_attente` (nombre seulement, même audience que
    « Mes tâches ») et règle **R21 `validations_temps_en_attente`** (rang 21, `attention`),
-   `actionPath: '/projets/mes-taches/temps/a-valider'` ; `MORNING_BRIEF_VERSION` **1.7.0** ; sans
+   `actionPath: '/projets/mes-taches/temps/a-valider'` ; `MORNING_BRIEF_VERSION` **1.8.0** (la 1.7.0 est le fait « Tâches à valider » d’ADR-0076, gardé) ; sans
    l'entrée, le fait est « non disponible » et R1 à R20 sont inchangées.
 8. **Paie** : rien n'est relié (ADR-0070). Le temps validé n'alimente ni salaire, ni taux, ni
    bulletin, ni `work_member_rates`.
@@ -221,6 +221,20 @@ Index unique `{ organizationId, userId, week }` ; index `{ organizationId, statu
    page `/projets/mes-taches/temps/a-valider` liste les semaines à valider. Le panneau de
    tâche (chantier parallèle) n'est pas modifié : une saisie refusée y affiche le message de
    l'API (`WORK_TIMESHEET_LOCKED`) ; masquer ses boutons est une suite.
+
+### 5. Rôles dans le projet (ADR-0076)
+
+1. **Contrat → projet** : mêmes droits que `from-quote` (`work.manage` + `sales.read`) ; le
+   projet créé a `ownerUserId: null` (pas de chef désigné d'office), comme un projet issu d'un
+   devis ; le chef se désigne ensuite dans les Réglages. Un jalon d'échéance suit la règle
+   d'ADR-0076 § 3 (jalon « à valider » facturé après approbation) **et** celle d'O3 (contrat qui
+   facture lui-même : aucun brouillon par jalon).
+2. **Saisie de temps** : le Lecteur d'un projet ne saisit pas de temps (contrôle d'ADR-0076 avant
+   la création) ; le verrou d'une semaine validée s'ajoute à ce contrôle, il ne le remplace pas.
+3. **Validation des feuilles de temps** : le chef et l'adjoint d'un projet **ne valident pas** une
+   semaine. Une semaine porte le temps d'un membre sur **tous** ses projets ; le chef d'un projet
+   n'a autorité que sur le sien, et ADR-0076 lui confie la validation des **tâches**, pas du
+   temps. La règle reste : manager du membre (relation RH) ou `work.manage`, jamais soi-même.
 
 ## Conséquences
 
