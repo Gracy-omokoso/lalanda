@@ -1,0 +1,34 @@
+import { describe, expect, it } from 'vitest';
+
+import { OPTIONS_STATUT, TONS_STATUT, corpsStatut, resumeStatut } from './statut-model';
+
+describe('statut déclaré du projet (ADR-0076 § 5)', () => {
+  it('quatre statuts dans l’ordre, chacun son ton', () => {
+    expect(OPTIONS_STATUT.map((o) => o.label)).toEqual([
+      'Dans les temps',
+      'À risque',
+      'En retard',
+      'Terminé',
+    ]);
+    expect(TONS_STATUT.off_track).toBe('late');
+  });
+
+  it('résumé daté et signé', () => {
+    expect(
+      resumeStatut({ status: 'at_risk', date: '2026-11-16', author: { userId: 'u', name: 'Awa' } }),
+    ).toBe('À risque · 16/11/2026 · Awa');
+  });
+
+  it('corps : texte obligatoire, date facultative', () => {
+    expect(corpsStatut({ status: 'on_track', text: '   ', date: '' })).toBeNull();
+    expect(corpsStatut({ status: 'on_track', text: ' OK ', date: '' })).toEqual({
+      status: 'on_track',
+      text: 'OK',
+    });
+    expect(corpsStatut({ status: 'done', text: 'Livré', date: '2026-11-15' })).toEqual({
+      status: 'done',
+      text: 'Livré',
+      date: '2026-11-15',
+    });
+  });
+});

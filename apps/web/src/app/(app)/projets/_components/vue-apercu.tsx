@@ -23,6 +23,8 @@ import { SANTE, libellesSemaines, phraseSante, pourcentTermine } from './apercu-
 import { Avatar, DateEcheance } from './elements';
 import { hrefProjet } from './projets-model';
 import { useProjet } from './project-context';
+// ADR-0076 § 5 : statut déclaré par le chef de projet, à côté de la santé calculée.
+import { StatutDeclare } from './statut-projet';
 
 function Bloc({
   titre,
@@ -42,7 +44,7 @@ function Bloc({
 }
 
 export function VueApercu(): React.ReactElement {
-  const { project, apercu, chargement, gerer, travailler, tasks } = useProjet();
+  const { project, apercu, chargement, gererProjet: gerer, travailler, tasks } = useProjet();
 
   if (project === null) {
     return chargement ? <Skeleton className="h-64 w-full" /> : <></>;
@@ -99,7 +101,7 @@ export function VueApercu(): React.ReactElement {
         )}
       </Bloc>
 
-      <Bloc titre="Statut du projet">
+      <Bloc titre="Santé du projet">
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill tone={sante.tone}>{sante.label}</StatusPill>
           <span className="text-xs text-[var(--foreground-muted)]">calculé aujourd’hui</span>
@@ -112,6 +114,8 @@ export function VueApercu(): React.ReactElement {
           <Chiffre label="Sans responsable" valeur={t.unassigned} />
         </dl>
       </Bloc>
+
+      <StatutDeclare />
 
       <Bloc titre="Avancement">
         {total === 0 ? (
