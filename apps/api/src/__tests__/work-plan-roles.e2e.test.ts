@@ -11,7 +11,7 @@ import { expect, it } from 'vitest';
 import { e2eSuite } from './e2e-utils.js';
 import { useWorkFixture } from './work-e2e-fixtures.js';
 
-const csv = (lines: string[]) => Buffer.from(`﻿${lines.join('\r\n')}\r\n`, 'utf8');
+const csv = (lines: string[]) => Buffer.from(`\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
 
 e2eSuite('Projets : import et plans IA sous les rôles du projet — ADR-0076 § 1', () => {
   const f = useWorkFixture('wplanrole', { extraRoles: ['employee', 'intern', 'guest'] });
