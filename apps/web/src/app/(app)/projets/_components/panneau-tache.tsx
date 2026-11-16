@@ -53,6 +53,9 @@ import {
   messageWork,
 } from './projets-model';
 import { Collaboration } from './tache-collab';
+// ADR-0076 : collaborateurs, abonnés, liste de contrôle, validation.
+import { droitsTache } from './collab-model';
+import { ListeControle, ParticipantsTache, ValidationTache } from './tache-participants';
 
 import {
   candidatsDependance,
@@ -123,6 +126,8 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
     members,
     travailler,
     gerer,
+    gererProjet,
+    droitsProjet,
     moi,
     assignerSoiSeulement,
     fermerTache,
@@ -197,7 +202,14 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
   }
 
   const d = detail;
-  const ecrire = travailler;
+  const parent = d.parentTaskId ? tasks.find((t) => t.id === d.parentTaskId) : null;
+  // ADR-0076 § 2 : droits dits par le serveur (repli : règle partagée, puis l'organisation).
+  const droits = droitsTache(d, { moi, travailler, droitsProjet, parent: parent ?? null });
+  const ecrire = droits.canEdit;
+  const aValider = d.approval?.required === true && d.approval.state !== 'approved';
+  // Terminer ou rouvrir : le responsable, le chef, l'adjoint ; une tâche à valider se
+  // termine par l'approbation.
+  const peutBasculer = droits.canComplete && !(aValider && !d.done);
   const labels = settings?.labels ?? [];
   // ADR-0066 § 2 et § 3 : « Moi » seulement pour un Stagiaire ; sinon les personnes qui
   // voient le projet. Le serveur reste juge.
@@ -271,12 +283,10 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
       'Changement d’état impossible.',
     );
 
-  const parent = d.parentTaskId ? tasks.find((t) => t.id === d.parentTaskId) : null;
-
   return (
     <div className="flex flex-col gap-5 p-4 sm:p-5">
       <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--background)] px-4 py-2.5 sm:-mx-5 sm:-mt-5 sm:px-5">
-        {ecrire ? (
+        {peutBasculer ? (
           <button
             type="button"
             disabled={envoi}
@@ -293,7 +303,8 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
           </button>
         ) : (
           <span className="text-sm text-[var(--foreground-muted)]">
-            {d.done ? '✓ Terminée' : 'Ouverte'} · lecture seule
+            {d.done ? '✓ Terminée' : aValider ? 'À valider' : 'Ouverte'}
+            {ecrire ? '' : ' · lecture seule'}
           </span>
         )}
         <span className="flex items-center gap-1">
@@ -649,12 +660,14 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             </span>
           </dd>
 
-          {d.parentTaskId === null && d.subtasks.length === 0 ? (
+          {/* ADR-0076 § 1 : les jalons sont posés par la gestion du projet. */}
+          {d.parentTaskId === null && d.subtasks.length === 0 && (gererProjet || d.isMilestone) ? (
             <>
               <dt className="text-[var(--foreground-muted)]">Jalon</dt>
               <dd>
                 <Switch
                   checked={f.isMilestone}
+                  disabled={!gererProjet}
                   onChange={(v) => void sauver({ isMilestone: v })}
                   label={
                     <>
@@ -682,6 +695,18 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
         />
       </Field>
 
+      {/* ─── ADR-0076 : validation, liste de contrôle, participants ──────── */}
+      <ValidationTache d={d} droits={droits} envoi={envoi} agir={agir} apres={apres} />
+      <ListeControle d={d} droits={droits} envoi={envoi} agir={agir} apres={apres} />
+      <ParticipantsTache
+        d={d}
+        droits={droits}
+        envoi={envoi}
+        agir={agir}
+        apres={apres}
+        onSuivi={charger}
+      />
+
       {/* ─── Sous-tâches ─────────────────────────────────────────────────── */}
       {d.parentTaskId === null && !d.isMilestone ? (
         <section aria-labelledby="sous-titre" className="flex flex-col gap-2">
@@ -697,7 +722,11 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                 <CercleCoche
                   coche={s.done}
                   taille={16}
-                  disabled={!ecrire || envoi}
+                  disabled={
+                    envoi ||
+                    !droitsTache(s, { moi, travailler, droitsProjet, parent: d }).canComplete ||
+                    (s.approval?.required === true && s.approval.state !== 'approved' && !s.done)
+                  }
                   label={
                     s.done ? `Rouvrir #${s.number} ${s.title}` : `Terminer #${s.number} ${s.title}`
                   }
@@ -729,7 +758,7 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
               </li>
             ))}
           </ul>
-          {ecrire && d.subtasks.length < 100 ? (
+          {travailler && (droitsProjet?.canCreateTasks ?? true) && d.subtasks.length < 100 ? (
             <form
               className="flex gap-2"
               onSubmit={(e) => {
@@ -768,7 +797,7 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
           Temps saisi : {formatMinutes(d.loggedMinutes)}
           {d.source?.kind === 'quote_line' ? ' · Issue d’une ligne de devis' : ''}
         </span>
-        {gerer && project.status !== 'archived' ? (
+        {gererProjet && project.status !== 'archived' ? (
           <button
             type="button"
             className={buttonClasses('danger', 'sm')}
