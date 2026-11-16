@@ -1400,6 +1400,13 @@ describe('ADR-0045 — H5 : rapports, registre exporté, feuille de temps', () =
       'HrReportsController.exportRegister': ['hr.read', 'hr.manage'],
       // Soi au guard ; autrui (`work.manage` ou manager) décidé dans le service.
       'WorkTimesheetsController.weekly': ['work.read'],
+      // ADR-0077 § 4 : validation hebdomadaire ; le validateur (manager ou `work.manage`,
+      // jamais soi-même) est décidé dans le service.
+      'WorkTimesheetsController.pending': ['work.read'],
+      'WorkTimesheetsController.submit': ['work.read'],
+      'WorkTimesheetsController.approve': ['work.read'],
+      'WorkTimesheetsController.returnWeek': ['work.read'],
+      'WorkTimesheetsController.reopen': ['work.read'],
     };
     const routes = TOUTES_LES_ROUTES.filter((r) =>
       /^(HrReports|WorkTimesheets)Controller\./.test(r.cle),
@@ -1411,9 +1418,20 @@ describe('ADR-0045 — H5 : rapports, registre exporté, feuille de temps', () =
     }
   });
 
-  it('aucune route d’écriture sur la feuille de temps (ni saisie, ni validation)', () => {
+  // ADR-0077 § 4 lève l'écart d'ADR-0045 O5 pour la VALIDATION seulement : toujours
+  // aucune saisie de temps par la feuille (on saisit depuis les tâches).
+  it('feuille de temps : validation seulement, aucune saisie', () => {
     const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('WorkTimesheetsController.'));
-    expect(routes.map((r) => r.cle)).toEqual(['WorkTimesheetsController.weekly']);
+    expect(routes.map((r) => r.cle).sort()).toEqual(
+      [
+        'WorkTimesheetsController.approve',
+        'WorkTimesheetsController.pending',
+        'WorkTimesheetsController.reopen',
+        'WorkTimesheetsController.returnWeek',
+        'WorkTimesheetsController.submit',
+        'WorkTimesheetsController.weekly',
+      ].sort(),
+    );
   });
 });
 
