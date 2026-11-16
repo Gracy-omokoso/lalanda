@@ -25,6 +25,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { EntityAssetsPanel } from '@/components/entity-assets-panel';
+// ADR-0077 § 3 : « Voir toutes ses dépenses » ouvre la liste filtrée de la trésorerie.
+import { lienDepensesFournisseur } from '../../tresorerie/depenses/_components/filtres-depenses';
 import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import {
   purchasesApi,
@@ -232,7 +234,13 @@ function Identite({ s }: { s: SupplierView }): React.ReactElement {
   );
 }
 
-function SectionsFiche({ sections }: { sections: Sections }): React.ReactElement {
+function SectionsFiche({
+  sections,
+  supplierId,
+}: {
+  sections: Sections;
+  supplierId: string;
+}): React.ReactElement {
   const commandes = sections.orders;
   const solde = sections.balance;
   const factures = sections.invoices;
@@ -361,6 +369,15 @@ function SectionsFiche({ sections }: { sections: Sections }): React.ReactElement
             ))}
           </ul>
         )}
+        {/* ADR-0077 § 3 : section visible = `treasury.read`, le droit de la liste. */}
+        {depenses.status !== 'hidden' ? (
+          <Link
+            href={lienDepensesFournisseur(supplierId)}
+            className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+          >
+            Voir toutes ses dépenses
+          </Link>
+        ) : null}
       </Panneau>
     </div>
   );
@@ -451,7 +468,7 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
       </div>
 
       {o ? (
-        <SectionsFiche sections={o.sections} />
+        <SectionsFiche sections={o.sections} supplierId={supplierId} />
       ) : erreur ? (
         <Alert tone="danger">
           <p>{erreur}</p>

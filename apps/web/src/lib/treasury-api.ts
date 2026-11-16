@@ -145,7 +145,12 @@ export interface RecurringExpenseView {
   currency: TreasuryCurrency;
   category: string;
   categoryLabel: string;
+  /** Nom COURANT de la fiche si `supplierId` est posé (ADR-0077 § 2), sinon le nom libre. */
   supplierName: string | null;
+  /** ADR-0044 — P2 / ADR-0077 § 2 : fiche fournisseur, ou `null`. */
+  supplierId?: string | null;
+  /** ADR-0077 § 2 : projet du RUN, ou `null`. */
+  workProjectId?: string | null;
   accountId: string | null;
   frequency: RecurrenceFrequency;
   startDate: string;
@@ -161,6 +166,10 @@ export interface RecurringExpenseBody {
   currency: TreasuryCurrency;
   category: string;
   supplierName?: string | null;
+  /** ADR-0077 § 2 : mêmes règles qu'une dépense (ADR-0075). */
+  supplierId?: string | null;
+  /** ADR-0077 § 2 : absent = inchangé ; `null` = détaché. */
+  workProjectId?: string | null;
   accountId?: string | null;
   frequency: RecurrenceFrequency;
   startDate: string;
@@ -425,6 +434,8 @@ export const treasuryApi = {
     currency?: string;
     /** Dépenses d'un projet du RUN (ADR-0039 § 6.4). */
     workProjectId?: string;
+    /** ADR-0077 § 3 : dépenses d'une fiche fournisseur. */
+    supplierId?: string;
     status?: 'recorded' | 'cancelled' | 'all';
     q?: string;
     cursor?: string | null;

@@ -12,9 +12,14 @@
 //
 // ADR-0075 (A) : fournisseur en `EntityPicker` relié à la fiche fournisseur
 // (`supplierId`), nom libre toujours possible ; « + » sous `purchase.manage`.
+//
+// ADR-0077 § 2 et § 3 : règles récurrentes avec fournisseur et projet (hérités par les
+// occurrences) ; filtres « Fournisseur » et « Projet » de la liste, lus et écrits dans
+// l'URL (`?fournisseur=<id>&projet=<id>`), « Tous les mois » pour tout voir.
 
 import {
   DatePicker,
+  EntityPicker,
   Field,
   FormGrid,
   Modal,
@@ -25,11 +30,14 @@ import {
   StatusPill,
   SubmitButton,
   TextInput,
+  ToggleChip,
   buttonClasses,
 } from '@lalanda/ui';
+import type { WorkProjectSummary } from '@lalanda/shared/work';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   codeOf,
@@ -57,6 +65,7 @@ import { contient, nombre } from '@/components/tableau-de-bord/format';
 import { TableauChiffres } from '@/components/tableau-de-bord/tableau';
 import { useTableau } from '@/components/tableau-de-bord/use-tableau';
 import { runStatsApi } from '@/lib/api-run-stats';
+import { workBillingApi } from '@/lib/work-billing-api';
 
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 import { Bandeau, Section, useAccesTresorerie } from '../_components/treasury-access';
@@ -74,7 +83,20 @@ import {
 } from './_components/depense-possedee';
 import { rappelPersonnel } from './_components/depense-personnel';
 import { ChoixFournisseurDepense } from './_components/choix-fournisseur-depense';
-import { champsFournisseur, type FournisseurDepense } from './_components/fournisseur-depense';
+import {
+  champsFournisseur,
+  cleOption,
+  type FournisseurDepense,
+} from './_components/fournisseur-depense';
+import {
+  aDesFiltres,
+  ecrireFiltres,
+  lireFiltres,
+  nomFicheFiltree,
+  optionsFiltreFournisseur,
+  periodeListe,
+  type FiltresDepenses,
+} from './_components/filtres-depenses';
 import {
   FREQUENCY_LABELS,
   formatMontantSigne,
@@ -134,7 +156,23 @@ const VIDE: Formulaire = {
 };
 
 export default function DepensesPage(): React.ReactElement {
+  // `useSearchParams` exige une frontière de chargement (filtres lus dans l'URL).
+  return (
+    <Suspense fallback={null}>
+      <DepensesEcran />
+    </Suspense>
+  );
+}
+
+function DepensesEcran(): React.ReactElement {
   const { gerer } = useAccesTresorerie();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const filtres = useMemo(() => lireFiltres(params), [params]);
+  const [tousLesMois, setTousLesMois] = useState(() => aDesFiltres(lireFiltres(params)));
+  // ADR-0077 § 3 : projets non archivés (`work.read`) ; `null` : filtre et noms masqués.
+  const [projets, setProjets] = useState<WorkProjectSummary[] | null>(null);
   const [categories, setCategories] = useState<ExpenseCategoryView[]>([]);
   const [comptes, setComptes] = useState<TreasuryAccountView[]>([]);
   const [mois, setMois] = useState(moisCourant());
@@ -157,12 +195,11 @@ export default function DepensesPage(): React.ReactElement {
   const charger = useCallback(async () => {
     setErreur(null);
     try {
-      const from = `${mois}-01`;
-      const to = finDeMois(mois);
       const [liste, r, e] = await Promise.all([
         treasuryApi.listExpenses({
-          from,
-          to,
+          ...periodeListe(mois, tousLesMois, finDeMois),
+          ...(filtres.fournisseurId ? { supplierId: filtres.fournisseurId } : {}),
+          ...(filtres.projetId ? { workProjectId: filtres.projetId } : {}),
           category: filtreCategorie || undefined,
           status: statut,
           limit: 200,
@@ -177,7 +214,12 @@ export default function DepensesPage(): React.ReactElement {
     } catch (err) {
       setErreur(messageOf(err));
     }
-  }, [mois, filtreCategorie, statut]);
+  }, [mois, filtreCategorie, statut, tousLesMois, filtres]);
+
+  /** Filtres écrits dans l'URL (lien partageable, retour arrière). */
+  function changerFiltres(suite: Partial<FiltresDepenses>): void {
+    router.replace(`${pathname}${ecrireFiltres({ ...filtres, ...suite })}`, { scroll: false });
+  }
 
   useEffect(() => {
     void treasuryApi
@@ -188,6 +230,10 @@ export default function DepensesPage(): React.ReactElement {
       .listAccounts()
       .then((p) => setComptes(p.items.filter((a) => a.active)))
       .catch(() => undefined);
+    void workBillingApi
+      .activeProjects()
+      .then((p) => setProjets(p.items))
+      .catch(() => setProjets(null));
   }, []);
   useEffect(() => {
     void charger();
@@ -650,13 +696,56 @@ export default function DepensesPage(): React.ReactElement {
                 ...categories.map((c) => ({ value: c.code, label: c.label })),
               ]}
             />
+            <div className="min-w-0 max-w-full shrink sm:w-56">
+              <EntityPicker<FournisseurDepense>
+                aria-label="Fournisseur"
+                value={
+                  filtres.fournisseurId
+                    ? {
+                        supplierId: filtres.fournisseurId,
+                        name: nomFicheFiltree(filtres.fournisseurId, depenses),
+                      }
+                    : null
+                }
+                onChange={(v) => changerFiltres({ fournisseurId: v?.supplierId ?? null })}
+                search={async (texte) =>
+                  optionsFiltreFournisseur((await treasuryApi.suppliers(texte)).entries ?? [])
+                }
+                getKey={cleOption}
+                getLabel={(v) => v.name}
+                placeholder="Tous les fournisseurs"
+                emptyText="Aucune fiche fournisseur."
+                debounceMs={250}
+              />
+            </div>
+            {projets !== null ? (
+              <Select<string>
+                aria-label="Projet"
+                className="min-w-0 max-w-full shrink sm:w-52"
+                value={filtres.projetId ?? ''}
+                onChange={(v) => changerFiltres({ projetId: v || null })}
+                options={[
+                  { value: '', label: 'Tous les projets' },
+                  ...projets.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                searchPlaceholder="Rechercher un projet…"
+              />
+            ) : null}
+            <ToggleChip checked={tousLesMois} onChange={setTousLesMois}>
+              Tous les mois
+            </ToggleChip>
           </div>
         </div>
         {visibles.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-[var(--foreground-muted)]">
-            {q.trim() !== '' || filtreCategorie !== '' || statut !== 'recorded'
+            {q.trim() !== '' ||
+            filtreCategorie !== '' ||
+            statut !== 'recorded' ||
+            aDesFiltres(filtres)
               ? 'Aucune dépense ne correspond à ces critères.'
-              : `Aucune dépense en ${libelleMois(mois)}.`}
+              : tousLesMois
+                ? 'Aucune dépense.'
+                : `Aucune dépense en ${libelleMois(mois)}.`}
           </p>
         ) : (
           <>
@@ -767,6 +856,7 @@ export default function DepensesPage(): React.ReactElement {
         regles={regles}
         categories={categories}
         comptes={comptes}
+        projets={projets}
         gerer={gerer}
         onChange={() => void charger()}
         onError={setErreur}
@@ -779,6 +869,7 @@ function RecurringSection({
   regles,
   categories,
   comptes,
+  projets,
   gerer,
   onChange,
   onError,
@@ -786,6 +877,8 @@ function RecurringSection({
   regles: RecurringExpenseView[];
   categories: ExpenseCategoryView[];
   comptes: TreasuryAccountView[];
+  /** ADR-0077 § 2 : projets non archivés (`work.read`), `null` sinon. */
+  projets: WorkProjectSummary[] | null;
   gerer: boolean;
   onChange: () => void;
   onError: (m: string) => void;
@@ -799,7 +892,12 @@ function RecurringSection({
     frequency: 'monthly' as RecurrenceFrequency,
     startDate: aujourdhui(),
     endDate: '',
+    // ADR-0077 § 2 : fiche ou nom libre, et projet (`''` : aucun).
+    fournisseur: null as FournisseurDepense | null,
+    workProjectId: '',
   });
+  const nomProjet = (pid: string | null | undefined): string | null =>
+    pid ? (projets?.find((p) => p.id === pid)?.name ?? null) : null;
   const [creation, setCreation] = useState(false);
   const [erreurCreation, setErreurCreation] = useState<string | null>(null);
 
@@ -820,12 +918,14 @@ function RecurringSection({
         amount: montant.valeur,
         currency: f.currency,
         category: f.category,
+        ...champsFournisseur(f.fournisseur),
+        workProjectId: f.workProjectId || null,
         accountId: f.accountId || null,
         frequency: f.frequency,
         startDate: f.startDate,
         endDate: f.endDate || null,
       });
-      setF({ ...f, label: '', amount: '' });
+      setF({ ...f, label: '', amount: '', fournisseur: null, workProjectId: '' });
       setCreation(false);
       onChange();
     } catch (err) {
@@ -841,6 +941,8 @@ function RecurringSection({
         currency: r.currency,
         category: r.category,
         supplierName: r.supplierName,
+        // ADR-0077 § 2 : la fiche est gardée ; le projet n'est pas envoyé (inchangé).
+        ...(r.supplierId ? { supplierId: r.supplierId } : {}),
         accountId: r.accountId,
         frequency: r.frequency,
         startDate: r.startDate,
@@ -885,6 +987,16 @@ function RecurringSection({
               <span>
                 <span className="font-medium">{r.label}</span> —{' '}
                 {FREQUENCY_LABELS[r.frequency].toLowerCase()} · {r.categoryLabel}
+                {r.supplierName || nomProjet(r.workProjectId) ? (
+                  <span className="block text-xs text-[var(--foreground-muted)]">
+                    {[
+                      r.supplierName,
+                      nomProjet(r.workProjectId) ? `Projet ${nomProjet(r.workProjectId)}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                ) : null}
                 {r.nextOccurrence ? (
                   <span className="block text-xs text-[var(--foreground-muted)]">
                     Prochaine échéance : {libelleDate(r.nextOccurrence)}
@@ -976,6 +1088,28 @@ function RecurringSection({
                 shortcuts={['endOfYear']}
               />
             </Field>
+            <Field
+              id="rec-fournisseur"
+              label="Fournisseur"
+              optional
+              size="md"
+              newRow
+              hint="Choisissez la fiche fournisseur, ou tapez un nom libre pour un fournisseur de passage."
+            >
+              <ChoixFournisseurDepense
+                id="rec-fournisseur"
+                valeur={f.fournisseur}
+                onChange={(v) => setF({ ...f, fournisseur: v })}
+              />
+            </Field>
+            {projets !== null ? (
+              <WorkProjectSelect
+                id="rec-projet"
+                size="md"
+                value={f.workProjectId}
+                onChange={(workProjectId) => setF({ ...f, workProjectId })}
+              />
+            ) : null}
             <Field id="rec-compte" label="Compte" optional size="md" newRow>
               <Select<string>
                 value={f.accountId}
