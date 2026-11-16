@@ -164,7 +164,7 @@ e2eSuite('RH — liens avec le brief, les projets, le temps et la marge (ADR-004
   describe('brief du matin (§ 6.5, critère 16)', () => {
     it('A (manager) : deux absents dans son équipe → R13 ; une demande à valider → R14', async () => {
       const b = await brief('analyst');
-      expect(b.version).toBe('1.7.0'); // ADR-0076 (1.7.0)
+      expect(b.version).toBe('1.8.0'); // ADR-0076 (1.7.0), ADR-0077 § 4.7 (1.8.0)
       expect(fact(b, 'rh.absents_aujourdhui')).toMatchObject({ status: 'known', value: '2' });
       expect(fact(b, 'mes_validations_absence.en_attente')).toMatchObject({
         status: 'known',

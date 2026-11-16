@@ -168,7 +168,7 @@ e2eSuite('feuilles de temps : soumission, validation, verrou (ADR-0077 § 4)', (
       (f) => f.id === 'mes_validations_temps.en_attente',
     );
     expect(fact).toMatchObject({ status: 'known', value: '1' });
-    expect(brief.version).toBe('1.7.0');
+    expect(brief.version).toBe('1.8.0');
     // La feuille vue par le manager : il peut décider.
     expect(ok(await sheet('analyst', fx.userIds['accountant']))['approval']).toMatchObject({
       status: 'submitted',
