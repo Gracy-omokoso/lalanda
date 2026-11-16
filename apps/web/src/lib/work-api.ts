@@ -50,6 +50,13 @@ import type {
   WorkProjectSlackChannelView,
   // ADR-0065 : notifications par WhatsApp.
   WhatsAppView,
+  // ADR-0076 : rôles, validation, liste de contrôle, statut du projet.
+  DecideWorkApprovalBody,
+  PostWorkProjectStatusBody,
+  PutWorkChecklistBody,
+  WorkProjectMemberRole,
+  WorkProjectRole,
+  WorkProjectStatusView,
 } from '@lalanda/shared/work';
 
 import { API_URL, jsonRequest, salesQuery } from './api';
@@ -74,6 +81,10 @@ export interface WorkMemberOption extends WorkMemberRef {
    * projet. Un responsable doit voir le projet de sa tâche.
    */
   seesProject?: boolean;
+  /** ADR-0076 § 1 : peut être Chef de projet ou Adjoint (interne, `work.update`). */
+  canLead?: boolean;
+  /** ADR-0076 § 1 : rôle dans le projet demandé (`?projectId=`). */
+  projectRole?: WorkProjectRole;
 }
 
 /** `GET /work/members?projectId=` : membres et règle d'assignation de l'appelant. */
@@ -271,6 +282,32 @@ export const workApi = {
       { method: 'DELETE' },
     ),
 
+  // ─── ADR-0076 : validation, liste de contrôle, suivre ──────────────────────
+  submitApproval: (taskId: string, expectedRevision: number) =>
+    jsonRequest<WorkTaskWriteResult>(`/work/tasks/${id(taskId)}/approval/submit`, {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
+  decideApproval: (taskId: string, body: DecideWorkApprovalBody) =>
+    jsonRequest<WorkTaskWriteResult>(`/work/tasks/${id(taskId)}/approval/decide`, {
+      method: 'POST',
+      body,
+    }),
+  putChecklist: (taskId: string, body: PutWorkChecklistBody) =>
+    jsonRequest<WorkTaskWriteResult>(`/work/tasks/${id(taskId)}/checklist`, {
+      method: 'PUT',
+      body,
+    }),
+  followTask: (taskId: string) =>
+    jsonRequest<{ following: boolean }>(`/work/tasks/${id(taskId)}/follow`, {
+      method: 'POST',
+      body: {},
+    }),
+  unfollowTask: (taskId: string) =>
+    jsonRequest<{ following: boolean }>(`/work/tasks/${id(taskId)}/follow`, {
+      method: 'DELETE',
+    }),
+
   // ─── Commentaires ─────────────────────────────────────────────────────────
   listCommentsPage,
   /** Tous les commentaires de la tâche, pages enchaînées (100 par page, le maximum). */
@@ -356,6 +393,28 @@ export const workApi = {
       `/work/projects/${id(projectId)}/members/teams/${id(teamId)}`,
       { method: 'DELETE' },
     ),
+
+  // ─── ADR-0076 : rôles des membres, statut du projet ───────────────────────
+  setProjectUserRole: (projectId: string, userId: string, role: WorkProjectMemberRole) =>
+    jsonRequest<WorkProjectMembersView>(
+      `/work/projects/${id(projectId)}/members/users/${id(userId)}/role`,
+      { method: 'PUT', body: { role } },
+    ),
+  setProjectTeamRole: (projectId: string, teamId: string, role: WorkProjectMemberRole) =>
+    jsonRequest<WorkProjectMembersView>(
+      `/work/projects/${id(projectId)}/members/teams/${id(teamId)}/role`,
+      { method: 'PUT', body: { role } },
+    ),
+  listProjectStatusUpdates: (projectId: string) =>
+    jsonRequest<WorkItems<WorkProjectStatusView>>(
+      `/work/projects/${id(projectId)}/status-updates`,
+      { method: 'GET' },
+    ).then((r) => r.items),
+  postProjectStatus: (projectId: string, body: PostWorkProjectStatusBody) =>
+    jsonRequest<WorkProjectStatusView>(`/work/projects/${id(projectId)}/status-updates`, {
+      method: 'POST',
+      body,
+    }),
 
   // ─── ADR-0061 : mes notifications ─────────────────────────────────────────
   getNotificationPreferences: () =>
