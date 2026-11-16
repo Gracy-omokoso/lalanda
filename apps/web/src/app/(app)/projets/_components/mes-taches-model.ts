@@ -35,6 +35,10 @@
 // approuver, préavis, fin de terme, reconduction à constater, copie signée manquante,
 // brouillons d'échéance à émettre, échéance bloquée, acompte à traiter) n'a pas de case à
 // cocher : il ouvre l'écran propriétaire et porte sa pastille (`kindLabel`). Aucun montant.
+//
+// ADR-0077 § 4.6 : un élément `source: 'work_timesheet'` est une semaine de temps soumise
+// que l'appelant peut valider. Pas de case à cocher (valider est une décision) : il ouvre
+// la feuille du membre et porte la pastille « Feuille de temps à valider ».
 
 import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
@@ -50,12 +54,14 @@ import {
   type MyTaskItem,
   type MyTasksView,
   type WorkMyTaskItem,
+  type WorkTimesheetMyTaskItem,
 } from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
 
 import { formatJours, libellePeriode } from '../../rh/_components/rh-model';
 import { formatMontant } from '../../ventes/_components/sales-model';
+import { formatMinutes } from './temps-model';
 
 export type CleGroupe = 'overdue' | 'today' | 'next7Days' | 'later' | 'noDate';
 
@@ -149,6 +155,22 @@ export function estElementContrat(e: MyTaskEntry): e is SalesContractMyTaskItem 
 /** Ligne secondaire : client et objet, motifs d'une échéance bloquée, ou la pastille. */
 export function sousTitreElementContrat(e: SalesContractMyTaskItem): string {
   return e.detail ?? e.kindLabel;
+}
+
+/** ADR-0077 § 4.6 : semaine de temps à valider — un lien, sans case à cocher. */
+export function estFeuilleTemps(e: MyTaskEntry): e is WorkTimesheetMyTaskItem {
+  return e.source === 'work_timesheet';
+}
+
+/** « Feuille de Bea Kanku » : le membre, jamais une durée dans le titre. */
+export function titreFeuilleTemps(e: WorkTimesheetMyTaskItem): string {
+  return `Feuille de ${e.userName}`;
+}
+
+/** « Semaine du 16/11 · 7 h 30 » : la semaine et les minutes rendues par l'API. */
+export function sousTitreFeuilleTemps(e: WorkTimesheetMyTaskItem): string {
+  const [, m, d] = e.week.split('-');
+  return `Semaine du ${d}/${m} · ${e.totalMinutes > 0 ? formatMinutes(e.totalMinutes) : 'aucun temps saisi'}`;
 }
 
 /**

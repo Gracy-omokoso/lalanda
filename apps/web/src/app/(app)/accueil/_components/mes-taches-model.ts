@@ -15,7 +15,7 @@ import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
-import type { MyTaskEntry, MyTaskItem } from '@lalanda/shared/work';
+import type { MyTaskEntry, MyTaskItem, WorkTimesheetMyTaskItem } from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
 
@@ -75,7 +75,22 @@ function estElementContrat(t: Element): t is SalesContractMyTaskItem {
   return 'source' in t && t.source === 'sales_contracts';
 }
 
+// ADR-0077 § 4.6 : semaine de temps à valider — un lien, sans durée dans le titre.
+function estFeuilleTemps(t: Element): t is WorkTimesheetMyTaskItem {
+  return 'source' in t && t.source === 'work_timesheet';
+}
+
 function ligne(t: Element, enRetard: boolean): LigneTache {
+  if (estFeuilleTemps(t)) {
+    return {
+      id: t.id,
+      titre: `${t.kindLabel} : ${t.userName}`,
+      projet: 'Feuilles de temps',
+      echeance: enRetard ? `En retard · ${formatJour(t.dueDate, false)}` : 'Aujourd’hui',
+      enRetard,
+      lien: t.href,
+    };
+  }
   if (estElementContrat(t)) {
     const echeance = t.dueDate === null ? 'Sans échéance' : formatJour(t.dueDate, false);
     return {

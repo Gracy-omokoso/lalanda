@@ -21,6 +21,7 @@ import {
   type MyTasksView,
   type WorkMyTaskItem,
   type WorkProjectSummary,
+  type WorkTimesheetMyTaskItem,
 } from '@lalanda/shared/work';
 import {
   Alert,
@@ -34,7 +35,7 @@ import {
   TextInput,
   buttonClasses,
 } from '@lalanda/ui';
-import { ClipboardCheck, FileSignature, Scale } from 'lucide-react';
+import { ClipboardCheck, Clock, FileSignature, Scale } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -60,6 +61,9 @@ import {
   estElementContrat,
   estElementMagasin,
   estElementRh,
+  estFeuilleTemps,
+  sousTitreFeuilleTemps,
+  titreFeuilleTemps,
   sousTitreElementContrat,
   sousTitreElementMagasin,
   estRelance,
@@ -263,7 +267,14 @@ export function MesTaches(): React.ReactElement {
                 ) : (
                   <ul className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                     {liste.map((t) =>
-                      estElementContrat(t) ? (
+                      estFeuilleTemps(t) ? (
+                        <LigneFeuilleTemps
+                          key={t.id}
+                          e={t}
+                          today={vue.asOf}
+                          dueSoonDays={dueSoon}
+                        />
+                      ) : estElementContrat(t) ? (
                         <LigneContrat key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
                       ) : estElementMagasin(t) ? (
                         <LigneMagasin key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
@@ -481,6 +492,49 @@ function LigneMagasin({
           </Link>
           <span className="truncate text-xs text-[var(--foreground-muted)]">
             {sousTitreElementMagasin(e)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
+          {e.kindLabel}
+        </span>
+        <Echeance
+          task={{ dueDate: e.dueDate, done: false, isMilestone: false }}
+          today={today}
+          dueSoonDays={dueSoonDays}
+        />
+      </div>
+    </li>
+  );
+}
+
+/**
+ * ADR-0077 § 4.6 : semaine de temps à valider — un lien vers la feuille du membre et sa
+ * pastille, sans case à cocher (approuver ou renvoyer se décide sur la feuille).
+ */
+function LigneFeuilleTemps({
+  e,
+  today,
+  dueSoonDays,
+}: {
+  e: WorkTimesheetMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+}): React.ReactElement {
+  return (
+    <li className="relative flex min-w-0 flex-col gap-1.5 px-3 py-2.5 hover:bg-[var(--surface-muted)] sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <Clock aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-run)]" />
+        <span className="flex min-w-0 flex-col">
+          <Link
+            href={e.href}
+            className="break-words text-sm font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
+          >
+            {titreFeuilleTemps(e)}
+          </Link>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {sousTitreFeuilleTemps(e)}
           </span>
         </span>
       </div>

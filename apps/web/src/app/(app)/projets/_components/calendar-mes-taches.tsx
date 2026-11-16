@@ -46,6 +46,9 @@ import {
   estApprobation,
   estElementContrat,
   estElementMagasin,
+  estFeuilleTemps,
+  sousTitreFeuilleTemps,
+  titreFeuilleTemps,
   estElementRh,
   sousTitreElementContrat,
   sousTitreElementMagasin,
@@ -74,6 +77,22 @@ function versCalendrier(e: MyTaskEntry): ElementCalendrier {
       number: 0,
       title: titreElementRh(e),
       etiquette: pastilleElementRh(e),
+      startDate: null,
+      dueDate: e.dueDate,
+      isMilestone: false,
+      done: false,
+      rank: e.rank,
+      revision: 0,
+      element: e,
+    };
+  }
+  // ADR-0077 § 4.6 : semaine de temps à valider — au dimanche de la semaine, sans se déplacer.
+  if (estFeuilleTemps(e)) {
+    return {
+      id: e.id,
+      number: 0,
+      title: titreFeuilleTemps(e),
+      etiquette: e.kindLabel,
       startDate: null,
       dueDate: e.dueDate,
       isMilestone: false,
@@ -288,17 +307,19 @@ export function CalendrierMesTaches(): React.ReactElement {
           idPrefixe="mes-taches-cal"
           bandeaux={bandeaux}
           sousTitre={(t) =>
-            estElementContrat(t.element)
-              ? sousTitreElementContrat(t.element)
-              : estElementMagasin(t.element)
-                ? sousTitreElementMagasin(t.element)
-                : estElementRh(t.element)
-                  ? sousTitreElementRh(t.element)
-                  : estApprobation(t.element)
-                    ? sousTitreApprobation(t.element)
-                    : estRelance(t.element)
-                      ? sousTitreRelance(t.element)
-                      : t.element.projectName
+            estFeuilleTemps(t.element)
+              ? sousTitreFeuilleTemps(t.element)
+              : estElementContrat(t.element)
+                ? sousTitreElementContrat(t.element)
+                : estElementMagasin(t.element)
+                  ? sousTitreElementMagasin(t.element)
+                  : estElementRh(t.element)
+                    ? sousTitreElementRh(t.element)
+                    : estApprobation(t.element)
+                      ? sousTitreApprobation(t.element)
+                      : estRelance(t.element)
+                        ? sousTitreRelance(t.element)
+                        : t.element.projectName
           }
           onOuvrir={(t) =>
             router.push(
@@ -306,7 +327,8 @@ export function CalendrierMesTaches(): React.ReactElement {
                 estApprobation(t.element) ||
                 estElementRh(t.element) ||
                 estElementMagasin(t.element) ||
-                estElementContrat(t.element)
+                estElementContrat(t.element) ||
+                estFeuilleTemps(t.element)
                 ? t.element.href
                 : hrefTache(t.element.projectId, t.element.id, 'calendrier'),
             )
