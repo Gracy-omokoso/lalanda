@@ -68,6 +68,8 @@ import {
   preparerProjet,
   type FormulaireProjet,
 } from './projets-model';
+// ADR-0076 § 5 : statut déclaré à côté de la santé calculée.
+import { statutDeclareAffiche } from './statut-model';
 
 /** Client tel que le sélecteur le connaît. */
 type ClientProjet = Pick<CustomerView, 'id' | 'name'> & Partial<Pick<CustomerView, 'nif'>>;
@@ -344,11 +346,20 @@ function Avancement({ p }: { p: WorkPortfolioProject }): React.ReactElement {
 
 function Statut({ p }: { p: WorkPortfolioProject }): React.ReactElement {
   const s = statutAffiche(p);
+  // ADR-0076 § 5 : le statut DÉCLARÉ s'affiche à côté de la santé calculée.
+  const declare = statutDeclareAffiche(p.latestStatus);
   return (
-    <StatusPill tone={s.ton} title={raisonSante(p)}>
-      {s.libelle}
-      <span className="sr-only"> — {raisonSante(p)}</span>
-    </StatusPill>
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <StatusPill tone={s.ton} title={raisonSante(p)}>
+        {s.libelle}
+        <span className="sr-only"> — {raisonSante(p)}</span>
+      </StatusPill>
+      {declare ? (
+        <StatusPill tone={declare.ton} title={declare.titre}>
+          {declare.libelle}
+        </StatusPill>
+      ) : null}
+    </span>
   );
 }
 

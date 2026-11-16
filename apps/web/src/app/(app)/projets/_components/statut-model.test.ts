@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { OPTIONS_STATUT, TONS_STATUT, corpsStatut, resumeStatut } from './statut-model';
+import {
+  OPTIONS_STATUT,
+  TONS_STATUT,
+  corpsStatut,
+  resumeStatut,
+  statutDeclareAffiche,
+} from './statut-model';
 
 describe('statut déclaré du projet (ADR-0076 § 5)', () => {
   it('quatre statuts dans l’ordre, chacun son ton', () => {
@@ -30,5 +36,21 @@ describe('statut déclaré du projet (ADR-0076 § 5)', () => {
       text: 'Livré',
       date: '2026-11-15',
     });
+  });
+
+  it('pastille du portefeuille, rien sans statut', () => {
+    expect(statutDeclareAffiche(null)).toBeNull();
+    const p = statutDeclareAffiche({
+      id: 's',
+      projectId: 'p',
+      status: 'off_track',
+      text: 'Retard du client',
+      date: '2026-11-16',
+      author: { userId: 'u', name: 'Awa' },
+      createdAt: '2026-11-16T08:00:00.000Z',
+    });
+    expect(p?.libelle).toBe('Déclaré : En retard');
+    expect(p?.ton).toBe('late');
+    expect(p?.titre).toContain('Retard du client');
   });
 });

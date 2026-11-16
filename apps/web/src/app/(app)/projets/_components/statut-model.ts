@@ -39,3 +39,18 @@ export function corpsStatut(f: {
   if (text === '') return null;
   return { status: f.status, text, ...(f.date ? { date: f.date } : {}) };
 }
+
+/**
+ * Pastille du statut déclaré sur le portefeuille : « Déclaré : À risque », avec le
+ * résumé en titre. `null` sans statut publié (instance N-1 comprise).
+ */
+export function statutDeclareAffiche(
+  latest: WorkProjectStatusView | null | undefined,
+): { libelle: string; ton: StatusTone; titre: string } | null {
+  if (!latest) return null;
+  return {
+    libelle: `Déclaré : ${WORK_PROJECT_STATUS_LABELS[latest.status]}`,
+    ton: TONS_STATUT[latest.status],
+    titre: `${resumeStatut(latest)} — ${latest.text.slice(0, 200)}`,
+  };
+}
