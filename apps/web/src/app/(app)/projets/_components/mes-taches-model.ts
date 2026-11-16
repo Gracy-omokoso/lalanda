@@ -258,3 +258,27 @@ export function sectionsMesTaches(v: MyTasksView): SectionsMesTaches {
     noDate: v.noDate,
   };
 }
+
+// ── ADR-0076 : « À valider » et « Je collabore » ─────────────────────────────
+
+export type CleSectionCollab = 'toApprove' | 'collaborating';
+
+/**
+ * Sections ajoutées par ADR-0076 : tâches qui attendent MA validation, tâches dont je
+ * suis collaborateur. Absentes (instance N-1) ou vides : non affichées.
+ */
+export function sectionsCollaboration(
+  v: MyTasksView,
+): { cle: CleSectionCollab; titre: string; items: WorkMyTaskItem[] }[] {
+  const avecSource = (xs: readonly MyTaskItem[] | undefined): WorkMyTaskItem[] =>
+    (xs ?? []).map((t) => ({ ...t, source: 'work' as const }));
+  return [
+    { cle: 'toApprove' as const, titre: 'À valider', items: avecSource(v.toApprove) },
+    { cle: 'collaborating' as const, titre: 'Je collabore', items: avecSource(v.collaborating) },
+  ].filter((s) => s.items.length > 0);
+}
+
+/** Une tâche « à valider » non approuvée ne se coche pas : elle se soumet. */
+export function cochableDansMesTaches(t: Pick<WorkMyTaskItem, 'approval'>): boolean {
+  return !(t.approval?.required === true && t.approval.state !== 'approved');
+}

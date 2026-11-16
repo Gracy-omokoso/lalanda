@@ -50,6 +50,9 @@ import { CercleCocher, OngletsMesTaches, PastilleProjet } from './equipe-element
 import {
   SECTIONS_MES_TACHES,
   sectionsMesTaches,
+  // ADR-0076 : « À valider », « Je collabore ».
+  cochableDansMesTaches,
+  sectionsCollaboration,
   PASTILLE_RELANCE,
   PASTILLE_APPROBATION,
   appliquerTache,
@@ -123,6 +126,7 @@ export function MesTaches(): React.ReactElement {
   }
 
   const sections = vue ? sectionsMesTaches(vue) : null;
+  const sectionsCollab = vue ? sectionsCollaboration(vue) : [];
 
   return (
     <section className="flex min-w-0 flex-col gap-4">
@@ -181,6 +185,38 @@ export function MesTaches(): React.ReactElement {
           </ul>
         </section>
       ) : null}
+      {/* ADR-0076 : tâches à valider par moi, tâches où je collabore. */}
+      {vue !== null && sectionsCollab.length > 0 ? (
+        <div className="flex flex-col gap-5">
+          {sectionsCollab.map((g) => (
+            <section key={g.cle} aria-labelledby={`mt-${g.cle}`} className="flex flex-col gap-1.5">
+              <h2
+                id={`mt-${g.cle}`}
+                className="flex items-baseline gap-2 text-[13px] font-semibold"
+              >
+                {g.titre}
+                <span className="text-xs font-normal text-[var(--foreground-muted)] tabular-nums">
+                  {g.items.length}
+                </span>
+              </h2>
+              <ul className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
+                {g.items.map((t) => (
+                  <LigneTache
+                    key={`${g.cle}-${t.id}`}
+                    t={t}
+                    today={vue.asOf}
+                    dueSoonDays={dueSoon}
+                    // Une tâche à valider se décide dans son panneau ; un collaborateur
+                    // ne termine pas la tâche d'un autre.
+                    peutCocher={false}
+                    onTerminer={() => terminer(t)}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : null}
       {vue === null || sections === null ? (
         erreur ? null : (
           <div aria-busy="true" className="flex flex-col gap-3">
@@ -188,7 +224,8 @@ export function MesTaches(): React.ReactElement {
             <Skeleton className="h-24 w-full" />
           </div>
         )
-      ) : totalMesTaches(vue) === 0 ? (
+      ) : totalMesTaches(vue) === 0 && sectionsCollab.length > 0 ? null : totalMesTaches(vue) ===
+        0 ? (
         <EmptyState
           title="Aucune tâche ouverte pour vous"
           description={
@@ -249,7 +286,7 @@ export function MesTaches(): React.ReactElement {
                           t={t}
                           today={vue.asOf}
                           dueSoonDays={dueSoon}
-                          peutCocher={travailler}
+                          peutCocher={travailler && cochableDansMesTaches(t)}
                           onTerminer={() => terminer(t)}
                         />
                       ),
