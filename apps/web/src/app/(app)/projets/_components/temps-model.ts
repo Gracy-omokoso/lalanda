@@ -2,11 +2,18 @@
 //
 // Grille jour × projet des saisies de temps existantes, croisée avec les absences
 // accordées (demi-journées, jamais le type) et les jours fériés : tout vient de
-// `GET /work/timesheets` (moteur RH `weeklyTimesheet`), totaux compris. Aucune
-// saisie, aucune validation, aucun verrou. L'écran met en forme et navigue d'une
-// semaine à l'autre ; il n'additionne rien.
+// `GET /work/timesheets` (moteur RH `weeklyTimesheet`), totaux compris. L'écran met en
+// forme et navigue d'une semaine à l'autre ; il n'additionne rien. ADR-0077 § 4 : état
+// de validation de la semaine (soumission, validation, renvoi, réouverture).
 
-import { addDays, type WeeklyTimesheetView } from '@lalanda/shared/work';
+import {
+  TIMESHEET_STATUS_LABELS,
+  addDays,
+  isMondayDay,
+  type TimesheetApprovalView,
+  type TimesheetHistoryEntryView,
+  type WeeklyTimesheetView,
+} from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
 
@@ -95,6 +102,75 @@ export function tonConstat(
   c: Pick<WeeklyTimesheetView['findings'][number], 'code'>,
 ): 'attention' | 'info' {
   return c.code === 'TIME_ON_LEAVE_DAY' ? 'attention' : 'info';
+}
+
+// ── ADR-0077 § 4 : validation hebdomadaire ──────────────────────────────────
+//
+// Le serveur décide de tout (validateur, état, verrou) et le dit dans `approval`
+// (`canSubmit`, `canDecide`, `canReopen`, `locked`) ; l'écran n'en déduit rien d'autre.
+
+export const TEMPS_A_VALIDER_HREF = '/projets/mes-taches/temps/a-valider';
+
+/** Pastille de l'état d'une semaine (forme et libellé, pas seulement une couleur). */
+export function pastilleSemaine(a: Pick<TimesheetApprovalView, 'status'>): {
+  label: string;
+  ton: 'ok' | 'open' | 'late' | 'wait' | 'draft';
+} {
+  const label = TIMESHEET_STATUS_LABELS[a.status];
+  switch (a.status) {
+    case 'approved':
+      return { label, ton: 'ok' };
+    case 'submitted':
+      return { label, ton: 'wait' };
+    case 'returned':
+      return { label, ton: 'late' };
+    case 'reopened':
+      return { label, ton: 'open' };
+    default:
+      return { label, ton: 'draft' };
+  }
+}
+
+/** Phrase d'état, pour l'écran et les lecteurs d'écran. */
+export function phraseValidation(a: TimesheetApprovalView): string {
+  switch (a.status) {
+    case 'open':
+      return 'Semaine en cours : soumettez-la quand elle est complète.';
+    case 'submitted':
+      return 'Semaine soumise : en attente de validation.';
+    case 'approved':
+      return `Semaine validée${a.decidedBy ? ` par ${a.decidedBy.name}` : ''} : les saisies sont verrouillées.`;
+    case 'returned':
+      return `Semaine renvoyée${a.reason ? ` : « ${a.reason} »` : ''}. Corrigez puis soumettez de nouveau.`;
+    case 'reopened':
+      return `Semaine rouverte${a.reason ? ` : « ${a.reason} »` : ''}. Les saisies sont de nouveau modifiables.`;
+  }
+}
+
+const ACTIONS_SEMAINE: Record<TimesheetHistoryEntryView['action'], string> = {
+  submitted: 'Soumise',
+  approved: 'Validée',
+  returned: 'Renvoyée',
+  reopened: 'Rouverte',
+};
+
+/** Ligne d'historique : « Validée par Aline, le 20 nov. 2026 — « motif » ». */
+export function ligneHistorique(h: TimesheetHistoryEntryView): string {
+  const jour = formatJour(h.at.slice(0, 10));
+  return `${ACTIONS_SEMAINE[h.action]} par ${h.by.name}, le ${jour}${h.reason ? ` — « ${h.reason} »` : ''}`;
+}
+
+/** Paramètres d'URL de la feuille (`?membre=<id>&semaine=<lundi>`), ignorés s'ils sont malformés. */
+export function lireParamsFeuille(params: { get(k: string): string | null }): {
+  membre: string;
+  semaine: string | undefined;
+} {
+  const m = params.get('membre');
+  const s = params.get('semaine');
+  return {
+    membre: m && /^[0-9a-f]{24}$/i.test(m) ? m.toLowerCase() : '',
+    semaine: s && isMondayDay(s) ? s : undefined,
+  };
 }
 
 export function phraseSemaine(v: Pick<WeeklyTimesheetView, 'days'>): string {

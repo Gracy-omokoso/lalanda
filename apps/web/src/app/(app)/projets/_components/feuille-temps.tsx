@@ -3,13 +3,17 @@
 // `/projets/mes-taches/temps` — feuille de temps hebdomadaire en LECTURE seule
 // (ADR-0045 O5, § 6.3), lot H7 : grille jour × projet des saisies existantes,
 // croisée avec les absences accordées (sans le type) et les jours fériés, et les
-// constats rendus par l'API. Aucune saisie, validation ni verrou : on saisit son
-// temps depuis les tâches. Totaux et constats viennent du moteur (`weeklyTimesheet`).
+// constats rendus par l'API. On saisit son temps depuis les tâches. Totaux et constats
+// viennent du moteur (`weeklyTimesheet`).
+//
+// ADR-0077 § 4 : soumission de la semaine, validation par le manager ou `work.manage`
+// (bloc `ValidationSemaine`) ; le lien de « Mes tâches » ouvre `?membre=&semaine=`.
 
 import type { WeeklyTimesheetView } from '@lalanda/shared/work';
 import { Alert, PageHeader, Select, buttonClasses } from '@lalanda/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { hrAdminApi } from '@/lib/api-hr-admin';
@@ -25,12 +29,15 @@ import {
   etatJour,
   formatMinutes,
   formatPrevu,
+  lireParamsFeuille,
   messageConstat,
   peutChoisirMembre,
   phraseSemaine,
   semaineVoisine,
   tonConstat,
+  TEMPS_A_VALIDER_HREF,
 } from './temps-model';
+import { ValidationSemaine } from './validation-semaine';
 
 const TH = 'px-2 py-2 text-left text-xs font-semibold text-[var(--foreground-muted)]';
 const TD = 'px-2 py-2 align-top tabular-nums';
@@ -39,8 +46,10 @@ export function FeuilleTemps(): React.ReactElement {
   const { actions, chargees } = useShell();
   const lecture = peutLire(actions);
   const choisir = peutChoisirMembre(actions);
-  const [semaine, setSemaine] = useState<string | undefined>(undefined);
-  const [membre, setMembre] = useState('');
+  // ADR-0077 § 4.6 : ouverte depuis « Mes tâches » sur la semaine d'un membre.
+  const initiaux = lireParamsFeuille(useSearchParams());
+  const [semaine, setSemaine] = useState<string | undefined>(initiaux.semaine);
+  const [membre, setMembre] = useState(initiaux.membre);
   const [membres, setMembres] = useState<WorkMemberOption[]>([]);
   const [vue, setVue] = useState<WeeklyTimesheetView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -85,11 +94,16 @@ export function FeuilleTemps(): React.ReactElement {
         module="run"
         moduleLabel="Exploiter · Projets"
         title="Mes tâches"
-        description="Votre semaine en lecture : le temps saisi sur les tâches, les absences accordées et les jours fériés. Rien ne se saisit ni ne se valide ici."
+        description="Votre semaine : le temps saisi sur les tâches, les absences accordées et les jours fériés. Soumettez-la quand elle est complète ; votre manager la valide."
         actions={
-          <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
-            Tous les projets
-          </Link>
+          <span className="flex flex-wrap gap-2">
+            <Link href={TEMPS_A_VALIDER_HREF} className={buttonClasses('secondary', 'md')}>
+              À valider
+            </Link>
+            <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
+              Tous les projets
+            </Link>
+          </span>
         }
       />
       <OngletsMesTaches actif="temps" />
@@ -149,6 +163,14 @@ export function FeuilleTemps(): React.ReactElement {
                   ? ''
                   : ' (sans fiche collaborateur : semaine de l’organisation, aucune absence)'}
               </p>
+              {vue.approval ? (
+                <ValidationSemaine
+                  approval={vue.approval}
+                  userId={vue.user.userId}
+                  week={vue.week}
+                  onChange={(approval) => setVue({ ...vue, approval })}
+                />
+              ) : null}
               <div className="max-w-full overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                 <table className="w-full min-w-[44rem] border-collapse text-sm">
                   <caption className="sr-only">
