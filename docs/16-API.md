@@ -1265,6 +1265,43 @@ authentifié capable d'accorder un abonnement).
 Calcul pur `computeWorkProjectOverview`, tâches de premier niveau (les commentaires couvrent toutes les
 tâches). Règle de santé : ADR-0057 § 2. Lecture seule, aucun montant.
 
+## Rôles dans le projet, collaboration, validation (ADR-0076)
+
+« Gestion du projet » = Chef de projet (`ownerUserId`) ou Adjoint (`deputyUserId`), internes avec
+`work.update`, ou `work.manage`. Les refus de rôle répondent `403` avec un code ; un projet hors
+portée répond toujours `404`. Contrats : `@lalanda/shared/work` (`roles.ts`, `schemas.ts`,
+`views.ts`).
+
+| Route | Permission | Règle et réponse |
+|---|---|---|
+| `PUT /work/projects/:projectId` · `POST …/archive` · `POST …/restore` | `work.update` (était `work.manage`) + gestion | `403 WORK_PROJECT_MANAGE_FORBIDDEN` ; `deputyUserId` accepté (création et modification) ; changer le chef ou l'adjoint : `work.manage` ou le chef ; Invité, Stagiaire ou sans `work.update` : `400 WORK_PROJECT_LEAD_NOT_ELIGIBLE` |
+| `GET /work/projects/:projectId` | `work.read` | + `deputy`, `myRole` (`lead` · `deputy` · `member` · `viewer` · `none`), `myRights` (`canManage`, `canCreateTasks`, `canComment`, `canLogTime`, `assignable`, `hasLead`), `latestStatus` |
+| `POST /work/projects/:projectId/members` · `DELETE …/members/users/:userId` · `DELETE …/members/teams/:teamId` | `work.update` (était `work.manage`) + gestion | `role?` (`member` · `viewer`, défaut `member`) à l'ajout ; vue des membres : `deputy`, `role` par personne et par équipe, `canManage` |
+| `PUT /work/projects/:projectId/members/users/:userId/role` · `…/teams/:teamId/role` | `work.update` + gestion | `{ role }` ; historique `project.member_role_changed` ; non membre : `404 WORK_MEMBER_NOT_FOUND` |
+| `DELETE /work/tasks/:taskId` | `work.update` (était `work.manage`) + gestion | `403 WORK_PROJECT_MANAGE_FORBIDDEN` |
+| `POST /work/projects/:projectId/tasks` · `PATCH /work/tasks/:taskId` | `work.update` | Lecteur : `403 WORK_TASK_CREATE_FORBIDDEN` ; modifier : responsable, collaborateur, créateur, tâche libre ou gestion, sinon `403 WORK_TASK_EDIT_FORBIDDEN` ; jalon et `approval` : gestion ; `collaboratorUserIds` (10 au plus, `400 WORK_COLLABORATOR_NOT_ELIGIBLE`) ; responsable Lecteur : `400 WORK_ASSIGNEE_VIEWER` |
+| `POST /work/tasks/:taskId/complete` · `…/reopen` · `…/move` (vers ou hors de « terminé ») | `work.update` | responsable ou gestion, sinon `403 WORK_TASK_COMPLETE_FORBIDDEN` ; tâche à valider non approuvée : `409 WORK_TASK_APPROVAL_REQUIRED` |
+| `POST /work/tasks/:taskId/approval/submit` | `work.update` | `{ expectedRevision }` ; responsable ou gestion (`403 WORK_APPROVAL_FORBIDDEN`) ; validateur résolu (désigné, chef, adjoint), sinon `400 WORK_APPROVER_REQUIRED` ; notification `work.task_approval_requested` |
+| `POST /work/tasks/:taskId/approval/decide` | `work.update` | `{ expectedRevision, decision: approve \| request_changes \| reject, reason? }` (motif obligatoire hors `approve`) ; validateur ou gestion, jamais l'auteur de la soumission (`409 WORK_SELF_APPROVAL_FORBIDDEN`) ; rien en attente : `409 WORK_APPROVAL_NOT_PENDING` ; approuver termine la tâche (jalon : suggestion `PREPARE_INVOICE`) |
+| `POST /work/tasks/:taskId/prepare-invoice` | inchangée | jalon « à valider » non approuvé : `409 WORK_MILESTONE_NOT_APPROVED` ; jamais d'émission |
+| `PUT /work/tasks/:taskId/checklist` | `work.update` | `{ expectedRevision, items: [{ id?, text, done }] }` (30 au plus) ; cocher : responsable, collaborateurs, gestion ; composer : qui modifie la tâche ; sinon `403 WORK_CHECKLIST_FORBIDDEN` ; `doneBy`/`doneAt` posés par le serveur |
+| `POST` · `DELETE /work/tasks/:taskId/follow` | `work.read` | `{ following }` ; 20 abonnés au plus (`409 WORK_FOLLOWERS_LIMIT`) |
+| `GET /work/projects/:projectId/status-updates` | `work.read` | `{ items: WorkProjectStatusView[] }`, 50 derniers |
+| `POST /work/projects/:projectId/status-updates` | `work.update` + gestion | `{ status: on_track \| at_risk \| off_track \| done, text, date? }` → `201` ; notification `work.project_status_posted` aux personnes du projet |
+| `POST /work/tasks/:taskId/time-entries` | inchangée | Lecteur du projet : `403 WORK_TASK_CREATE_FORBIDDEN` |
+| `POST /work/projects/:projectId/import` | inchangée | vérifié avant écriture : Lecteur `403 WORK_TASK_CREATE_FORBIDDEN` ; jalon hors gestion `403 WORK_PROJECT_MANAGE_FORBIDDEN` ; responsable Lecteur `400 WORK_ASSIGNEE_VIEWER` ; le chef et l'adjoint ajoutent des sections |
+| `POST /work/import/projects` · `POST /work/plans/projects` | inchangée | `ownerUserId` et `deputyUserId` (requête ou plan) : Invité ou Stagiaire `400 WORK_PROJECT_LEAD_NOT_ELIGIBLE`, aucun projet créé |
+
+Vues : `WorkTaskView` + `collaboratorUserIds`, `checklistDone`, `checklistTotal`, `approval`
+(`required`, `state`, `approverUserId`, `pendingApproverUserId`), `createdBy` ; `WorkTaskDetail` +
+`collaborators`, `checklist`, `approvalDetail`, `myRights` (`canEdit`, `canComplete`, `canCheck`,
+`canSubmit`, `canDecide`, `canManage`), `following` ; `GET /work/my-tasks` + `collaborating`
+(« Je collabore ») et `toApprove` (« À valider ») ; `GET /work/portfolio` + `latestStatus` à côté de
+`health` ; `GET /work/members?projectId=` + `canLead`, `projectRole`. Brief du matin 1.7.0 : fait
+`mes_validations_taches.en_attente`. Préférences : quatre événements facultatifs à l'écriture
+(`task_collaborator_added`, `task_approval_requested`, `task_approval_decided`,
+`project_status_posted`).
+
 ## API publique
 
 Réservée aux offres compatibles. Clés à portée limitée, rotation, quotas, journal d’utilisation et documentation séparée. Aucune API publique avant stabilisation des contrats internes.

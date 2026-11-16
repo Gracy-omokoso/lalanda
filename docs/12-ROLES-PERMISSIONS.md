@@ -203,6 +203,39 @@ super-administrateur et le support, `work.update` et `work.manage` sous accès d
 le seul super-administrateur. Aucune n'est un interdit absolu ; les rôles attribuables
 sont inchangés.
 
+### ADR-0076 — rôles dans un projet (relations, aucune action ajoutée)
+
+[ADR-0076](adr/ADR-0076-projets-roles-collaboration-validation.md) ajoute des **rôles dans un
+projet**, lus à chaque requête comme le responsable d'équipe (ADR-0066 § 1). Ce sont des
+**relations** : la matrice et les 57 actions sont inchangées, et le rôle d'organisation reste
+un **plafond** (sans `work.update`, rien n'est modifiable, quel que soit le rôle dans le projet).
+`work.manage` garde la main sur tous les projets.
+
+| Rôle dans le projet | Où il est stocké | Ce qu'il permet sur CE projet |
+|---|---|---|
+| **Chef de projet** | `ownerUserId` (ancien « Responsable du projet ») | gestion : réglages, membres et leurs rôles, colonnes, jalons, archivage et restauration, suppression de tâches, réglage et décision des validations, statut du projet, modifier et terminer toute tâche ; nomme l'adjoint, peut passer la main |
+| **Adjoint** | `deputyUserId` (un seul) | la même gestion, sauf nommer le chef ou l'adjoint |
+| **Membre** | défaut d'une personne ou d'une équipe ajoutée (`memberRoles` absent) | crée des tâches, commente, saisit son temps ; modifie les tâches dont il est responsable, collaborateur ou créateur, et les tâches sans responsable |
+| **Lecteur** | `memberRoles[]` `{ kind, id, role: 'viewer' }` | lit et commente ; ni création, ni import, ni temps ; ni responsable, ni collaborateur, ni validateur |
+
+- La gestion du chef et de l'adjoint exige `work.update` **et** un rôle interne : ni l'Invité
+  externe (`PROJECT_SCOPED_ROLES`) ni le Stagiaire (`SELF_ASSIGN_ONLY_ROLES`) ne sont nommés
+  chef ou adjoint (`400 WORK_PROJECT_LEAD_NOT_ELIGIBLE`, aussi à l'import et par l'IA).
+- Une personne non membre d'un projet ouvert se comporte en Membre (défaut, à revoir avec la
+  dirigeante).
+- **Terminer ou rouvrir** une tâche : son responsable, le chef, l'adjoint, `work.manage` ;
+  sans responsable, le responsable de la tâche parente (sous-tâche) ou, dans un projet sans chef
+  ni adjoint, tout Membre qui peut la modifier. Un **collaborateur** modifie, commente et coche
+  la liste de contrôle mais ne termine pas la tâche d'un autre.
+- **Validation** : le validateur désigné (défaut : chef, puis adjoint) ou la gestion décide ;
+  jamais l'auteur de la soumission (`409 WORK_SELF_APPROVAL_FORBIDDEN`).
+- Sept routes passent de `work.manage` à `work.update`, la gestion du projet étant vérifiée par
+  le service (`403 WORK_PROJECT_MANAGE_FORBIDDEN`) : `PUT /work/projects/:id`,
+  `POST …/archive`, `POST …/restore`, `POST …/members`, `DELETE …/members/users/:userId`,
+  `DELETE …/members/teams/:teamId`, `DELETE /work/tasks/:taskId`. Créer ou supprimer un projet,
+  l'import en nouveau projet, l'IA, le canal Slack du projet et les liens de facture restent sous
+  `work.manage`.
+
 ### ADR-0040 — rôle Commercial et action `sales.quote` (appliqué, lot C0)
 
 > **Statut : appliqué** par le lot C0 d'[ADR-0040](adr/ADR-0040-crm-complet.md) § 4 (29 oct.

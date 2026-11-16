@@ -247,6 +247,7 @@ export const WORK_ERROR_CODES = [
   'WORK_APPROVAL_FORBIDDEN',
   'WORK_SELF_APPROVAL_FORBIDDEN',
   'WORK_MILESTONE_NOT_APPROVED',
+  'WORK_FOLLOWERS_LIMIT',
 ] as const;
 export type WorkErrorCode = (typeof WORK_ERROR_CODES)[number];
 
