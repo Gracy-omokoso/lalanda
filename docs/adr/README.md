@@ -283,3 +283,12 @@ Décideurs :
   `@lalanda/shared/phone`, mêmes règles d'acceptation, mobile money exclu, factures gelées avant
   le 13 nov. 2026 réimprimées à l'identique (champ figé facultatif `phoneFormat`). Statut :
   **accepté** (13 nov. 2026, décision de Gracy).
+- [ADR-0076](ADR-0076-projets-roles-collaboration-validation.md) — Projets : rôles dans le projet
+  (Chef de projet = `ownerUserId`, un Adjoint `deputyUserId`, Membre par défaut, Lecteur ; rôle
+  stocké par membre ou équipe, défaut à la lecture), gestion du projet par le chef et l'adjoint
+  sans `work.manage` (interne avec `work.update`, plafond du rôle d'organisation) ; collaborateurs
+  et abonnés d'une tâche, « Je collabore » ; seul le responsable (ou la gestion) termine sa tâche ;
+  validation des tâches et des jalons (approuver, demander des modifications, refuser, motif
+  obligatoire, « À valider », brief du matin, brouillon de facture après approbation seulement) ;
+  liste de contrôle (30 éléments) ; statut du projet déclaré à côté de la santé calculée.
+  Statut : **accepté** (16 nov. 2026, décision de Gracy ; points « à revoir » listés).
