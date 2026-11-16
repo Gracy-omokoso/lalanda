@@ -44,6 +44,13 @@ import {
   type WorkCardColor,
   type WorkTaskWriteResult,
   type WorkWarning,
+  // ADR-0076 : rôles, collaboration, validation.
+  WORK_COLLAB_LIMITS,
+  taskRights,
+  type WorkProjectRights,
+  type WorkTaskApprovalSummary,
+  type WorkTaskMyRights,
+  type WorkTaskRights,
 } from '@lalanda/shared/work';
 import { MY_TASKS_MAX_PER_SOURCE, type CrmMyTaskItem } from '@lalanda/shared/crm';
 import { PURCHASES_AGENDA_MAX, type PurchasesMyTaskItem } from '@lalanda/shared/purchases';
@@ -57,7 +64,7 @@ import {
 } from '@lalanda/shared/sales-contracts';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { Model } from 'mongoose';
+import { Types, type Model } from 'mongoose';
 
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/time-cursor.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
@@ -132,6 +139,9 @@ interface ViewContext {
   absences: Map<string, WorkTaskAbsence> | null;
 }
 
+/** ADR-0076 : tâches lues au plus par section « Je collabore » et « À valider ». */
+const MY_TASKS_SECTION_MAX = 200;
+
 /** ADR-0045 — H5 : constats d'absence lus au plus dans « Mes tâches » du créateur. */
 const ABSENCE_FINDINGS_MAX = 200;
 
@@ -150,6 +160,58 @@ export function assertSelfAssignment(
     forbidden(
       'WORK_ASSIGN_SELF_ONLY',
       'Votre rôle permet de vous assigner une tâche, ou de la laisser sans responsable, mais pas de l’assigner à quelqu’un d’autre ni de réassigner la tâche d’un collègue.',
+    );
+  }
+}
+
+/** ADR-0076 § 3 : résumé de validation d'une tâche (`null` : sans validation). */
+export function approvalSummaryOf(
+  d: Pick<WorkTaskLean, 'approval'>,
+): WorkTaskApprovalSummary | null {
+  const a = d.approval;
+  if (!a || (!a.required && a.state === 'none')) return null;
+  return {
+    required: a.required,
+    state: a.state,
+    approverUserId: a.approverUserId ?? null,
+    pendingApproverUserId: a.pendingApproverUserId ?? null,
+  };
+}
+
+/** ADR-0076 § 3 : validateur effectif — désigné, sinon chef, sinon adjoint. */
+export function effectiveApprover(
+  task: Pick<WorkTaskLean, 'approval'>,
+  project: Pick<WorkProjectLean, 'ownerUserId' | 'deputyUserId'>,
+): string | null {
+  return task.approval?.approverUserId ?? project.ownerUserId ?? project.deputyUserId ?? null;
+}
+
+/** ADR-0076 § 2 : 403 hors des droits de modification d'une tâche. */
+export function assertCanEdit(rights: WorkTaskRights): void {
+  if (!rights.canEdit) {
+    forbidden(
+      'WORK_TASK_EDIT_FORBIDDEN',
+      'Vous ne pouvez modifier que les tâches dont vous êtes responsable ou collaborateur : demandez au chef de projet de vous y associer.',
+    );
+  }
+}
+
+/** ADR-0076 § 2 : 403 hors des droits d'achèvement (terminer, rouvrir). */
+export function assertCanComplete(rights: WorkTaskRights): void {
+  if (!rights.canComplete) {
+    forbidden(
+      'WORK_TASK_COMPLETE_FORBIDDEN',
+      'Seuls le responsable de la tâche, le chef de projet et son adjoint peuvent la terminer ou la rouvrir.',
+    );
+  }
+}
+
+/** ADR-0076 § 3 : une tâche « à valider » ne passe à « terminé » que par l'approbation. */
+export function assertNoPendingApproval(task: Pick<WorkTaskLean, 'approval'>): void {
+  if (task.approval?.required && task.approval.state !== 'approved') {
+    conflict(
+      'WORK_TASK_APPROVAL_REQUIRED',
+      'Cette tâche est à valider : soumettez-la au validateur, elle sera terminée à son approbation.',
     );
   }
 }
@@ -230,6 +292,167 @@ export class WorkTasksService {
     const project = await this.projects.requireOwn(organizationId, task.projectId);
     if (project.status === 'archived') projectArchived();
     return { task, project };
+  }
+
+  // ── Droits dans le projet (ADR-0076) ──────────────────────────────────────
+
+  /** Droits de l'appelant sur le projet (rôle dans le projet, plafond d'organisation). */
+  async projectRightsOf(
+    organizationId: string,
+    project: WorkProjectLean,
+    actor: WorkActor,
+  ): Promise<WorkProjectRights> {
+    return this.access.rightsOn(organizationId, project, actor);
+  }
+
+  /** Droits de l'appelant sur une tâche (responsable de la parente lu au besoin). */
+  async taskRightsOf(
+    organizationId: string,
+    project: WorkProjectLean,
+    task: WorkTaskLean,
+    actor: WorkActor,
+    rights?: WorkProjectRights,
+  ): Promise<WorkTaskRights & { project: WorkProjectRights }> {
+    const pr = rights ?? (await this.projectRightsOf(organizationId, project, actor));
+    const parent =
+      task.parentTaskId && !task.assigneeUserId && isWorkId(task.parentTaskId)
+        ? await this.tasks
+            .findOne({ _id: oid(task.parentTaskId), organizationId }, { assigneeUserId: 1 })
+            .lean<{ assigneeUserId: string | null }>()
+            .exec()
+        : null;
+    return {
+      ...taskRights({
+        userId: actor.userId,
+        project: pr,
+        task: {
+          assigneeUserId: task.assigneeUserId ?? null,
+          collaboratorUserIds: task.collaboratorUserIds ?? [],
+          createdBy: task.createdBy ?? null,
+        },
+        parent: parent ? { assigneeUserId: parent.assigneeUserId ?? null } : null,
+      }),
+      project: pr,
+    };
+  }
+
+  /**
+   * ADR-0076 § 1 et § 2 : responsable, collaborateur ou validateur — pas un Lecteur du
+   * projet (400 `code` sur `path`).
+   */
+  private async assertNotViewers(
+    organizationId: string,
+    projectId: string,
+    userIds: readonly string[],
+    path: string,
+    code: string,
+  ): Promise<void> {
+    if (userIds.length === 0) return;
+    const audience = await this.projectMembers.audienceOf(organizationId, projectId);
+    if (userIds.some((u) => audience.roles?.get(u) === 'viewer')) {
+      invalid(
+        path,
+        code,
+        'Cette personne est Lecteur du projet : elle lit et commente, mais ne peut pas porter une tâche.',
+      );
+    }
+  }
+
+  /**
+   * ADR-0076 § 2 : collaborateurs — `work.update`, voient le projet, pas Lecteur ; le
+   * Stagiaire ne s'ajoute ou ne se retire que lui-même.
+   */
+  private async checkCollaborators(
+    organizationId: string,
+    projectId: string,
+    from: readonly string[],
+    to: readonly string[],
+    actor: WorkActor,
+  ): Promise<void> {
+    const added = to.filter((u) => !from.includes(u));
+    const removed = from.filter((u) => !to.includes(u));
+    if (
+      isSelfAssignOnlyRole(actor.role) &&
+      [...added, ...removed].some((u) => u !== actor.userId)
+    ) {
+      forbidden(
+        'WORK_ASSIGN_SELF_ONLY',
+        'Votre rôle permet de vous ajouter comme collaborateur, ou de vous retirer, mais pas d’y associer quelqu’un d’autre.',
+      );
+    }
+    if (added.length === 0) return;
+    await this.members.requireEligible(
+      organizationId,
+      added,
+      'work.update',
+      'WORK_COLLABORATOR_NOT_ELIGIBLE',
+      'collaboratorUserIds',
+    );
+    for (const u of added) {
+      if (!(await this.assigneeSees(organizationId, projectId, u))) {
+        invalid(
+          'collaboratorUserIds',
+          'WORK_COLLABORATOR_NOT_ELIGIBLE',
+          'Cette personne ne voit pas ce projet : ajoutez-la d’abord aux membres du projet.',
+        );
+      }
+    }
+    await this.assertNotViewers(
+      organizationId,
+      projectId,
+      added,
+      'collaboratorUserIds',
+      'WORK_COLLABORATOR_NOT_ELIGIBLE',
+    );
+  }
+
+  /**
+   * ADR-0076 § 3 : réglage « à valider » — gestion du projet seulement ; un validateur
+   * possible (désigné, chef ou adjoint) ; le validateur désigné porte une tâche.
+   */
+  private async checkApprovalSetting(
+    organizationId: string,
+    project: WorkProjectLean,
+    approval: { required: boolean; approverUserId?: string | null },
+    rights: WorkProjectRights,
+  ): Promise<void> {
+    if (!rights.canManage) {
+      forbidden(
+        'WORK_PROJECT_MANAGE_FORBIDDEN',
+        'Seuls le chef de projet, son adjoint et les gestionnaires règlent la validation d’une tâche.',
+      );
+    }
+    const designated = approval.approverUserId ?? null;
+    if (designated) {
+      await this.members.requireEligible(
+        organizationId,
+        [designated],
+        'work.update',
+        'WORK_APPROVER_REQUIRED',
+        'approval.approverUserId',
+      );
+      if (!(await this.assigneeSees(organizationId, String(project._id), designated))) {
+        invalid(
+          'approval.approverUserId',
+          'WORK_APPROVER_REQUIRED',
+          'Le validateur doit voir ce projet.',
+        );
+      }
+      await this.assertNotViewers(
+        organizationId,
+        String(project._id),
+        [designated],
+        'approval.approverUserId',
+        'WORK_APPROVER_REQUIRED',
+      );
+    }
+    if (approval.required && !designated && !project.ownerUserId && !project.deputyUserId) {
+      invalid(
+        'approval.approverUserId',
+        'WORK_APPROVER_REQUIRED',
+        'Ce projet n’a ni chef ni adjoint : désignez le validateur de la tâche.',
+      );
+    }
   }
 
   // ── Vues ─────────────────────────────────────────────────────────────────
@@ -351,6 +574,12 @@ export class WorkTasksService {
       doneSubtaskCount: sub?.done ?? 0,
       revision: d.revision,
       updatedAt: new Date(d.updatedAt).toISOString(),
+      // ADR-0076 : collaborateurs, liste de contrôle, validation, créateur.
+      collaboratorUserIds: d.collaboratorUserIds ?? [],
+      checklistDone: (d.checklist ?? []).filter((c) => c.done).length,
+      checklistTotal: (d.checklist ?? []).length,
+      approval: approvalSummaryOf(d),
+      createdBy: d.createdBy,
       // ADR-0045 — H5 (§ 6.2) : présent seulement avec le module RH.
       ...(ctx.absences === null
         ? {}
@@ -575,6 +804,44 @@ export class WorkTasksService {
         : Promise.resolve({ items: [] as SalesContractMyTaskItem[], truncated: false }),
     ]);
     const workTruncated = docs.length > MY_TASKS_MAX_PER_SOURCE;
+    // ADR-0076 § 2 et § 3 : « Je collabore » et « À valider », mêmes projets visibles.
+    const sectionFilter = (extra: Record<string, unknown>): Record<string, unknown> => ({
+      organizationId,
+      ...extra,
+      ...(archived.length > 0 ? { projectId: { $nin: archived } } : {}),
+      ...(Object.keys(visible).length > 0 ? { $and: [visible] } : {}),
+    });
+    const [collabDocs, approveDocs] = await Promise.all([
+      this.tasks
+        .find(
+          sectionFilter({
+            collaboratorUserIds: actor.userId,
+            assigneeUserId: { $ne: actor.userId },
+            done: false,
+          }),
+          LIGHT,
+        )
+        .sort({ dueDate: 1, _id: 1 })
+        .limit(MY_TASKS_SECTION_MAX)
+        .lean<WorkTaskLean[]>()
+        .exec(),
+      this.tasks
+        .find(
+          sectionFilter({
+            'approval.pendingApproverUserId': actor.userId,
+            'approval.state': 'pending',
+          }),
+          LIGHT,
+        )
+        .sort({ 'approval.submittedAt': 1, _id: 1 })
+        .limit(MY_TASKS_SECTION_MAX)
+        .lean<WorkTaskLean[]>()
+        .exec(),
+    ]);
+    const [collaborating, toApprove] = await Promise.all([
+      this.withProjectNames(organizationId, collabDocs),
+      this.withProjectNames(organizationId, approveDocs),
+    ]);
     const work = await this.withProjectNames(
       organizationId,
       docs.slice(0, MY_TASKS_MAX_PER_SOURCE),
@@ -608,6 +875,8 @@ export class WorkTasksService {
         stock.truncated ||
         assets.truncated ||
         salesContracts.truncated,
+      collaborating,
+      toApprove,
       // ADR-0045 — H5 (§ 6.2) : constats d'absence des tâches que l'appelant a créées.
       ...(this.absenceSource === null
         ? {}
@@ -671,7 +940,7 @@ export class WorkTasksService {
     );
   }
 
-  async detail(organizationId: string, taskId: string): Promise<WorkTaskDetail> {
+  async detail(organizationId: string, taskId: string, actor?: WorkActor): Promise<WorkTaskDetail> {
     const doc = await this.requireOwn(organizationId, taskId);
     const project = await this.projects.requireOwn(organizationId, doc.projectId);
     const id = String(doc._id);
@@ -701,10 +970,45 @@ export class WorkTasksService {
             .sort({ number: 1 })
             .lean<{ _id: unknown; number: number; title: string; done: boolean }[]>()
             .exec();
-    const [views, followers] = await Promise.all([
+    const a = doc.approval ?? null;
+    const [views, followers, rights] = await Promise.all([
       this.views(organizationId, [doc, ...subDocs], [project]),
-      this.members.refs(doc.followerUserIds ?? []),
+      // ADR-0076 : abonnés, collaborateurs, auteurs de la liste et de la validation.
+      this.members.refs([
+        ...(doc.followerUserIds ?? []),
+        ...(doc.collaboratorUserIds ?? []),
+        ...(doc.checklist ?? []).map((c) => c.doneBy),
+        a?.approverUserId,
+        a?.pendingApproverUserId,
+        a?.submittedBy,
+        a?.decidedBy,
+        project.ownerUserId,
+        project.deputyUserId,
+      ]),
+      actor ? this.taskRightsOf(organizationId, project, doc, actor) : null,
     ]);
+    const ref = (u: string | null | undefined) =>
+      u ? WorkMembersService.refOf(followers, u) : null;
+    const summary = approvalSummaryOf(doc);
+    const myRights: WorkTaskMyRights | undefined =
+      rights && actor
+        ? {
+            canEdit: rights.canEdit,
+            canComplete: rights.canComplete,
+            canCheck: rights.canCheck,
+            canManage: rights.project.canManage,
+            canSubmit:
+              !!a?.required &&
+              !doc.done &&
+              ['none', 'changes_requested', 'rejected'].includes(a.state) &&
+              (doc.assigneeUserId === actor.userId || rights.project.canManage),
+            canDecide:
+              !!a?.required &&
+              a.state === 'pending' &&
+              a.submittedBy !== actor.userId &&
+              (a.pendingApproverUserId === actor.userId || rights.project.canManage),
+          }
+        : undefined;
     const info = (t: { _id: unknown; number: number; title: string; done: boolean }) => ({
       taskId: String(t._id),
       number: t.number,
@@ -733,6 +1037,34 @@ export class WorkTasksService {
         : null,
       createdBy: doc.createdBy,
       createdAt: new Date(doc.createdAt).toISOString(),
+      collaborators: (doc.collaboratorUserIds ?? []).map((u) =>
+        WorkMembersService.refOf(followers, u),
+      ),
+      checklist: (doc.checklist ?? []).map((c) => ({
+        id: c.id,
+        text: c.text,
+        done: c.done,
+        doneBy: ref(c.doneBy),
+        doneAt: iso(c.doneAt),
+      })),
+      approvalDetail:
+        summary && a
+          ? {
+              ...summary,
+              approver: ref(a.approverUserId),
+              pendingApprover: ref(
+                a.pendingApproverUserId ??
+                  (a.state === 'pending' ? null : effectiveApprover(doc, project)),
+              ),
+              submittedBy: ref(a.submittedBy),
+              submittedAt: iso(a.submittedAt),
+              decidedBy: ref(a.decidedBy),
+              decidedAt: iso(a.decidedAt),
+              reason: a.reason ?? null,
+            }
+          : null,
+      ...(myRights ? { myRights } : {}),
+      ...(actor ? { following: (doc.followerUserIds ?? []).includes(actor.userId) } : {}),
     };
   }
 
@@ -982,7 +1314,9 @@ export class WorkTasksService {
     assigneeUserId: string,
     actor: WorkActor,
   ): Promise<void> {
-    await this.projectMembers.add(organizationId, projectId, { userIds: [assigneeUserId] }, actor);
+    await this.projectMembers.add(organizationId, projectId, { userIds: [assigneeUserId] }, actor, {
+      trusted: true,
+    });
   }
 
   // ── Création ─────────────────────────────────────────────────────────────
@@ -999,6 +1333,23 @@ export class WorkTasksService {
     opts: { assignments?: WorkAssignmentBatch } = {},
   ): Promise<WorkTaskWriteResult> {
     const project = await this.projects.requireWritable(organizationId, projectId);
+    // ADR-0076 § 1 : le Lecteur ne crée pas de tâche ; jalons et validation : gestion.
+    const rights = await this.projectRightsOf(organizationId, project, actor);
+    if (!rights.canCreateTasks) {
+      forbidden(
+        'WORK_TASK_CREATE_FORBIDDEN',
+        'Vous êtes Lecteur de ce projet : vous pouvez lire et commenter, pas créer de tâche.',
+      );
+    }
+    if (body.isMilestone === true && !rights.canManage) {
+      forbidden(
+        'WORK_PROJECT_MANAGE_FORBIDDEN',
+        'Seuls le chef de projet, son adjoint et les gestionnaires posent les jalons.',
+      );
+    }
+    if (body.approval) {
+      await this.checkApprovalSetting(organizationId, project, body.approval, rights);
+    }
     const count = await this.tasks.countDocuments({ organizationId, projectId }).exec();
     if (count >= WORK_LIMITS.tasksPerProject) {
       conflict(
@@ -1048,6 +1399,19 @@ export class WorkTasksService {
     const addMember = assigneeUserId
       ? await this.membershipNeeded(organizationId, projectId, assigneeUserId, actor)
       : false;
+    if (assigneeUserId) {
+      await this.assertNotViewers(
+        organizationId,
+        projectId,
+        [assigneeUserId],
+        'assigneeUserId',
+        'WORK_ASSIGNEE_VIEWER',
+      );
+    }
+    const collaboratorUserIds = (body.collaboratorUserIds ?? []).filter(
+      (u) => u !== assigneeUserId,
+    );
+    await this.checkCollaborators(organizationId, projectId, [], collaboratorUserIds, actor);
     const followers = body.followerUserIds ?? [];
     await this.members.requireEligible(
       organizationId,
@@ -1065,7 +1429,12 @@ export class WorkTasksService {
       : await this.endRank(organizationId, projectId, column.key);
     const number = await this.projects.nextTaskNumber(organizationId, projectId);
     const followerUserIds = [
-      ...new Set([actor.userId, ...(assigneeUserId ? [assigneeUserId] : []), ...followers]),
+      ...new Set([
+        actor.userId,
+        ...(assigneeUserId ? [assigneeUserId] : []),
+        ...collaboratorUserIds,
+        ...followers,
+      ]),
     ].slice(0, WORK_LIMITS.followersMax);
 
     const created = await this.tasks.create({
@@ -1079,6 +1448,21 @@ export class WorkTasksService {
       rank,
       assigneeUserId,
       followerUserIds,
+      collaboratorUserIds,
+      checklist: [],
+      approval: body.approval?.required
+        ? {
+            required: true,
+            approverUserId: body.approval.approverUserId ?? null,
+            state: 'none',
+            pendingApproverUserId: null,
+            submittedBy: null,
+            submittedAt: null,
+            decidedBy: null,
+            decidedAt: null,
+            reason: null,
+          }
+        : null,
       priority: body.priority ?? 'none',
       labelKeys: body.labelKeys ?? [],
       startDate: body.startDate ?? null,
@@ -1118,7 +1502,33 @@ export class WorkTasksService {
         actor,
       );
     }
+    await this.notifyCollaborators(
+      organizationId,
+      { id, projectId, number, title: body.title },
+      collaboratorUserIds,
+      actor,
+    );
     return this.result(organizationId, id);
+  }
+
+  /** ADR-0076 § 2 : « Vous êtes collaborateur de #3 … ». */
+  private async notifyCollaborators(
+    organizationId: string,
+    task: { id: string; projectId: string; number: number; title: string },
+    userIds: readonly string[],
+    actor: WorkActor,
+  ): Promise<void> {
+    const recipients = userIds.filter((u) => u !== actor.userId);
+    if (recipients.length === 0) return;
+    await this.notifier.taskEvent({
+      organizationId,
+      recipients,
+      kind: 'work.task_collaborator_added',
+      projectId: task.projectId,
+      taskId: task.id,
+      title: `${await this.actorName(actor)} vous a ajouté comme collaborateur de #${task.number} ${task.title}`,
+      actorUserId: actor.userId,
+    });
   }
 
   // ── Modification ─────────────────────────────────────────────────────────
@@ -1129,8 +1539,24 @@ export class WorkTasksService {
     body: PatchWorkTaskBody,
     actor: WorkActor,
   ): Promise<WorkTaskWriteResult> {
-    const { task: current } = await this.requireWritable(organizationId, taskId);
+    const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    // ADR-0076 § 2 : responsable, collaborateur, créateur, tâche libre ou gestion.
+    const rights = await this.taskRightsOf(organizationId, project, current, actor);
+    assertCanEdit(rights);
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
+    if (
+      body.isMilestone !== undefined &&
+      body.isMilestone !== current.isMilestone &&
+      !rights.project.canManage
+    ) {
+      forbidden(
+        'WORK_PROJECT_MANAGE_FORBIDDEN',
+        'Seuls le chef de projet, son adjoint et les gestionnaires posent ou retirent un jalon.',
+      );
+    }
+    if (body.approval !== undefined) {
+      await this.checkApprovalSetting(organizationId, project, body.approval, rights.project);
+    }
 
     const final = {
       isMilestone: body.isMilestone ?? current.isMilestone,
@@ -1211,12 +1637,78 @@ export class WorkTasksService {
         actor,
       );
     }
+    if (assigneeChanged && body.assigneeUserId) {
+      await this.assertNotViewers(
+        organizationId,
+        current.projectId,
+        [body.assigneeUserId],
+        'assigneeUserId',
+        'WORK_ASSIGNEE_VIEWER',
+      );
+    }
+    // ADR-0076 § 2 : collaborateurs (ajoutés : abonnés et notifiés).
+    const collabBefore = current.collaboratorUserIds ?? [];
+    let collabAdded: string[] = [];
+    let collabRemoved: string[] = [];
+    if (body.collaboratorUserIds !== undefined) {
+      const finalAssignee =
+        body.assigneeUserId !== undefined ? body.assigneeUserId : current.assigneeUserId;
+      const next = body.collaboratorUserIds.filter((u) => u !== finalAssignee);
+      await this.checkCollaborators(organizationId, current.projectId, collabBefore, next, actor);
+      collabAdded = next.filter((u) => !collabBefore.includes(u));
+      collabRemoved = collabBefore.filter((u) => !next.includes(u));
+      if (collabAdded.length + collabRemoved.length > 0) {
+        set['collaboratorUserIds'] = next;
+      }
+    } else if (
+      assigneeChanged &&
+      body.assigneeUserId &&
+      collabBefore.includes(body.assigneeUserId)
+    ) {
+      // Le nouveau responsable n'est plus « collaborateur » de sa propre tâche.
+      set['collaboratorUserIds'] = collabBefore.filter((u) => u !== body.assigneeUserId);
+      collabRemoved = [body.assigneeUserId];
+    }
+    // ADR-0076 § 3 : réglage de la validation (gestion, vérifié plus haut).
+    let approvalChanged = false;
+    if (body.approval !== undefined) {
+      const was = current.approval ?? null;
+      const approverUserId = body.approval.approverUserId ?? null;
+      if (!body.approval.required) {
+        if (was?.required) {
+          set['approval'] = null;
+          approvalChanged = true;
+        }
+      } else if (!was?.required || (was.approverUserId ?? null) !== approverUserId) {
+        const pending = was?.required && was.state === 'pending';
+        set['approval'] = {
+          required: true,
+          approverUserId,
+          state: was?.required ? was.state : 'none',
+          pendingApproverUserId: pending
+            ? (approverUserId ?? project.ownerUserId ?? project.deputyUserId ?? null)
+            : (was?.pendingApproverUserId ?? null),
+          submittedBy: was?.submittedBy ?? null,
+          submittedAt: was?.submittedAt ?? null,
+          decidedBy: was?.decidedBy ?? null,
+          decidedAt: was?.decidedAt ?? null,
+          reason: was?.reason ?? null,
+        };
+        approvalChanged = true;
+      }
+      if (approvalChanged) changed.push('approval');
+    }
     const update: Record<string, unknown> = { $set: set, $inc: { revision: 1 } };
+    const followersToAdd: string[] = [];
     if (assigneeChanged) {
       assign('assigneeUserId', body.assigneeUserId ?? null);
       if (body.assigneeUserId && body.followerUserIds === undefined) {
-        update['$addToSet'] = { followerUserIds: body.assigneeUserId };
+        followersToAdd.push(body.assigneeUserId);
       }
+    }
+    if (body.followerUserIds === undefined) followersToAdd.push(...collabAdded);
+    if (followersToAdd.length > 0) {
+      update['$addToSet'] = { followerUserIds: { $each: [...new Set(followersToAdd)] } };
     }
 
     const res = await this.tasks
@@ -1249,7 +1741,25 @@ export class WorkTasksService {
         data: { from: current.dueDate ?? null, to: body.dueDate },
       });
     }
+    if (collabAdded.length + collabRemoved.length > 0) {
+      entries.push({
+        ...base,
+        kind: 'task.collaborators_changed',
+        data: { added: collabAdded, removed: collabRemoved },
+      });
+    }
     await this.activity.record(organizationId, entries);
+    await this.notifyCollaborators(
+      organizationId,
+      {
+        id: taskId,
+        projectId: current.projectId,
+        number: current.number,
+        title: body.title ?? current.title,
+      },
+      collabAdded,
+      actor,
+    );
     if (assigneeChanged && body.assigneeUserId && addMember) {
       await this.addAssigneeAsMember(organizationId, current.projectId, body.assigneeUserId, actor);
     }
@@ -1278,8 +1788,15 @@ export class WorkTasksService {
     actor: WorkActor,
   ): Promise<WorkTaskWriteResult> {
     const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    const rights = await this.taskRightsOf(organizationId, project, current, actor);
+    assertCanEdit(rights);
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
     const column = this.columnOf(project, body.columnKey);
+    // ADR-0076 § 2 et § 3 : entrer dans « terminé » ou en sortir = terminer ou rouvrir.
+    if ((column.category === 'done') !== current.done) {
+      assertCanComplete(rights);
+      if (column.category === 'done') assertNoPendingApproval(current);
+    }
     const rank =
       body.afterTaskId || body.beforeTaskId
         ? await this.rankNear(
@@ -1305,8 +1822,10 @@ export class WorkTasksService {
     actor: WorkActor,
   ): Promise<WorkTaskWriteResult> {
     const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    assertCanComplete(await this.taskRightsOf(organizationId, project, current, actor));
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     if (current.done) return this.result(organizationId, taskId);
+    assertNoPendingApproval(current);
     const column = this.doneColumn(project);
     const rank = await this.endRank(organizationId, current.projectId, column.key, taskId);
     return this.place(organizationId, project, current, column, rank, expectedRevision, actor);
@@ -1319,6 +1838,7 @@ export class WorkTasksService {
     actor: WorkActor,
   ): Promise<WorkTaskWriteResult> {
     const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    assertCanComplete(await this.taskRightsOf(organizationId, project, current, actor));
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     if (!current.done) return this.result(organizationId, taskId);
     const column = this.firstTodo(project);
@@ -1326,7 +1846,12 @@ export class WorkTasksService {
     return this.place(organizationId, project, current, column, rank, expectedRevision, actor);
   }
 
-  private async place(
+  /**
+   * Place la tâche dans une colonne. `extraSet` : champs écrits dans la MÊME mise à jour
+   * (ADR-0076 § 3 : décision d'approbation). Rouvrir une tâche approuvée remet sa
+   * validation à zéro.
+   */
+  async place(
     organizationId: string,
     project: WorkProjectLean,
     current: WorkTaskLean,
@@ -1334,13 +1859,28 @@ export class WorkTasksService {
     rank: string,
     expectedRevision: number,
     actor: WorkActor,
+    extraSet: Record<string, unknown> = {},
   ): Promise<WorkTaskWriteResult> {
     const taskId = String(current._id);
     const fields = this.columnFields(current, column, actor);
+    const reopening = current.done && column.category !== 'done';
+    const approvalReset =
+      reopening && current.approval?.required && current.approval.state === 'approved'
+        ? {
+            'approval.state': 'none',
+            'approval.pendingApproverUserId': null,
+            'approval.decidedBy': null,
+            'approval.decidedAt': null,
+            'approval.reason': null,
+          }
+        : {};
     const res = await this.tasks
       .updateOne(
         { _id: current._id, organizationId, revision: expectedRevision },
-        { $set: { ...fields, rank, updatedBy: actor.userId }, $inc: { revision: 1 } },
+        {
+          $set: { ...fields, rank, updatedBy: actor.userId, ...approvalReset, ...extraSet },
+          $inc: { revision: 1 },
+        },
       )
       .exec();
     if (res.matchedCount !== 1) {
@@ -1372,10 +1912,14 @@ export class WorkTasksService {
         href: taskHref(current.projectId, taskId),
       });
     }
-    if (column.key !== current.columnKey && current.assigneeUserId) {
+    if (
+      column.key !== current.columnKey &&
+      (current.assigneeUserId || (current.collaboratorUserIds ?? []).length > 0)
+    ) {
       await this.notifier.taskEvent({
         organizationId,
-        recipients: [current.assigneeUserId],
+        // ADR-0076 § 2 : les collaborateurs sont notifiés comme le responsable.
+        recipients: [current.assigneeUserId, ...(current.collaboratorUserIds ?? [])],
         kind: 'work.task_status_changed',
         projectId: current.projectId,
         taskId,
@@ -1399,7 +1943,9 @@ export class WorkTasksService {
    * partent avec elle ; elle est retirée des dépendances des autres.
    */
   async remove(organizationId: string, taskId: string, actor: WorkActor): Promise<void> {
-    const { task: current } = await this.requireWritable(organizationId, taskId);
+    const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    // ADR-0076 § 1 : suppression de tâches — chef, adjoint ou `work.manage`.
+    await this.access.assertManage(organizationId, project, actor);
     const children = await this.tasks
       .find({ organizationId, parentTaskId: taskId }, { _id: 1, billing: 1 })
       .lean<{ _id: unknown; billing: unknown }[]>()
@@ -1470,7 +2016,8 @@ export class WorkTasksService {
     predecessorTaskId: string,
     actor: WorkActor,
   ): Promise<WorkTaskWriteResult> {
-    const { task: current } = await this.requireWritable(organizationId, taskId);
+    const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    assertCanEdit(await this.taskRightsOf(organizationId, project, current, actor));
     const predecessor = await this.requireOwn(organizationId, predecessorTaskId);
     // Dépendances entre projets : refusées en R1 (décision ouverte n° 4).
     if (predecessor.projectId !== current.projectId) taskNotFound();
@@ -1532,7 +2079,8 @@ export class WorkTasksService {
     predecessorTaskId: string,
     actor: WorkActor,
   ): Promise<WorkTaskWriteResult> {
-    const { task: current } = await this.requireWritable(organizationId, taskId);
+    const { task: current, project } = await this.requireWritable(organizationId, taskId);
+    assertCanEdit(await this.taskRightsOf(organizationId, project, current, actor));
     if (!(current.blockedBy ?? []).some((b) => b.taskId === predecessorTaskId)) taskNotFound();
     const res = await this.tasks
       .updateOne(
@@ -1554,6 +2102,308 @@ export class WorkTasksService {
       });
     }
     return this.result(organizationId, taskId);
+  }
+
+  // ── Validation (ADR-0076 § 3) ────────────────────────────────────────────
+
+  /** `POST /work/tasks/:taskId/approval/submit` — le responsable (ou la gestion) soumet. */
+  async submitApproval(
+    organizationId: string,
+    taskId: string,
+    expectedRevision: number,
+    actor: WorkActor,
+  ): Promise<WorkTaskWriteResult> {
+    const { task, project } = await this.requireWritable(organizationId, taskId);
+    const rights = await this.taskRightsOf(organizationId, project, task, actor);
+    const a = task.approval;
+    if (!a?.required) {
+      conflict('WORK_APPROVAL_NOT_PENDING', 'Cette tâche n’est pas à valider.');
+    }
+    if (task.assigneeUserId !== actor.userId && !rights.project.canManage) {
+      forbidden(
+        'WORK_APPROVAL_FORBIDDEN',
+        'Seul le responsable de la tâche (ou le chef de projet) la soumet à validation.',
+      );
+    }
+    if (task.revision !== expectedRevision) staleRevision(task.revision);
+    if (task.done || a.state === 'pending' || a.state === 'approved') {
+      conflict('WORK_APPROVAL_NOT_PENDING', 'Cette tâche est déjà soumise ou validée.');
+    }
+    const approver = effectiveApprover(task, project);
+    if (!approver) {
+      invalid(
+        'approval.approverUserId',
+        'WORK_APPROVER_REQUIRED',
+        'Ce projet n’a ni chef ni adjoint : demandez qu’un validateur soit désigné.',
+      );
+    }
+    const now = new Date();
+    const res = await this.tasks
+      .updateOne(
+        { _id: task._id, organizationId, revision: expectedRevision },
+        {
+          $set: {
+            'approval.state': 'pending',
+            'approval.pendingApproverUserId': approver,
+            'approval.submittedBy': actor.userId,
+            'approval.submittedAt': now,
+            'approval.decidedBy': null,
+            'approval.decidedAt': null,
+            'approval.reason': null,
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+      )
+      .exec();
+    if (res.matchedCount !== 1)
+      staleRevision((await this.requireOwn(organizationId, taskId)).revision);
+    await this.activity.record(organizationId, {
+      projectId: task.projectId,
+      taskId,
+      actorUserId: actor.userId,
+      kind: 'task.approval_submitted',
+      data: { approverUserId: approver },
+    });
+    const name = await this.actorName(actor);
+    this.notifier.channelEvent({
+      organizationId,
+      projectId: task.projectId,
+      eventLabel: 'Tâche à valider',
+      title: `#${task.number} ${task.title} — soumise à validation par ${name}`,
+      href: taskHref(task.projectId, taskId),
+    });
+    await this.notifier.taskEvent({
+      organizationId,
+      recipients: [approver],
+      kind: 'work.task_approval_requested',
+      projectId: task.projectId,
+      taskId,
+      title: `${name} vous demande de valider #${task.number} ${task.title}`,
+      actorUserId: actor.userId,
+    });
+    return this.result(organizationId, taskId);
+  }
+
+  /**
+   * `POST /work/tasks/:taskId/approval/decide` — le validateur (ou la gestion), jamais
+   * l'auteur de la soumission. Approuver termine la tâche (et le jalon : suggestion de
+   * facture) ; demander des modifications ou refuser exige un motif.
+   */
+  async decideApproval(
+    organizationId: string,
+    taskId: string,
+    body: {
+      expectedRevision: number;
+      decision: 'approve' | 'request_changes' | 'reject';
+      reason?: string | null;
+    },
+    actor: WorkActor,
+  ): Promise<WorkTaskWriteResult> {
+    const { task, project } = await this.requireWritable(organizationId, taskId);
+    const rights = await this.projectRightsOf(organizationId, project, actor);
+    const a = task.approval;
+    if (!a?.required || a.state !== 'pending') {
+      conflict('WORK_APPROVAL_NOT_PENDING', 'Aucune validation n’est en attente sur cette tâche.');
+    }
+    if (a.pendingApproverUserId !== actor.userId && !rights.canManage) {
+      forbidden(
+        'WORK_APPROVAL_FORBIDDEN',
+        'Seul le validateur désigné (ou le chef de projet) décide de cette validation.',
+      );
+    }
+    if (a.submittedBy === actor.userId) {
+      conflict(
+        'WORK_SELF_APPROVAL_FORBIDDEN',
+        'Vous avez soumis cette tâche : une autre personne doit la valider.',
+      );
+    }
+    if (task.revision !== body.expectedRevision) staleRevision(task.revision);
+    const now = new Date();
+    const reason = body.decision === 'approve' ? null : (body.reason ?? null);
+    const decided = {
+      'approval.decidedBy': actor.userId,
+      'approval.decidedAt': now,
+      'approval.reason': reason,
+    };
+    const kind =
+      body.decision === 'approve'
+        ? ('task.approval_approved' as const)
+        : body.decision === 'reject'
+          ? ('task.approval_rejected' as const)
+          : ('task.approval_changes_requested' as const);
+    let out: WorkTaskWriteResult;
+    if (body.decision === 'approve') {
+      const column = this.doneColumn(project);
+      const rank = await this.endRank(organizationId, task.projectId, column.key, taskId);
+      await this.activity.record(organizationId, {
+        projectId: task.projectId,
+        taskId,
+        actorUserId: actor.userId,
+        kind,
+        data: {},
+      });
+      out = await this.place(
+        organizationId,
+        project,
+        task,
+        column,
+        rank,
+        body.expectedRevision,
+        actor,
+        { 'approval.state': 'approved', ...decided },
+      );
+    } else {
+      const res = await this.tasks
+        .updateOne(
+          { _id: task._id, organizationId, revision: body.expectedRevision },
+          {
+            $set: {
+              'approval.state': body.decision === 'reject' ? 'rejected' : 'changes_requested',
+              ...decided,
+              updatedBy: actor.userId,
+            },
+            $inc: { revision: 1 },
+          },
+        )
+        .exec();
+      if (res.matchedCount !== 1) {
+        staleRevision((await this.requireOwn(organizationId, taskId)).revision);
+      }
+      await this.activity.record(organizationId, {
+        projectId: task.projectId,
+        taskId,
+        actorUserId: actor.userId,
+        kind,
+        data: { reason: (reason ?? '').slice(0, WORK_COLLAB_LIMITS.approvalReasonMax) },
+      });
+      out = await this.result(organizationId, taskId);
+    }
+    const name = await this.actorName(actor);
+    const verb =
+      body.decision === 'approve'
+        ? 'a validé'
+        : body.decision === 'reject'
+          ? 'a refusé'
+          : 'demande des modifications sur';
+    await this.notifier.taskEvent({
+      organizationId,
+      recipients: [task.assigneeUserId, a.submittedBy],
+      kind: 'work.task_approval_decided',
+      projectId: task.projectId,
+      taskId,
+      title: `${name} ${verb} #${task.number} ${task.title}${reason ? ` : ${reason}` : ''}`,
+      actorUserId: actor.userId,
+    });
+    return out;
+  }
+
+  // ── Liste de contrôle (ADR-0076 § 4) ─────────────────────────────────────
+
+  /**
+   * `PUT /work/tasks/:taskId/checklist` — remplace la liste. Cocher : responsable,
+   * collaborateurs, gestion ; ajouter, renommer, retirer, réordonner : qui modifie la tâche.
+   */
+  async putChecklist(
+    organizationId: string,
+    taskId: string,
+    body: { expectedRevision: number; items: { id?: string; text: string; done: boolean }[] },
+    actor: WorkActor,
+  ): Promise<WorkTaskWriteResult> {
+    const { task, project } = await this.requireWritable(organizationId, taskId);
+    const rights = await this.taskRightsOf(organizationId, project, task, actor);
+    if (task.revision !== body.expectedRevision) staleRevision(task.revision);
+    const before = task.checklist ?? [];
+    const byId = new Map(before.map((c) => [c.id, c]));
+    for (const item of body.items) {
+      if (item.id !== undefined && !byId.has(item.id)) {
+        invalid(
+          'items',
+          'INVALID_VALUE',
+          'Un élément de la liste est inconnu : rechargez la tâche.',
+        );
+      }
+    }
+    const structural =
+      body.items.length !== before.length ||
+      body.items.some((item, i) => item.id !== before[i]?.id || item.text !== before[i]?.text);
+    const toggled = body.items.some((item) => {
+      const was = item.id ? byId.get(item.id) : undefined;
+      return was ? was.done !== item.done : item.done;
+    });
+    const refuse = (): never =>
+      forbidden(
+        'WORK_CHECKLIST_FORBIDDEN',
+        'Seuls le responsable, les collaborateurs et le chef de projet cochent cette liste ; seuls ceux qui modifient la tâche la composent.',
+      );
+    if (structural && !rights.canEdit) refuse();
+    if (toggled && !rights.canCheck) refuse();
+    if (!structural && !toggled) return this.result(organizationId, taskId);
+    const now = new Date();
+    const next = body.items.map((item) => {
+      const was = item.id ? byId.get(item.id) : undefined;
+      const changedDone = was ? was.done !== item.done : item.done;
+      return {
+        id: item.id ?? new Types.ObjectId().toHexString(),
+        text: item.text,
+        done: item.done,
+        doneBy: changedDone ? (item.done ? actor.userId : null) : (was?.doneBy ?? null),
+        doneAt: changedDone ? (item.done ? now : null) : (was?.doneAt ?? null),
+      };
+    });
+    const res = await this.tasks
+      .updateOne(
+        { _id: task._id, organizationId, revision: body.expectedRevision },
+        { $set: { checklist: next, updatedBy: actor.userId }, $inc: { revision: 1 } },
+      )
+      .exec();
+    if (res.matchedCount !== 1)
+      staleRevision((await this.requireOwn(organizationId, taskId)).revision);
+    await this.activity.record(organizationId, {
+      projectId: task.projectId,
+      taskId,
+      actorUserId: actor.userId,
+      kind: 'task.checklist_changed',
+      data: { done: next.filter((c) => c.done).length, total: next.length },
+    });
+    return this.result(organizationId, taskId);
+  }
+
+  // ── Suivre / Ne plus suivre (ADR-0076 § 2) ───────────────────────────────
+
+  /** Toute personne qui voit la tâche la suit ou cesse de la suivre (Lecteur compris). */
+  async setFollowing(
+    organizationId: string,
+    taskId: string,
+    following: boolean,
+    actor: WorkActor,
+  ): Promise<{ following: boolean }> {
+    const task = await this.requireOwn(organizationId, taskId);
+    const current = task.followerUserIds ?? [];
+    if (following && !current.includes(actor.userId)) {
+      if (current.length >= WORK_LIMITS.followersMax) {
+        conflict(
+          'WORK_FOLLOWERS_LIMIT',
+          `Une tâche compte au plus ${WORK_LIMITS.followersMax} abonnés.`,
+        );
+      }
+      await this.tasks
+        .updateOne(
+          { _id: task._id, organizationId },
+          { $addToSet: { followerUserIds: actor.userId } },
+          { timestamps: false },
+        )
+        .exec();
+    } else if (!following && current.includes(actor.userId)) {
+      await this.tasks
+        .updateOne(
+          { _id: task._id, organizationId },
+          { $pull: { followerUserIds: actor.userId } },
+          { timestamps: false },
+        )
+        .exec();
+    }
+    return { following };
   }
 
   // ── Abonnés ──────────────────────────────────────────────────────────────

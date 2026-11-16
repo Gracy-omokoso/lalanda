@@ -9,16 +9,20 @@ import { Inject, Injectable, Optional, type OnModuleInit } from '@nestjs/common'
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
+import { projectRights, resolveProjectRole, type WorkProjectRights } from '@lalanda/shared/work';
+
 import { NotificationsService } from '../notifications/notifications.service.js';
 import {
   ALL_PROJECTS,
   inScope,
+  isLeadEligibleRole,
   isProjectScopedRole,
   membershipClauses,
   type WorkProjectScope,
 } from './work-access.js';
 import {
   actorCan,
+  forbidden,
   isWorkId,
   oid,
   projectNotFound,
@@ -90,6 +94,56 @@ export class WorkAccessService implements OnModuleInit {
       )
       .toArray();
     return docs.map((d) => String(d['_id']));
+  }
+
+  /**
+   * ADR-0076 § 1 : rôle et droits d'une personne sur un projet, lus à chaque requête (équipes
+   * comprises). `actor` porte le rôle d'organisation (plafond) et ses droits effectifs.
+   */
+  async rightsOn(
+    organizationId: string,
+    project: Pick<
+      WorkProjectDocument,
+      'ownerUserId' | 'deputyUserId' | 'memberUserIds' | 'memberTeamIds' | 'memberRoles'
+    >,
+    actor: WorkActor,
+  ): Promise<WorkProjectRights> {
+    const teams =
+      (project.memberTeamIds ?? []).length > 0
+        ? await this.teamIdsOf(organizationId, actor.userId)
+        : [];
+    const role = resolveProjectRole({
+      userId: actor.userId,
+      ownerUserId: project.ownerUserId,
+      deputyUserId: project.deputyUserId ?? null,
+      memberUserIds: project.memberUserIds,
+      memberTeamIds: project.memberTeamIds,
+      memberRoles: project.memberRoles ?? [],
+      userTeamIds: teams,
+    });
+    return projectRights({
+      role,
+      orgCanUpdate: actorCan(actor, 'work.update'),
+      orgCanManage: actorCan(actor, 'work.manage'),
+      internal: isLeadEligibleRole(actor.role),
+      hasLead: !!(project.ownerUserId || project.deputyUserId),
+    });
+  }
+
+  /** ADR-0076 § 1 : 403 `WORK_PROJECT_MANAGE_FORBIDDEN` hors gestion du projet. */
+  async assertManage(
+    organizationId: string,
+    project: Parameters<WorkAccessService['rightsOn']>[1],
+    actor: WorkActor,
+  ): Promise<WorkProjectRights> {
+    const rights = await this.rightsOn(organizationId, project, actor);
+    if (!rights.canManage) {
+      forbidden(
+        'WORK_PROJECT_MANAGE_FORBIDDEN',
+        'Seuls le chef de projet, son adjoint et les gestionnaires des projets peuvent faire ce geste.',
+      );
+    }
+    return rights;
   }
 
   /** Portée de l'appelant (voir `work-access.ts`). */

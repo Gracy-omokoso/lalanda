@@ -15,6 +15,7 @@
 // filtres Mongo. Tout point d'entrée de lecture applique la portée côté serveur ; un
 // projet hors portée répond 404, comme un projet d'une autre organisation.
 
+import type { WorkProjectRole } from '@lalanda/shared/work';
 import { Types } from 'mongoose';
 
 import {
@@ -85,12 +86,27 @@ export function projectIdFilter(
   return scope.ids.length === 0 ? {} : { [field]: { $nin: [...scope.ids] } };
 }
 
-/** Condition Mongo « l'utilisateur appartient au projet » (responsable, membre, équipe). */
+/**
+ * ADR-0076 § 1 : rôle d'organisation qui peut être Chef de projet ou Adjoint — ni l'Invité
+ * externe (`PROJECT_SCOPED_ROLES`), ni le Stagiaire (`SELF_ASSIGN_ONLY_ROLES`).
+ */
+export function isLeadEligibleRole(role: string | undefined): boolean {
+  return role !== undefined && !isProjectScopedRole(role) && !isSelfAssignOnlyRole(role);
+}
+
+/**
+ * Condition Mongo « l'utilisateur appartient au projet » (chef, adjoint — ADR-0076 § 1 —,
+ * membre, équipe).
+ */
 export function membershipClauses(
   userId: string,
   teamIds: readonly string[],
 ): Record<string, unknown>[] {
-  const clauses: Record<string, unknown>[] = [{ ownerUserId: userId }, { memberUserIds: userId }];
+  const clauses: Record<string, unknown>[] = [
+    { ownerUserId: userId },
+    { deputyUserId: userId },
+    { memberUserIds: userId },
+  ];
   if (teamIds.length > 0) clauses.push({ memberTeamIds: { $in: [...teamIds] } });
   return clauses;
 }
@@ -100,6 +116,8 @@ export interface WorkProjectAudience {
   visibility: 'organization' | 'private';
   /** Responsable, membres directs et membres courants de ses équipes. */
   members: ReadonlySet<string>;
+  /** ADR-0076 § 1 : rôle résolu de chaque personne du projet (absente : non membre). */
+  roles?: ReadonlyMap<string, WorkProjectRole>;
 }
 
 /**

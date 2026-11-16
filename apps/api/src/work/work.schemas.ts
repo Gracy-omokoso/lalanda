@@ -120,6 +120,20 @@ WorkSettingsSchema.index({ organizationId: 1 }, { unique: true });
 
 // ── Projets ─────────────────────────────────────────────────────────────────
 
+/** ADR-0076 § 1 : rôle stocké d'un membre (personne ou équipe) ; absent : Membre. */
+@Schema({ _id: false, strict: true })
+export class WorkProjectMemberRoleDoc {
+  @Prop({ type: String, required: true, enum: ['user', 'team'] })
+  kind!: 'user' | 'team';
+
+  @Prop({ type: String, required: true })
+  id!: string;
+
+  @Prop({ type: String, required: true, enum: ['member', 'viewer'] })
+  role!: 'member' | 'viewer';
+}
+const WorkProjectMemberRoleSchema = SchemaFactory.createForClass(WorkProjectMemberRoleDoc);
+
 @Schema({ _id: false, strict: true })
 export class WorkProjectLinks {
   @Prop({ type: String, default: null })
@@ -210,6 +224,10 @@ export class WorkProject {
   @Prop({ type: String, default: null })
   ownerUserId!: string | null;
 
+  /** ADR-0076 § 1 : Adjoint du chef de projet (absent sur les projets d'avant : `null`). */
+  @Prop({ type: String, default: null })
+  deputyUserId?: string | null;
+
   @Prop({ type: String, default: null })
   startDate!: string | null;
 
@@ -242,6 +260,10 @@ export class WorkProject {
   /** ADR-0060 § 4 : équipes ajoutées (`hr_teams`), membres résolus à chaque lecture. */
   @Prop({ type: [String], default: [] })
   memberTeamIds!: string[];
+
+  /** ADR-0076 § 1 : rôles des membres (entrée absente : Membre, défaut à la lecture). */
+  @Prop({ type: [WorkProjectMemberRoleSchema], default: undefined })
+  memberRoles?: WorkProjectMemberRoleDoc[];
 
   /**
    * ADR-0061 § 2 : dernier état de santé signalé (`at_risk`, `late`) — un projet ne
@@ -288,6 +310,8 @@ WorkProjectSchema.index({ organizationId: 1, 'links.customerId': 1 });
 WorkProjectSchema.index({ organizationId: 1, visibility: 1 });
 WorkProjectSchema.index({ organizationId: 1, memberUserIds: 1 });
 WorkProjectSchema.index({ organizationId: 1, memberTeamIds: 1 });
+// ADR-0076 § 1 : l'adjoint appartient au projet (portée).
+WorkProjectSchema.index({ organizationId: 1, deputyUserId: 1 });
 WorkProjectSchema.index({ organizationId: 1, 'links.opportunityId': 1 });
 WorkProjectSchema.index(
   { organizationId: 1, 'source.quoteId': 1 },
@@ -352,6 +376,65 @@ export class WorkTaskReminders {
 }
 const WorkTaskRemindersSchema = SchemaFactory.createForClass(WorkTaskReminders);
 
+/** ADR-0076 § 4 : élément de la liste de contrôle (ordre : celui du tableau). */
+@Schema({ _id: false, strict: true })
+export class WorkChecklistItemDoc {
+  @Prop({ type: String, required: true })
+  id!: string;
+
+  @Prop({ type: String, required: true })
+  text!: string;
+
+  @Prop({ type: Boolean, required: true, default: false })
+  done!: boolean;
+
+  @Prop({ type: String, default: null })
+  doneBy!: string | null;
+
+  @Prop({ type: Date, default: null })
+  doneAt!: Date | null;
+}
+const WorkChecklistItemSchema = SchemaFactory.createForClass(WorkChecklistItemDoc);
+
+/** ADR-0076 § 3 : validation d'une tâche (absente : pas de validation). */
+@Schema({ _id: false, strict: true })
+export class WorkTaskApprovalDoc {
+  @Prop({ type: Boolean, required: true, default: false })
+  required!: boolean;
+
+  /** Validateur désigné ; `null` : chef, puis adjoint. */
+  @Prop({ type: String, default: null })
+  approverUserId!: string | null;
+
+  @Prop({
+    type: String,
+    required: true,
+    enum: ['none', 'pending', 'changes_requested', 'rejected', 'approved'],
+    default: 'none',
+  })
+  state!: 'none' | 'pending' | 'changes_requested' | 'rejected' | 'approved';
+
+  /** Validateur résolu et figé à la soumission (« À valider »). */
+  @Prop({ type: String, default: null })
+  pendingApproverUserId!: string | null;
+
+  @Prop({ type: String, default: null })
+  submittedBy!: string | null;
+
+  @Prop({ type: Date, default: null })
+  submittedAt!: Date | null;
+
+  @Prop({ type: String, default: null })
+  decidedBy!: string | null;
+
+  @Prop({ type: Date, default: null })
+  decidedAt!: Date | null;
+
+  @Prop({ type: String, default: null })
+  reason!: string | null;
+}
+const WorkTaskApprovalSchema = SchemaFactory.createForClass(WorkTaskApprovalDoc);
+
 @Schema({ collection: 'work_tasks', timestamps: true, strict: true, minimize: false })
 export class WorkTask {
   @Prop({ type: String, required: true })
@@ -393,6 +476,18 @@ export class WorkTask {
 
   @Prop({ type: [String], default: [] })
   followerUserIds!: string[];
+
+  /** ADR-0076 § 2 : collaborateurs (membres du projet, 10 au plus). */
+  @Prop({ type: [String], default: undefined })
+  collaboratorUserIds?: string[];
+
+  /** ADR-0076 § 4 : liste de contrôle (30 éléments au plus). */
+  @Prop({ type: [WorkChecklistItemSchema], default: undefined })
+  checklist?: WorkChecklistItemDoc[];
+
+  /** ADR-0076 § 3 : validation ; absente sur les tâches d'avant (`null`). */
+  @Prop({ type: WorkTaskApprovalSchema, default: null })
+  approval?: WorkTaskApprovalDoc | null;
 
   @Prop({ type: String, required: true, enum: list(WORK_PRIORITIES), default: 'none' })
   priority!: WorkPriority;
@@ -462,6 +557,47 @@ WorkTaskSchema.index({ organizationId: 1, assigneeUserId: 1, done: 1, dueDate: 1
 WorkTaskSchema.index({ organizationId: 1, done: 1, dueDate: 1 });
 WorkTaskSchema.index({ organizationId: 1, projectId: 1, startDate: 1, dueDate: 1 });
 WorkTaskSchema.index({ organizationId: 1, 'blockedBy.taskId': 1 });
+// ADR-0076 : « Je collabore » et « À valider » dans « Mes tâches ».
+WorkTaskSchema.index({ organizationId: 1, collaboratorUserIds: 1, done: 1 });
+WorkTaskSchema.index({
+  organizationId: 1,
+  'approval.pendingApproverUserId': 1,
+  'approval.state': 1,
+});
+
+// ── Statut déclaré d'un projet (ADR-0076 § 5, en ajout seulement) ───────────
+
+@Schema({ collection: 'work_project_status_updates', strict: true })
+export class WorkProjectStatusUpdate {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true })
+  projectId!: string;
+
+  @Prop({ type: String, required: true, enum: ['on_track', 'at_risk', 'off_track', 'done'] })
+  status!: 'on_track' | 'at_risk' | 'off_track' | 'done';
+
+  @Prop({ type: String, required: true })
+  text!: string;
+
+  /** Jour de Kinshasa `AAAA-MM-JJ`. */
+  @Prop({ type: String, required: true })
+  date!: string;
+
+  @Prop({ type: String, required: true })
+  authorUserId!: string;
+
+  @Prop({ type: Date, required: true })
+  createdAt!: Date;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+}
+export type WorkProjectStatusUpdateDocument = HydratedDocument<WorkProjectStatusUpdate>;
+export type WorkProjectStatusUpdateLean = WorkProjectStatusUpdate & { _id: Types.ObjectId };
+export const WorkProjectStatusUpdateSchema = SchemaFactory.createForClass(WorkProjectStatusUpdate);
+WorkProjectStatusUpdateSchema.index({ organizationId: 1, projectId: 1, createdAt: -1 });
 
 // ── Commentaires ────────────────────────────────────────────────────────────
 

@@ -63,6 +63,9 @@ import { WorkTimeService } from './work-time.service.js';
 import { WorkAccessService } from './work-access.service.js';
 import { WorkProjectMembersController } from './work-project-members.controller.js';
 import { WorkProjectMembersService } from './work-project-members.service.js';
+// ADR-0076 § 5 : statut déclaré d'un projet.
+import { WorkProjectStatusController } from './work-project-status.controller.js';
+import { WorkProjectStatusService } from './work-project-status.service.js';
 import { WorkVisibilityGuard } from './work-visibility.guard.js';
 // ADR-0061 : préférences de notification (cloche, e-mail, résumé quotidien).
 import { WorkNotificationPreferencesController } from './preferences/work-notification-preferences.controller.js';
@@ -98,6 +101,8 @@ import {
   WorkMemberRateSchema,
   WorkProject,
   WorkProjectSchema,
+  WorkProjectStatusUpdate,
+  WorkProjectStatusUpdateSchema,
   WorkSettings,
   WorkSettingsSchema,
   WorkTask,
@@ -143,6 +148,8 @@ import {
         schema: WorkNotificationPreferencesSchema,
       },
       { name: WorkAiPlanLog.name, schema: WorkAiPlanLogSchema },
+      // ADR-0076 § 5
+      { name: WorkProjectStatusUpdate.name, schema: WorkProjectStatusUpdateSchema },
     ]),
   ],
   controllers: [
@@ -163,6 +170,8 @@ import {
     WorkPortfolioController,
     // ADR-0060 : membres d'un projet, équipes proposées.
     WorkProjectMembersController,
+    // ADR-0076 § 5 : statut déclaré d'un projet.
+    WorkProjectStatusController,
     // ADR-0061 : mes notifications des Projets.
     WorkNotificationPreferencesController,
     // ADR-0062 : import d'un fichier de tâches (aperçu, import, modèle).
@@ -201,6 +210,7 @@ import {
     WorkAccessService,
     WorkVisibilityGuard,
     WorkProjectMembersService,
+    WorkProjectStatusService,
     // ADR-0061 : préférences de notification, résumé quotidien, veille des projets.
     WorkNotificationPreferencesService,
     WorkDigestJob,

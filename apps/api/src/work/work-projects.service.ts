@@ -15,6 +15,7 @@ import {
   type UpdateWorkProjectBody,
   type WorkColumn,
   type WorkPage,
+  type WorkProjectStatusView,
   type WorkProjectSummary,
   type WorkProjectView,
 } from '@lalanda/shared/work';
@@ -51,9 +52,12 @@ import {
   WorkAttachment,
   WorkComment,
   WorkProject,
+  WorkProjectStatusUpdate,
   WorkTask,
   WorkTimeEntry,
   projectSourceViewOf,
+  type WorkProjectStatusUpdateDocument,
+  type WorkProjectStatusUpdateLean,
   type WorkAttachmentDocument,
   type WorkAttachmentLean,
   type WorkCommentDocument,
@@ -95,7 +99,43 @@ export class WorkProjectsService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    // ADR-0076 § 5 : dernier statut déclaré (Aperçu, portefeuille).
+    @InjectModel(WorkProjectStatusUpdate.name)
+    private readonly statuses: Model<WorkProjectStatusUpdateDocument>,
   ) {}
+
+  /** ADR-0076 § 5 : vue d'un statut déclaré. */
+  static statusViewOf(
+    d: WorkProjectStatusUpdateLean,
+    refs: Map<string, { userId: string; name: string }>,
+  ): WorkProjectStatusView {
+    return {
+      id: String(d._id),
+      projectId: d.projectId,
+      status: d.status,
+      text: d.text,
+      date: d.date,
+      author: WorkMembersService.refOf(refs, d.authorUserId),
+      createdAt: new Date(d.createdAt).toISOString(),
+    };
+  }
+
+  /** ADR-0076 § 5 : dernier statut déclaré de chaque projet. */
+  async latestStatuses(
+    organizationId: string,
+    projectIds: readonly string[],
+  ): Promise<Map<string, WorkProjectStatusView>> {
+    if (projectIds.length === 0) return new Map();
+    const docs = await this.statuses
+      .aggregate<{ _id: string; doc: WorkProjectStatusUpdateLean }>([
+        { $match: { organizationId, projectId: { $in: [...projectIds] } } },
+        { $sort: { createdAt: -1, _id: -1 } },
+        { $group: { _id: '$projectId', doc: { $first: '$$ROOT' } } },
+      ])
+      .exec();
+    const refs = await this.members.refs(docs.map((d) => d.doc.authorUserId));
+    return new Map(docs.map((d) => [d._id, WorkProjectsService.statusViewOf(d.doc, refs)]));
+  }
 
   // ── Lecture ──────────────────────────────────────────────────────────────
 
@@ -262,17 +302,28 @@ export class WorkProjectsService {
     });
   }
 
-  async get(organizationId: string, projectId: string): Promise<WorkProjectView> {
-    return this.view(organizationId, await this.requireOwn(organizationId, projectId));
+  async get(
+    organizationId: string,
+    projectId: string,
+    actor?: WorkActor,
+  ): Promise<WorkProjectView> {
+    return this.view(organizationId, await this.requireOwn(organizationId, projectId), actor);
   }
 
-  async view(organizationId: string, d: WorkProjectLean): Promise<WorkProjectView> {
+  /** `actor` : ajoute le rôle et les droits de l'appelant (ADR-0076 § 1). */
+  async view(
+    organizationId: string,
+    d: WorkProjectLean,
+    actor?: WorkActor,
+  ): Promise<WorkProjectView> {
     const links = d.links ?? { customerId: null, opportunityId: null, quoteIds: [] };
-    const [owners, customers, opportunity, quotes] = await Promise.all([
-      this.members.refs([d.ownerUserId]),
+    const [owners, customers, opportunity, quotes, statuses, rights] = await Promise.all([
+      this.members.refs([d.ownerUserId, d.deputyUserId ?? null]),
       this.customerNames(organizationId, [links.customerId]),
       links.opportunityId ? this.opportunityTitle(organizationId, links.opportunityId) : null,
       this.quoteNumbers(organizationId, links.quoteIds ?? []),
+      this.latestStatuses(organizationId, [String(d._id)]),
+      actor ? this.access.rightsOn(organizationId, d, actor) : null,
     ]);
     return {
       id: String(d._id),
@@ -301,6 +352,10 @@ export class WorkProjectsService {
       updatedBy: d.updatedBy,
       createdAt: new Date(d.createdAt).toISOString(),
       updatedAt: new Date(d.updatedAt).toISOString(),
+      // ADR-0076 § 1 et § 5.
+      deputy: d.deputyUserId ? WorkMembersService.refOf(owners, d.deputyUserId) : null,
+      latestStatus: statuses.get(String(d._id)) ?? null,
+      ...(rights ? { myRole: rights.role, myRights: rights } : {}),
     };
   }
 
@@ -404,6 +459,7 @@ export class WorkProjectsService {
     await this.assertCanCreate(organizationId, actor);
     await this.assertLimit(organizationId);
     const ownerUserId = body.ownerUserId ?? null;
+    const deputyUserId = body.deputyUserId ?? null;
     if (ownerUserId) {
       await this.members.requireEligible(
         organizationId,
@@ -412,6 +468,11 @@ export class WorkProjectsService {
         'WORK_ASSIGNEE_NOT_ELIGIBLE',
         'ownerUserId',
       );
+      // ADR-0076 § 1 : ni Invité externe, ni Stagiaire.
+      await this.members.requireLeadEligible(organizationId, ownerUserId, 'ownerUserId');
+    }
+    if (deputyUserId) {
+      await this.members.requireLeadEligible(organizationId, deputyUserId, 'deputyUserId');
     }
     const links = {
       customerId: body.links?.customerId ?? null,
@@ -431,6 +492,7 @@ export class WorkProjectsService {
       kind: body.kind,
       status: 'active',
       ownerUserId,
+      deputyUserId,
       startDate: body.startDate ?? null,
       dueDate: body.dueDate ?? null,
       links,
@@ -453,7 +515,7 @@ export class WorkProjectsService {
       kind: 'project.created',
       data: { name: body.name, kind: body.kind },
     });
-    return this.get(organizationId, projectId);
+    return this.get(organizationId, projectId, actor);
   }
 
   async update(
@@ -463,8 +525,31 @@ export class WorkProjectsService {
     actor: WorkActor,
   ): Promise<WorkProjectView> {
     const current = await this.requireOwn(organizationId, projectId);
+    // ADR-0076 § 1 : réglages du projet — chef, adjoint ou `work.manage`.
+    const rights = await this.access.assertManage(organizationId, current, actor);
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
     if (current.status === 'archived') projectArchived();
+    // Changer de chef ou d'adjoint : `work.manage` ou le chef lui-même (passer la main).
+    const leadsChange =
+      (body.ownerUserId !== undefined && body.ownerUserId !== (current.ownerUserId ?? null)) ||
+      (body.deputyUserId !== undefined && body.deputyUserId !== (current.deputyUserId ?? null));
+    if (leadsChange && !actorCan(actor, 'work.manage') && rights.role !== 'lead') {
+      forbidden(
+        'WORK_PROJECT_MANAGE_FORBIDDEN',
+        'Seuls le chef de projet et les gestionnaires des projets nomment le chef et l’adjoint.',
+      );
+    }
+    const nextOwner =
+      body.ownerUserId !== undefined ? body.ownerUserId : (current.ownerUserId ?? null);
+    const nextDeputy =
+      body.deputyUserId !== undefined ? body.deputyUserId : (current.deputyUserId ?? null);
+    if (nextOwner && nextDeputy && nextOwner === nextDeputy) {
+      invalid(
+        'deputyUserId',
+        'WORK_PROJECT_LEAD_NOT_ELIGIBLE',
+        'L’adjoint doit être une autre personne que le chef de projet.',
+      );
+    }
 
     const set: Record<string, unknown> = { updatedBy: actor.userId };
     const changed: string[] = [];
@@ -487,8 +572,17 @@ export class WorkProjectsService {
           'WORK_ASSIGNEE_NOT_ELIGIBLE',
           'ownerUserId',
         );
+        if (body.ownerUserId !== (current.ownerUserId ?? null)) {
+          await this.members.requireLeadEligible(organizationId, body.ownerUserId, 'ownerUserId');
+        }
       }
       assign('ownerUserId', body.ownerUserId);
+    }
+    if (body.deputyUserId !== undefined) {
+      if (body.deputyUserId !== null && body.deputyUserId !== (current.deputyUserId ?? null)) {
+        await this.members.requireLeadEligible(organizationId, body.deputyUserId, 'deputyUserId');
+      }
+      assign('deputyUserId', body.deputyUserId);
     }
     const startDate = body.startDate !== undefined ? body.startDate : current.startDate;
     const dueDate = body.dueDate !== undefined ? body.dueDate : current.dueDate;
@@ -555,7 +649,7 @@ export class WorkProjectsService {
         },
       });
     }
-    return this.get(organizationId, projectId);
+    return this.get(organizationId, projectId, actor);
   }
 
   /** Retirer une colonne qui porte des tâches, ou changer sa catégorie : refusé. */
@@ -595,8 +689,9 @@ export class WorkProjectsService {
     actor: WorkActor,
   ): Promise<WorkProjectView> {
     const current = await this.requireOwn(organizationId, projectId);
+    await this.access.assertManage(organizationId, current, actor);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
-    if (current.status === 'archived') return this.view(organizationId, current);
+    if (current.status === 'archived') return this.view(organizationId, current, actor);
     await this.setStatus(current, expectedRevision, {
       status: 'archived',
       archivedAt: new Date(),
@@ -608,7 +703,7 @@ export class WorkProjectsService {
       kind: 'project.archived',
       data: { from: current.status, to: 'archived' },
     });
-    return this.get(organizationId, projectId);
+    return this.get(organizationId, projectId, actor);
   }
 
   /** Restaurer : le projet redevient actif (ou terminé s'il l'était), dans la borne des 500. */
@@ -619,8 +714,9 @@ export class WorkProjectsService {
     actor: WorkActor,
   ): Promise<WorkProjectView> {
     const current = await this.requireOwn(organizationId, projectId);
+    await this.access.assertManage(organizationId, current, actor);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
-    if (current.status !== 'archived') return this.view(organizationId, current);
+    if (current.status !== 'archived') return this.view(organizationId, current, actor);
     await this.assertLimit(organizationId);
     const to = current.completedAt ? 'completed' : 'active';
     await this.setStatus(current, expectedRevision, {
@@ -634,7 +730,7 @@ export class WorkProjectsService {
       kind: 'project.restored',
       data: { from: 'archived', to },
     });
-    return this.get(organizationId, projectId);
+    return this.get(organizationId, projectId, actor);
   }
 
   private async setStatus(
@@ -684,6 +780,7 @@ export class WorkProjectsService {
       this.comments.deleteMany({ organizationId, projectId }).exec(),
       this.attachments.deleteMany({ organizationId, projectId }).exec(),
       this.time.deleteMany({ organizationId, projectId }).exec(),
+      this.statuses.deleteMany({ organizationId, projectId }).exec(),
       this.activity.purgeProject(organizationId, projectId),
     ]);
     await dropAttachmentObjects(

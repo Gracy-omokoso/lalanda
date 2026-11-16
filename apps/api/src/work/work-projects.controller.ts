@@ -3,14 +3,17 @@
 //   GET    /work/projects                         work.read   (filtres, curseur, compteurs)
 //   POST   /work/projects                         work.manage
 //   GET    /work/projects/:projectId              work.read
-//   PUT    /work/projects/:projectId              work.manage (révision attendue)
-//   POST   /work/projects/:projectId/archive      work.manage
-//   POST   /work/projects/:projectId/restore      work.manage
+//   PUT    /work/projects/:projectId              work.update + gestion du projet (révision attendue)
+//   POST   /work/projects/:projectId/archive      work.update + gestion du projet
+//   POST   /work/projects/:projectId/restore      work.update + gestion du projet
 //   DELETE /work/projects/:projectId              work.manage (409 si non vide)
 //   GET    /work/projects/:projectId/activity     work.read   (curseur)
 //
 // `POST /work/projects/from-quote` appartient au lot L4a (`work/billing/**`).
 // Un projet d'une autre organisation répond 404.
+//
+// ADR-0076 § 1 : « gestion du projet » = chef, adjoint (internes, `work.update`) ou
+// `work.manage`, vérifiée par le service (403 `WORK_PROJECT_MANAGE_FORBIDDEN`).
 
 import {
   Body,
@@ -93,13 +96,15 @@ export class WorkProjectsController {
   @RequirePermission('work.read')
   async get(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
   ): Promise<WorkProjectView> {
-    return this.projects.get(orgId, projectId);
+    return this.projects.get(orgId, projectId, workActorOf(user, perms));
   }
 
   @Put(':projectId')
-  @RequirePermission('work.manage')
+  @RequirePermission('work.update')
   async update(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -114,7 +119,7 @@ export class WorkProjectsController {
 
   @Post(':projectId/archive')
   @HttpCode(200)
-  @RequirePermission('work.manage')
+  @RequirePermission('work.update')
   async archive(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -134,7 +139,7 @@ export class WorkProjectsController {
 
   @Post(':projectId/restore')
   @HttpCode(200)
-  @RequirePermission('work.manage')
+  @RequirePermission('work.update')
   async restore(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,

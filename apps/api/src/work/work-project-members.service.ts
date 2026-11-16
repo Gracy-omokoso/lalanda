@@ -10,7 +10,11 @@
 import {
   WORK_PROJECT_MEMBER_LIMITS,
   distinctProjectMembers,
+  memberRoleOf,
+  resolveProjectRole,
   type AddProjectMembersBody,
+  type WorkProjectRole,
+  type WorkProjectMemberRole,
   type WorkMemberRef,
   type WorkProjectMembersView,
   type WorkProjectTeamView,
@@ -22,7 +26,6 @@ import type { Connection, Model } from 'mongoose';
 
 import { can } from '../authz/permissions.js';
 import {
-  actorCan,
   conflict,
   isWorkId,
   notFound,
@@ -31,7 +34,7 @@ import {
   type WorkActor,
 } from './work.common.js';
 import type { WorkProjectAudience } from './work-access.js';
-import { HR_TEAMS_COLLECTION } from './work-access.service.js';
+import { HR_TEAMS_COLLECTION, WorkAccessService } from './work-access.service.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
@@ -65,6 +68,7 @@ export class WorkProjectMembersService {
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
   ) {}
 
   private async teamsOf(organizationId: string, ids: readonly string[]): Promise<TeamRead[]> {
@@ -87,8 +91,27 @@ export class WorkProjectMembersService {
       ...(project.memberUserIds ?? []),
       ...teams.flatMap(teamMemberIds),
       ...(project.ownerUserId ? [project.ownerUserId] : []),
+      // ADR-0076 § 1 : l'adjoint appartient au projet.
+      ...(project.deputyUserId ? [project.deputyUserId] : []),
     ]);
-    return { visibility: project.visibility ?? 'organization', members };
+    const roles = new Map<string, WorkProjectRole>();
+    for (const userId of members) {
+      roles.set(
+        userId,
+        resolveProjectRole({
+          userId,
+          ownerUserId: project.ownerUserId,
+          deputyUserId: project.deputyUserId ?? null,
+          memberUserIds: project.memberUserIds,
+          memberTeamIds: project.memberTeamIds,
+          memberRoles: project.memberRoles ?? [],
+          userTeamIds: teams
+            .filter((t) => teamMemberIds(t).includes(userId))
+            .map((t) => String(t._id)),
+        }),
+      );
+    }
+    return { visibility: project.visibility ?? 'organization', members, roles };
   }
 
   /** `GET /work/teams` — équipes de l'organisation (sélecteur), sans leurs membres. */
@@ -115,39 +138,52 @@ export class WorkProjectMembersService {
       ...userIds,
       ...teams.flatMap(teamMemberIds),
       ...(project.ownerUserId ? [project.ownerUserId] : []),
+      ...(project.deputyUserId ? [project.deputyUserId] : []),
     ];
-    const [refs, perms] = await Promise.all([
+    const [refs, perms, rights] = await Promise.all([
       this.members.refs(allIds),
       this.members.permissions(organizationId, userIds),
+      this.access.rightsOn(organizationId, project, actor),
     ]);
+    const roles = project.memberRoles ?? [];
     const ref = (id: string): WorkMemberRef => WorkMembersService.refOf(refs, id);
     const byName = (a: WorkMemberRef, b: WorkMemberRef) => a.name.localeCompare(b.name, 'fr');
     const teamViews: WorkProjectTeamView[] = teams
       .map((t) => {
         const members = teamMemberIds(t).map(ref).sort(byName);
-        return { teamId: String(t._id), name: t.name, memberCount: members.length, members };
+        return {
+          teamId: String(t._id),
+          name: t.name,
+          memberCount: members.length,
+          members,
+          role: memberRoleOf(roles, 'team', String(t._id)),
+        };
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     return {
       projectId,
       visibility: project.visibility ?? 'organization',
       owner: project.ownerUserId ? ref(project.ownerUserId) : null,
+      deputy: project.deputyUserId ? ref(project.deputyUserId) : null,
       users: userIds
         .map((id) => {
           const m = perms.get(id);
           return {
             ...ref(id),
             canUpdate: m !== undefined && can(m.role, 'work.update', m.context),
+            role: memberRoleOf(roles, 'user', id),
           };
         })
         .sort(byName),
       teams: teamViews,
       memberCount: distinctProjectMembers({
         ownerUserId: project.ownerUserId,
+        deputyUserId: project.deputyUserId ?? null,
         userIds,
         teams: teamViews,
       }).length,
-      canManage: actorCan(actor, 'work.manage'),
+      // ADR-0076 § 1 : chef, adjoint ou `work.manage`.
+      canManage: rights.canManage,
     };
   }
 
@@ -156,9 +192,13 @@ export class WorkProjectMembersService {
     projectId: string,
     body: AddProjectMembersBody,
     actor: WorkActor,
+    opts: { trusted?: boolean } = {},
   ): Promise<WorkProjectMembersView> {
     const project = await this.projects.requireOwn(organizationId, projectId);
     if (project.status === 'archived') projectArchived();
+    // ADR-0076 § 1 : chef, adjoint ou `work.manage`. Un ajout par assignation (ADR-0066 § 3)
+    // passe par `addByAssignment`, déjà décidé par la règle de l'assigné.
+    if (!opts.trusted) await this.access.assertManage(organizationId, project, actor);
     const userIds = body.userIds ?? [];
     const teamIds = body.teamIds ?? [];
     await this.members.requireEligible(
@@ -188,6 +228,15 @@ export class WorkProjectMembersService {
       );
     }
     if (newUsers.length + newTeams.length > 0) {
+      // ADR-0076 § 1 : rôle des nouveaux venus ; Membre (défaut) n'écrit rien.
+      const role = body.role ?? 'member';
+      const roleEntries =
+        role === 'member'
+          ? []
+          : [
+              ...newUsers.map((id) => ({ kind: 'user' as const, id, role })),
+              ...newTeams.map((t) => ({ kind: 'team' as const, id: String(t._id), role })),
+            ];
       await this.projectModel
         .updateOne(
           { _id: project._id, organizationId },
@@ -196,7 +245,19 @@ export class WorkProjectMembersService {
               memberUserIds: { $each: newUsers },
               memberTeamIds: { $each: newTeams.map((t) => String(t._id)) },
             },
-            $set: { updatedBy: actor.userId },
+            $set: {
+              updatedBy: actor.userId,
+              ...(roleEntries.length > 0
+                ? {
+                    memberRoles: [
+                      ...(project.memberRoles ?? []).filter(
+                        (r) => !roleEntries.some((e) => e.kind === r.kind && e.id === r.id),
+                      ),
+                      ...roleEntries,
+                    ],
+                  }
+                : {}),
+            },
             $inc: { revision: 1 },
           },
         )
@@ -205,7 +266,7 @@ export class WorkProjectMembersService {
         projectId,
         actorUserId: actor.userId,
         kind: 'project.member_added',
-        data: { userIds: newUsers, teamIds: newTeams.map((t) => String(t._id)) },
+        data: { userIds: newUsers, teamIds: newTeams.map((t) => String(t._id)), role },
       });
       // ADR-0061 § 2 : « ajouté à un projet » — personnes ajoutées et membres des équipes.
       await this.notifier.projectEvent({
@@ -215,6 +276,50 @@ export class WorkProjectMembersService {
         projectId,
         title: `Vous avez été ajouté au projet ${project.name}`,
         actorUserId: actor.userId,
+      });
+    }
+    return this.get(organizationId, projectId, actor);
+  }
+
+  /**
+   * ADR-0076 § 1 : change le rôle (Membre, Lecteur) d'une personne ou d'une équipe déjà
+   * membre. Chef, adjoint ou `work.manage`. Le chef et l'adjoint gardent leur rôle propre.
+   */
+  async setRole(
+    organizationId: string,
+    projectId: string,
+    kind: 'user' | 'team',
+    id: string,
+    role: WorkProjectMemberRole,
+    actor: WorkActor,
+  ): Promise<WorkProjectMembersView> {
+    const project = await this.projects.requireOwn(organizationId, projectId);
+    if (project.status === 'archived') projectArchived();
+    await this.access.assertManage(organizationId, project, actor);
+    const list = kind === 'user' ? (project.memberUserIds ?? []) : (project.memberTeamIds ?? []);
+    if (!list.includes(id)) {
+      notFound('WORK_MEMBER_NOT_FOUND', 'Ce membre ou cette équipe ne fait pas partie du projet.');
+    }
+    const from = memberRoleOf(project.memberRoles, kind, id);
+    if (from !== role) {
+      const rest = (project.memberRoles ?? []).filter((r) => !(r.kind === kind && r.id === id));
+      await this.projectModel
+        .updateOne(
+          { _id: project._id, organizationId },
+          {
+            $set: {
+              memberRoles: role === 'member' ? rest : [...rest, { kind, id, role }],
+              updatedBy: actor.userId,
+            },
+            $inc: { revision: 1 },
+          },
+        )
+        .exec();
+      await this.activity.record(organizationId, {
+        projectId,
+        actorUserId: actor.userId,
+        kind: 'project.member_role_changed',
+        data: { kind, id, from, to: role },
       });
     }
     return this.get(organizationId, projectId, actor);
@@ -251,6 +356,7 @@ export class WorkProjectMembersService {
   ): Promise<WorkProjectMembersView> {
     const project = await this.projects.requireOwn(organizationId, projectId);
     if (project.status === 'archived') projectArchived();
+    await this.access.assertManage(organizationId, project, actor);
     const [field, value] = Object.entries(pull)[0]!;
     const current = (project as unknown as Record<string, string[] | undefined>)[field] ?? [];
     if (!current.includes(value)) {
@@ -259,7 +365,15 @@ export class WorkProjectMembersService {
     await this.projectModel
       .updateOne(
         { _id: project._id, organizationId },
-        { $pull: pull, $set: { updatedBy: actor.userId }, $inc: { revision: 1 } },
+        {
+          $pull: {
+            ...pull,
+            // ADR-0076 § 1 : le rôle part avec le membre.
+            memberRoles: { kind: field === 'memberUserIds' ? 'user' : 'team', id: value },
+          },
+          $set: { updatedBy: actor.userId },
+          $inc: { revision: 1 },
+        },
       )
       .exec();
     await this.activity.record(organizationId, {

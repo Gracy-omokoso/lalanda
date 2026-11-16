@@ -22,7 +22,13 @@ import {
 import { can, type Action, type OrgRole } from '../authz/permissions.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
-import { seesProjectAudience, type WorkProjectAudience } from './work-access.js';
+import type { WorkProjectRole } from '@lalanda/shared/work';
+
+import {
+  isLeadEligibleRole,
+  seesProjectAudience,
+  type WorkProjectAudience,
+} from './work-access.js';
 import { invalid, memberNotFound } from './work.common.js';
 
 /** Membre de l'organisation et ce qu'il peut faire dans le module. */
@@ -36,6 +42,10 @@ export interface WorkMemberView extends WorkMemberRef {
    * projet. Un responsable doit voir le projet de sa tâche.
    */
   seesProject?: boolean;
+  /** ADR-0076 § 1 : peut être Chef de projet ou Adjoint (interne, `work.update`). */
+  canLead?: boolean;
+  /** ADR-0076 § 1 : rôle dans le projet demandé (`?projectId=`). */
+  projectRole?: WorkProjectRole;
 }
 
 const FORMER_MEMBER = 'Ancien membre';
@@ -127,6 +137,22 @@ export class WorkMembersService {
     }
   }
 
+  /**
+   * ADR-0076 § 1 : Chef de projet ou Adjoint — membre (404 sinon), `work.update` et rôle
+   * interne (ni Invité externe, ni Stagiaire) ; sinon 400 `WORK_PROJECT_LEAD_NOT_ELIGIBLE`.
+   */
+  async requireLeadEligible(organizationId: string, userId: string, path: string): Promise<void> {
+    const m = await this.permissionsOf(organizationId, userId);
+    if (m === undefined) memberNotFound();
+    if (!can(m.role, 'work.update', m.context) || !isLeadEligibleRole(m.role)) {
+      invalid(
+        path,
+        'WORK_PROJECT_LEAD_NOT_ELIGIBLE',
+        'Un chef de projet ou un adjoint est un membre interne qui peut modifier les tâches (ni Invité externe, ni Stagiaire).',
+      );
+    }
+  }
+
   /** Vérifie l'appartenance seule (404 sinon). */
   async requireMember(organizationId: string, userId: string): Promise<OrgRole> {
     const role = await this.roleOf(organizationId, userId);
@@ -144,12 +170,14 @@ export class WorkMembersService {
         ...WorkMembersService.refOf(refs, id),
         canUpdate: can(m.role, 'work.update', m.context),
         canManage: can(m.role, 'work.manage', m.context),
+        canLead: can(m.role, 'work.update', m.context) && isLeadEligibleRole(m.role),
         ...(audience
           ? {
               seesProject: seesProjectAudience(
                 { userId: id, role: m.role, context: m.context },
                 audience,
               ),
+              projectRole: audience.roles?.get(id) ?? ('none' as const),
             }
           : {}),
       }))

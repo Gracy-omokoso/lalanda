@@ -8,12 +8,17 @@
 //   PATCH  /work/tasks/:taskId                                   work.update (révision attendue)
 //   POST   /work/tasks/:taskId/move                              work.update
 //   POST   /work/tasks/:taskId/complete · …/reopen               work.update
-//   DELETE /work/tasks/:taskId                                   work.manage
+//   DELETE /work/tasks/:taskId                                   work.update + gestion du projet
+//   POST   /work/tasks/:taskId/approval/submit                   work.update (ADR-0076 § 3)
+//   POST   /work/tasks/:taskId/approval/decide                   work.update (ADR-0076 § 3)
+//   PUT    /work/tasks/:taskId/checklist                         work.update (ADR-0076 § 4)
+//   POST   /work/tasks/:taskId/follow · DELETE …/follow          work.read   (ADR-0076 § 2)
 //   POST   /work/tasks/:taskId/dependencies                      work.update
 //   DELETE /work/tasks/:taskId/dependencies/:predecessorTaskId   work.update
 //   GET    /work/tasks/:taskId/activity                          work.read   (curseur)
 //
 // Les écritures rendent `{ task, warnings, suggestions }` (`WorkTaskWriteResult`).
+// ADR-0076 : le service applique les droits du rôle dans le projet (403 sinon).
 
 import {
   Body,
@@ -25,12 +30,15 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   AddDependencyBody,
   CreateWorkTaskBody,
+  DecideWorkApprovalBody,
+  PutWorkChecklistBody,
   ListProjectTasksQuery,
   ListWorkTasksQuery,
   MoveWorkTaskBody,
@@ -127,9 +135,11 @@ export class WorkTasksController {
   @RequirePermission('work.read')
   async get(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
   ): Promise<WorkTaskDetail> {
-    return this.tasks.detail(orgId, taskId);
+    return this.tasks.detail(orgId, taskId, workActorOf(user, perms));
   }
 
   @Patch('tasks/:taskId')
@@ -198,7 +208,7 @@ export class WorkTasksController {
 
   @Delete('tasks/:taskId')
   @HttpCode(204)
-  @RequirePermission('work.manage')
+  @RequirePermission('work.update')
   async remove(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -238,6 +248,78 @@ export class WorkTasksController {
     @Param('predecessorTaskId', WorkIdPipe) predecessorTaskId: string,
   ): Promise<WorkTaskWriteResult> {
     return this.tasks.removeDependency(orgId, taskId, predecessorTaskId, workActorOf(user, perms));
+  }
+
+  @Post('tasks/:taskId/approval/submit')
+  @HttpCode(200)
+  @RequirePermission('work.update')
+  async submitApproval(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Param('taskId', WorkIdPipe) taskId: string,
+    @Body() body: unknown,
+  ): Promise<WorkTaskWriteResult> {
+    const parsed = WorkExpectedRevisionBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.tasks.submitApproval(
+      orgId,
+      taskId,
+      parsed.data.expectedRevision,
+      workActorOf(user, perms),
+    );
+  }
+
+  @Post('tasks/:taskId/approval/decide')
+  @HttpCode(200)
+  @RequirePermission('work.update')
+  async decideApproval(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Param('taskId', WorkIdPipe) taskId: string,
+    @Body() body: unknown,
+  ): Promise<WorkTaskWriteResult> {
+    const parsed = DecideWorkApprovalBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.tasks.decideApproval(orgId, taskId, parsed.data, workActorOf(user, perms));
+  }
+
+  @Put('tasks/:taskId/checklist')
+  @RequirePermission('work.update')
+  async putChecklist(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Param('taskId', WorkIdPipe) taskId: string,
+    @Body() body: unknown,
+  ): Promise<WorkTaskWriteResult> {
+    const parsed = PutWorkChecklistBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.tasks.putChecklist(orgId, taskId, parsed.data, workActorOf(user, perms));
+  }
+
+  @Post('tasks/:taskId/follow')
+  @HttpCode(200)
+  @RequirePermission('work.read')
+  async follow(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Param('taskId', WorkIdPipe) taskId: string,
+  ): Promise<{ following: boolean }> {
+    return this.tasks.setFollowing(orgId, taskId, true, workActorOf(user, perms));
+  }
+
+  @Delete('tasks/:taskId/follow')
+  @RequirePermission('work.read')
+  async unfollow(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Param('taskId', WorkIdPipe) taskId: string,
+  ): Promise<{ following: boolean }> {
+    return this.tasks.setFollowing(orgId, taskId, false, workActorOf(user, perms));
   }
 
   @Get('tasks/:taskId/activity')
