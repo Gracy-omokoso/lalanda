@@ -45,7 +45,11 @@ import type { CachedLevelInput, StockItemInput } from '../stock/types.js';
  * un nom, un montant ni la nature d'une avance ; règles R19 et R20. Sans ces deux
  * entrées, leurs faits sont « non disponibles » et les règles R1 à R18 inchangées.
  */
-export const MORNING_BRIEF_VERSION = '1.6.0';
+/**
+ * 1.7.0 (ADR-0076 § 3) : fait `mes_validations_taches.en_attente` (tâches soumises dont
+ * l'appelant est le validateur) — un NOMBRE ; sans l'entrée, « non disponible ».
+ */
+export const MORNING_BRIEF_VERSION = '1.7.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -126,7 +130,13 @@ export interface BriefWorkTaskInput {
 export type BriefWorkInput =
   | 'hidden'
   | { status: 'unavailable' }
-  | { status: 'known'; tasks: readonly BriefWorkTaskInput[]; truncated: boolean };
+  | {
+      status: 'known';
+      tasks: readonly BriefWorkTaskInput[];
+      truncated: boolean;
+      /** ADR-0076 § 3 : tâches en attente de la validation de l'appelant ; absent : non disponible. */
+      pendingApprovalCount?: number;
+    };
 
 /**
  * Relance CRM NON faite dont l'échéance est aujourd'hui ou passée (ADR-0040 § 5.5),

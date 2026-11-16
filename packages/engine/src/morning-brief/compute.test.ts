@@ -490,7 +490,19 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
   });
 
   it('version mineure suivante (ADR-0044 § 6.4)', () => {
-    expect(brief([]).version).toBe('1.6.0');
+    expect(brief([]).version).toBe('1.7.0');
+  });
+
+  it('ADR-0076 § 3 : tâches à valider — connu, non disponible sans l’entrée, masqué', () => {
+    const fact = (w: Parameters<typeof input>[1]) =>
+      buildMorningBrief(input([], w)).facts.find(
+        (f) => f.id === 'mes_validations_taches.en_attente',
+      );
+    expect(
+      fact({ work: { status: 'known', tasks: [], truncated: false, pendingApprovalCount: 3 } }),
+    ).toMatchObject({ status: 'known', value: '3' });
+    expect(fact(work([], false))).toMatchObject({ status: 'unavailable', value: null });
+    expect(fact({ work: 'hidden' })).toMatchObject({ status: 'hidden', value: null });
   });
 
   it('les vingt règles ont des rangs uniques', () => {
@@ -854,10 +866,10 @@ describe('ressources humaines — absences du jour, validations, échéances, R1
     }
   });
 
-  it('lecture bornée : le brief le dit ; version 1.6.0', () => {
+  it('lecture bornée : le brief le dit ; version 1.7.0', () => {
     const b = buildMorningBrief(input([], rh({ truncated: true })));
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.6.0');
+    expect(b.version).toBe('1.7.0');
   });
 });
 
@@ -1119,6 +1131,6 @@ describe('stocks, équipements, documents — faits et règles R16 à R18 (ADR-0
       }
     }
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.6.0');
+    expect(b.version).toBe('1.7.0');
   });
 });

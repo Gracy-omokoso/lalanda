@@ -69,7 +69,9 @@ export class WorkBriefSource implements WorkSource {
       )
       .lean()
       .exec()) as unknown as ProjectRow[];
-    if (projects.length === 0) return { status: 'known', tasks: [], truncated: false };
+    if (projects.length === 0) {
+      return { status: 'known', tasks: [], truncated: false, pendingApprovalCount: 0 };
+    }
 
     const active = new Set(projects.filter((p) => p.status === 'active').map((p) => String(p._id)));
     const today = kinshasaDayOf(now);
@@ -89,6 +91,15 @@ export class WorkBriefSource implements WorkSource {
       .lean()
       .exec()) as unknown as TaskRow[];
 
+    // ADR-0076 § 3 : tâches soumises dont le destinataire est le validateur.
+    const pendingApprovalCount = await this.tasks
+      .countDocuments({
+        organizationId,
+        projectId: { $in: projects.map((p) => String(p._id)) },
+        'approval.pendingApproverUserId': userId,
+        'approval.state': 'pending',
+      })
+      .exec();
     const truncated = rows.length > MAX_BRIEF_WORK_TASKS;
     const tasks: BriefWorkTaskInput[] = rows.slice(0, MAX_BRIEF_WORK_TASKS).map((t) => ({
       projectId: t.projectId,
@@ -97,6 +108,6 @@ export class WorkBriefSource implements WorkSource {
       mine: t.assigneeUserId === userId,
       projectActive: active.has(t.projectId),
     }));
-    return { status: 'known', tasks, truncated };
+    return { status: 'known', tasks, truncated, pendingApprovalCount };
   }
 }

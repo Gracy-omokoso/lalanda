@@ -228,6 +228,8 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
 
   // Projets et tâches du RUN (ADR-0039 § 6.5).
   facts.push(...workFacts(input.work, today));
+  // ADR-0076 § 3 : tâches qui attendent la validation de l'appelant — un nombre.
+  facts.push(workApprovalFact(input.work));
 
   // Relances et pipeline du CRM (ADR-0040 — C4 § 5.5).
   facts.push(...crmFacts(input.crm ?? { status: 'unavailable' }, today));
@@ -352,6 +354,34 @@ function workFacts(
     status: 'known' as const,
     value: values[f.id] ?? null,
   }));
+}
+
+/**
+ * ADR-0076 § 3 (1.7.0) : tâches « à valider » dont l'appelant est le validateur. Masqué
+ * sans `work.read` ; non disponible si la source ne le fournit pas.
+ */
+function workApprovalFact(work: BriefWorkInput): BriefFact {
+  const base: Omit<BriefFact, 'status' | 'value'> = {
+    id: 'mes_validations_taches.en_attente',
+    label: 'Tâches à valider',
+    kind: 'count',
+    currency: null,
+    source: {
+      module: 'run.work',
+      collection: 'work_tasks',
+      rule: 'Tâches soumises à validation dont vous êtes le validateur, projets visibles non archivés',
+      reference: 'ADR-0076 § 3',
+    },
+  };
+  if (work === 'hidden') return { ...base, status: 'hidden', value: null };
+  if (work.status !== 'known' || work.pendingApprovalCount === undefined) {
+    return { ...base, status: 'unavailable', value: null };
+  }
+  return {
+    ...base,
+    status: 'known',
+    value: String(Math.max(0, Math.trunc(work.pendingApprovalCount))),
+  };
 }
 
 // ── Relances et pipeline du CRM (ADR-0040 — C4 § 5.5) ───────────────────────
