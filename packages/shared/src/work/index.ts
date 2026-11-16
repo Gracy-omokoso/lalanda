@@ -9,6 +9,8 @@ export * from './schemas.js';
 export * from './views.js';
 // ADR-0045 — H5 : feuille de temps hebdomadaire en lecture (§ 6.3).
 export * from './timesheets.js';
+// ADR-0077 : contrat → projet, validation des feuilles de temps.
+export * from './sync.js';
 // ADR-0057 : aperçu d'un projet (santé, avancement, charge, jalons).
 export * from './overview.js';
 // ADR-0058 : accueil des projets (portefeuille), santé et chiffres.

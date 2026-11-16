@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { isCalendarDay } from './scheduling.js';
+import type { TimesheetApprovalView } from './sync.js';
 import type { WorkMemberRef } from './views.js';
 
 const ID = /^[0-9a-f]{24}$/;
@@ -76,4 +77,6 @@ export interface WeeklyTimesheetView {
   }[];
   totalMinutes: number;
   findings: { code: TimesheetFindingCode; date: string; minutes: number }[];
+  /** ADR-0077 § 4 : état de validation de la semaine (absent : API antérieure). */
+  approval?: TimesheetApprovalView;
 }

@@ -16,6 +16,8 @@ import type { StockMyTaskItem } from '../stock/agenda.js';
 import type { AssetsMyTaskItem } from '../assets/agenda.js';
 // ADR-0050 — V6 : alertes des contrats, commandes et abonnements dans « Mes tâches » (§ 6).
 import type { SalesContractMyTaskItem } from '../sales-contracts/agenda.js';
+// ADR-0077 § 4.6
+import type { WorkTimesheetMyTaskItem } from './sync.js';
 import type {
   WorkActivityKind,
   WorkColumn,
@@ -375,7 +377,8 @@ export type MyTaskEntry =
   | HrMyTaskItem
   | StockMyTaskItem
   | AssetsMyTaskItem
-  | SalesContractMyTaskItem; // ADR-0050 — V6
+  | SalesContractMyTaskItem // ADR-0050 — V6
+  | WorkTimesheetMyTaskItem; // ADR-0077 § 4.6
 
 /** `GET /work/my-tasks` — groupes calculés par `groupMyTasks`. */
 export interface MyTasksView {
@@ -559,6 +562,11 @@ export interface ProjectMarginView {
    * `null` sans module RH (rien n'est lu).
    */
   pendingExpenseClaims?: ProjectMarginPendingExpenseClaimsView[] | null;
+  /**
+   * ADR-0077 § 4.5 — part du temps saisi du projet dans une semaine VALIDÉE, à titre
+   * INFORMATIF : tout le temps saisi reste compté dans la marge. Moteur `timeApprovalShare`.
+   */
+  timeApproval?: { totalMinutes: number; approvedMinutes: number };
 }
 
 /** Frais approuvés non remboursés d'une devise (ADR-0051 § 7.3), rendus par le moteur. */
