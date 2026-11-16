@@ -5,12 +5,16 @@
 // Visibilité (Toute l'organisation / Membres seulement), personnes ajoutées une à
 // une, équipes ajoutées (leurs membres COURANTS, résolus par le serveur : rejoindre
 // l'équipe plus tard donne accès). Lecture pour qui voit le projet ; modification
-// pour `work.manage`. L'accès réel est décidé par l'API, jamais par cet écran.
+// pour le chef de projet, son adjoint et `work.manage` (ADR-0076 § 1, `canManage`
+// dit par le serveur). Chaque personne ou équipe est Membre ou Lecteur. L'accès réel
+// est décidé par l'API, jamais par cet écran.
 
-import type {
-  WorkProjectMembersView,
-  WorkProjectVisibility,
-  WorkTeamRef,
+import {
+  WORK_PROJECT_ROLE_LABELS,
+  type WorkProjectMemberRole,
+  type WorkProjectMembersView,
+  type WorkProjectVisibility,
+  type WorkTeamRef,
 } from '@lalanda/shared/work';
 import {
   Alert,
@@ -18,6 +22,7 @@ import {
   ChoiceCards,
   EntityPicker,
   Field,
+  SegmentedControl,
   StatusPill,
   buttonClasses,
   correspondRecherche,
@@ -39,17 +44,24 @@ import {
 import { useProjet } from './project-context';
 import { codeWork, messageWork } from './projets-model';
 
+/** ADR-0076 § 1 : rôles qu'on donne à une personne ou une équipe ajoutée. */
+const OPTIONS_ROLE: { value: WorkProjectMemberRole; label: string }[] = [
+  { value: 'member', label: WORK_PROJECT_ROLE_LABELS.member },
+  { value: 'viewer', label: WORK_PROJECT_ROLE_LABELS.viewer },
+];
+
 function message(err: unknown, repli: string): string {
   return messageMembres(codeWork(err), messageWork(err, repli));
 }
 
 export function MembresProjet(): React.ReactElement {
   const id = useId();
-  const { projectId, project, members, gerer, setProject } = useProjet();
+  const { projectId, project, members, setProject } = useProjet();
   const [vue, setVue] = useState<WorkProjectMembersView | null>(null);
   const [equipes, setEquipes] = useState<WorkTeamRef[]>([]);
   const [personne, setPersonne] = useState('');
   const [equipe, setEquipe] = useState('');
+  const [roleAjout, setRoleAjout] = useState<WorkProjectMemberRole>('member');
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [version, setVersion] = useState(0);
@@ -109,7 +121,7 @@ export function MembresProjet(): React.ReactElement {
     }
   }
 
-  const modifiable = gerer && vue?.canManage === true && project?.status !== 'archived';
+  const modifiable = vue?.canManage === true && project?.status !== 'archived';
   const visibilite = project?.visibility ?? vue?.visibility ?? 'organization';
   const ajoutables = personnesAjoutables(members, vue);
   const equipesLibres = equipesAjoutables(equipes, vue);
@@ -160,7 +172,7 @@ export function MembresProjet(): React.ReactElement {
               e.preventDefault();
               if (personne === '') return;
               void agir(
-                workApi.addProjectMembers(projectId, { userIds: [personne] }),
+                workApi.addProjectMembers(projectId, { userIds: [personne], role: roleAjout }),
                 'Le membre n’a pas pu être ajouté.',
               );
             }}
@@ -195,7 +207,7 @@ export function MembresProjet(): React.ReactElement {
               e.preventDefault();
               if (equipe === '') return;
               void agir(
-                workApi.addProjectMembers(projectId, { teamIds: [equipe] }),
+                workApi.addProjectMembers(projectId, { teamIds: [equipe], role: roleAjout }),
                 'L’équipe n’a pas pu être ajoutée.',
               );
             }}
@@ -225,6 +237,20 @@ export function MembresProjet(): React.ReactElement {
               Ajouter l’équipe
             </Button>
           </form>
+          <Field
+            id={`${id}-role`}
+            label="Rôle des personnes et équipes ajoutées"
+            group
+            size="full"
+            className="md:col-span-2"
+            hint="Membre : crée et fait avancer ses tâches. Lecteur : lit et commente seulement."
+          >
+            <SegmentedControl<WorkProjectMemberRole>
+              value={roleAjout}
+              onChange={setRoleAjout}
+              options={OPTIONS_ROLE}
+            />
+          </Field>
           <p className="text-xs text-[var(--foreground-muted)] md:col-span-2">
             Une équipe ajoutée donne accès à tous ses membres, y compris ceux qui la rejoindront
             plus tard.
@@ -244,6 +270,13 @@ export function MembresProjet(): React.ReactElement {
                   <StatusPill tone="open">Chef de projet</StatusPill>
                 </li>
               ) : null}
+              {vue.deputy ? (
+                <li className="flex items-center gap-3 px-3 py-2 text-sm">
+                  <Avatar name={vue.deputy.name} cle={vue.deputy.userId} taille={28} />
+                  <span className="min-w-0 flex-1 break-words">{vue.deputy.name}</span>
+                  <StatusPill tone="open">Adjoint</StatusPill>
+                </li>
+              ) : null}
               {vue.users.length === 0 && !vue.owner ? (
                 <li className="px-3 py-3 text-sm text-[var(--foreground-muted)]">
                   Personne n’est ajouté un à un.
@@ -260,6 +293,22 @@ export function MembresProjet(): React.ReactElement {
                       </span>
                     ) : null}
                   </span>
+                  {modifiable ? (
+                    <SegmentedControl<WorkProjectMemberRole>
+                      aria-label={`Rôle de ${u.name}`}
+                      value={u.role ?? 'member'}
+                      disabled={envoi}
+                      onChange={(r) =>
+                        void agir(
+                          workApi.setProjectUserRole(projectId, u.userId, r),
+                          'Le rôle n’a pas pu être changé.',
+                        )
+                      }
+                      options={OPTIONS_ROLE}
+                    />
+                  ) : u.role === 'viewer' ? (
+                    <StatusPill tone="draft">{WORK_PROJECT_ROLE_LABELS.viewer}</StatusPill>
+                  ) : null}
                   {modifiable ? (
                     <button
                       type="button"
@@ -302,6 +351,22 @@ export function MembresProjet(): React.ReactElement {
                         {libelleEquipe(t)}
                       </span>
                       <PileAvatars membres={t.members} max={4} taille={24} />
+                      {modifiable ? (
+                        <SegmentedControl<WorkProjectMemberRole>
+                          aria-label={`Rôle de l’équipe ${t.name}`}
+                          value={t.role ?? 'member'}
+                          disabled={envoi}
+                          onChange={(r) =>
+                            void agir(
+                              workApi.setProjectTeamRole(projectId, t.teamId, r),
+                              'Le rôle n’a pas pu être changé.',
+                            )
+                          }
+                          options={OPTIONS_ROLE}
+                        />
+                      ) : t.role === 'viewer' ? (
+                        <StatusPill tone="draft">{WORK_PROJECT_ROLE_LABELS.viewer}</StatusPill>
+                      ) : null}
                       {modifiable ? (
                         <button
                           type="button"
