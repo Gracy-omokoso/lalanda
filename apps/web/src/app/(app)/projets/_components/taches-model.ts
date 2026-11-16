@@ -384,6 +384,15 @@ const LIBELLES_ACTIVITE: Record<WorkActivityKind, string> = {
   'invoice.linked': 'a lié une facture',
   'invoice.unlinked': 'a délié une facture',
   'invoice.prepared': 'a préparé un brouillon de facture',
+  // ADR-0076
+  'project.member_role_changed': 'a changé le rôle d’un membre du projet',
+  'project.status_posted': 'a publié un statut du projet',
+  'task.collaborators_changed': 'a changé les collaborateurs',
+  'task.checklist_changed': 'a mis à jour la liste de contrôle',
+  'task.approval_submitted': 'a soumis la tâche à validation',
+  'task.approval_approved': 'a validé la tâche',
+  'task.approval_changes_requested': 'a demandé des modifications',
+  'task.approval_rejected': 'a refusé la tâche',
 };
 
 /** « Kevin a déplacé la tâche (À faire → En cours) ». */

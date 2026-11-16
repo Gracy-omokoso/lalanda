@@ -24,6 +24,23 @@ export const INTERVALLE_COMPTEUR_MS = NOTIFICATION_LIMITS.unreadPollMs;
 
 /** Libellé et explication de chaque type (préférences, page). */
 export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: string }> = {
+  // ADR-0076 § 6
+  'work.task_collaborator_added': {
+    label: 'Collaborateur d’une tâche',
+    aide: 'Quelqu’un vous associe à une tâche comme collaborateur.',
+  },
+  'work.task_approval_requested': {
+    label: 'Tâche à valider',
+    aide: 'Une tâche attend votre validation.',
+  },
+  'work.task_approval_decided': {
+    label: 'Validation décidée',
+    aide: 'Votre tâche a été validée, renvoyée pour modifications ou refusée.',
+  },
+  'work.project_status_posted': {
+    label: 'Statut du projet',
+    aide: 'Le chef de projet a publié un nouveau statut.',
+  },
   'work.task_assigned': {
     label: 'Tâche assignée',
     aide: 'Quelqu’un vous confie une tâche.',
