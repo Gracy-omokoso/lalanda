@@ -64,6 +64,16 @@ e2eSuite('Stagiaire : assignation à soi seulement — ADR-0066 § 2', () => {
   });
 
   it('ne réassigne pas la tâche d’un collègue (ni à lui, ni à personne) ; la fait avancer', async () => {
+    // ADR-0076 § 2 : il ne modifie la tâche d'un collègue qu'en collaborateur.
+    const seul = await reassigner('intern', autreTache, f.userId('intern'));
+    expect(seul.status).toBe(403);
+    expect(seul.body.code).toBe('WORK_TASK_EDIT_FORBIDDEN');
+    const t0 = await f.get('analyst', `/work/tasks/${autreTache}`);
+    const collab = await f.patch('analyst', `/work/tasks/${autreTache}`, {
+      expectedRevision: t0.body.revision,
+      collaboratorUserIds: [f.userId('intern')],
+    });
+    expect(collab.status, JSON.stringify(collab.body)).toBe(200);
     for (const to of [f.userId('intern'), null]) {
       const r = await reassigner('intern', autreTache, to);
       expect(r.status).toBe(403);

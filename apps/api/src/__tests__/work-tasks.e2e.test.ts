@@ -197,10 +197,12 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
     });
 
     it('jalon client terminé : suggestion de facture et notification au responsable du projet', async () => {
+      // ADR-0076 § 2 : seul le responsable (ou la gestion) termine — l'Analyste porte le jalon.
       const m = await f.post('owner', `/work/projects/${clientProject}/tasks`, {
         title: 'Livraison',
         isMilestone: true,
         dueDate: '2026-12-01',
+        assigneeUserId: f.userId('analyst'),
       });
       expect(m.status, JSON.stringify(m.body)).toBe(201);
       f.notifications.length = 0;
@@ -259,9 +261,10 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
       const b = await task({ title: 'Successeur' });
       await f.post('owner', `/work/tasks/${b.id}/dependencies`, { predecessorTaskId: a.id });
 
+      // ADR-0076 § 1 : supprimer une tâche relève de la gestion du projet (le service juge).
       const analyst = await f.del('analyst', `/work/tasks/${a.id}`);
       expect(analyst.status).toBe(403);
-      expect(analyst.body.action).toBe('work.manage');
+      expect(analyst.body.code).toBe('WORK_PROJECT_MANAGE_FORBIDDEN');
 
       const del = await f.del('owner', `/work/tasks/${a.id}`);
       expect(del.status).toBe(204);
