@@ -10,8 +10,43 @@ import {
   optionsDeplacement,
   placer,
   recalculerBlocages,
+  refusDeplacement,
   remplacerTache,
 } from './kanban-model';
+
+describe('refusDeplacement (ADR-0076 § 2 et § 3)', () => {
+  const todo = { category: 'todo' as const };
+  const enCours = { category: 'in_progress' as const };
+  const termine = { category: 'done' as const };
+  const ouverte = { done: false, approval: null };
+  const tout = { canEdit: true, canComplete: true };
+
+  it('sans droit de modification : aucun déplacement', () => {
+    expect(refusDeplacement(ouverte, enCours, { canEdit: false, canComplete: false })).toMatch(
+      /responsable ou collaborateur/,
+    );
+  });
+
+  it('collaborateur : déplace entre colonnes ouvertes, ne termine ni ne rouvre', () => {
+    const collab = { canEdit: true, canComplete: false };
+    expect(refusDeplacement(ouverte, enCours, collab)).toBeNull();
+    expect(refusDeplacement(ouverte, termine, collab)).toMatch(/terminer/);
+    expect(refusDeplacement({ done: true, approval: null }, todo, collab)).toMatch(/rouvrir/);
+    expect(refusDeplacement({ done: true, approval: null }, termine, collab)).toBeNull();
+  });
+
+  it('responsable : termine ; une tâche à valider n’entre en « terminé » qu’approuvée', () => {
+    expect(refusDeplacement(ouverte, termine, tout)).toBeNull();
+    const aValider = (state: 'none' | 'pending' | 'approved') => ({
+      done: false,
+      approval: { required: true, state, approverUserId: null, pendingApproverUserId: null },
+    });
+    expect(refusDeplacement(aValider('pending'), termine, tout)).toMatch(/à valider/);
+    expect(refusDeplacement(aValider('none'), termine, tout)).toMatch(/à valider/);
+    expect(refusDeplacement(aValider('approved'), termine, tout)).toBeNull();
+    expect(refusDeplacement(aValider('pending'), enCours, tout)).toBeNull();
+  });
+});
 
 const COLS = [...DEFAULT_WORK_COLUMNS];
 const a = tache({ id: oid(1), rank: 'c', number: 1 });

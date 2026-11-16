@@ -238,3 +238,31 @@ export function optionsDeplacement(
 export function repereCategorie(category: WorkColumnCategory): string {
   return category === 'done' ? '✓' : category === 'in_progress' ? '◐' : '○';
 }
+
+/**
+ * ADR-0076 § 2 et § 3 : refus, CÔTÉ ÉCRAN, d'un déplacement que le serveur refuserait (le
+ * serveur reste juge : 403 ou 409). Entrer dans la colonne « terminé » ou en sortir,
+ * c'est terminer ou rouvrir : seul qui peut terminer la tâche le fait, et une tâche « à
+ * valider » n'y entre qu'après son approbation. Sans droit de modification, aucun
+ * déplacement. `null` : déplacement permis.
+ */
+export function refusDeplacement(
+  task: Pick<WorkTaskView, 'done' | 'approval'>,
+  cible: Pick<WorkColumn, 'category'>,
+  droits: { canEdit: boolean; canComplete: boolean },
+): string | null {
+  if (!droits.canEdit) {
+    return 'Vous ne pouvez déplacer que les tâches dont vous êtes responsable ou collaborateur.';
+  }
+  const versTermine = cible.category === 'done';
+  if (versTermine === task.done) return null;
+  if (!droits.canComplete) {
+    return versTermine
+      ? 'Seuls le responsable de la tâche, le chef de projet et son adjoint peuvent la terminer.'
+      : 'Seuls le responsable de la tâche, le chef de projet et son adjoint peuvent la rouvrir.';
+  }
+  if (versTermine && task.approval?.required && task.approval.state !== 'approved') {
+    return 'Cette tâche est à valider : soumettez-la, elle sera terminée à son approbation.';
+  }
+  return null;
+}

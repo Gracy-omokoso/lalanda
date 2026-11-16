@@ -38,9 +38,11 @@ import {
   indexDepot,
   optionsDeplacement,
   placer,
+  refusDeplacement,
   repereCategorie,
   type ColonneKanban,
 } from './kanban-model';
+import { droitsTache } from './collab-model';
 import { numeroVisible, styleCarte } from './cartes-model';
 import { useProjet } from './project-context';
 import { CATEGORIES_COLONNE } from './projets-model';
@@ -61,6 +63,8 @@ export function VueKanban(): React.ReactElement {
     appliquerEcriture,
     signalerErreur,
     recharger,
+    moi,
+    droitsProjet,
   } = useProjet();
   const [filtres, setFiltres] = useFiltres();
   const [glisse, setGlisse] = useState<string | null>(null);
@@ -75,9 +79,19 @@ export function VueKanban(): React.ReactElement {
   const completes = colonnesKanban(project.columns, tasks);
   const affichees = colonnesKanban(project.columns, filtrerTaches(tasks, filtres));
 
+  /** ADR-0076 : refus côté écran (le serveur reste juge). */
+  const refusPour = (task: WorkTaskView, column: Pick<WorkColumn, 'category'>): string | null =>
+    refusDeplacement(task, column, droitsTache(task, { moi, travailler, droitsProjet }));
+
   async function deplacer(task: WorkTaskView, column: WorkColumn, index: number): Promise<void> {
     const cible = completes.find((c) => c.column.key === column.key);
     if (!cible) return;
+    const refus = refusPour(task, column);
+    if (refus !== null) {
+      setAnnonce(refus);
+      signalerErreur(null, refus);
+      return;
+    }
     const p = placer(task, column.key, cible.taches, index);
     if (p === null) return;
     setTasks((t) => appliquerDeplacement(t, task.id, column, p.rang));
@@ -157,6 +171,7 @@ export function VueKanban(): React.ReactElement {
                     labels={settings?.labels ?? []}
                     today={today}
                     travailler={travailler}
+                    refusPour={refusPour}
                     glissee={glisse === t.id}
                     indicateur={enSurvol && survol?.avant === t.id}
                     onOuvrir={() => ouvrirTache(t.id)}
@@ -205,6 +220,7 @@ function Carte({
   labels,
   today,
   travailler,
+  refusPour,
   glissee,
   indicateur,
   onOuvrir,
@@ -219,6 +235,7 @@ function Carte({
   labels: Parameters<typeof Etiquettes>[0]['labels'];
   today: string;
   travailler: boolean;
+  refusPour: (task: WorkTaskView, column: Pick<WorkColumn, 'category'>) => string | null;
   glissee: boolean;
   indicateur: boolean;
   onOuvrir: () => void;
@@ -232,7 +249,13 @@ function Carte({
   const commentaires = nbCommentaires(t.id);
   // ADR-0061 : couleur post-it (aucune : affichage actuel) et numéro selon les réglages.
   const numero = numeroVisible(t.number, settings?.showTaskNumbers);
-  const options = travailler ? optionsDeplacement(colonnes, t) : [];
+  // ADR-0076 : le menu ne propose pas une colonne que le serveur refuserait.
+  const options = travailler
+    ? optionsDeplacement(colonnes, t).filter((o) => {
+        const col = colonnes.find((c) => c.column.key === o.columnKey)?.column;
+        return !col || refusPour(t, col) === null;
+      })
+    : [];
   const idMenu = `deplacer-${t.id}`;
   return (
     <li
