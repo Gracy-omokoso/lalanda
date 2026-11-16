@@ -571,7 +571,8 @@ export class SalesContractsService {
       cancellation: c.cancellation
         ? { at: iso(c.cancellation.at)!, by: c.cancellation.by, reason: c.cancellation.reason }
         : null,
-      projectId: c.projectId ?? null,
+      // ADR-0077 § 1 : une réservation en cours (`pending:<id>`) n'est pas un projet.
+      projectId: c.projectId && !c.projectId.startsWith('pending:') ? c.projectId : null,
       contentSha256: c.contentSha256 ?? null,
       previousVersions: (c.previousVersions ?? []).map((v) => ({
         version: v.version,

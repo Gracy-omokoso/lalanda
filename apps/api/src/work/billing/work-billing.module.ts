@@ -21,6 +21,8 @@ import { WORK_HR_EXPENSES_SOURCE } from '../margin/work-hr-expenses.port.js';
 import { WorkModule } from '../work.module.js';
 import { WorkBillingController } from './work-billing.controller.js';
 import { WorkBillingService } from './work-billing.service.js';
+// ADR-0077 § 1 : contrat → projet.
+import { WorkContractProjectsService } from './work-contract-projects.service.js';
 import { WorkInvoiceLink, WorkInvoiceLinkSchema } from './work-invoice-link.schema.js';
 
 @Module({
@@ -34,6 +36,7 @@ import { WorkInvoiceLink, WorkInvoiceLinkSchema } from './work-invoice-link.sche
   controllers: [WorkBillingController],
   providers: [
     WorkBillingService,
+    WorkContractProjectsService,
     ProjectMarginService,
     // ADR-0044 — P6 : coûts engagés de la marge (lecture seule par la connexion).
     { provide: WORK_PURCHASES_SOURCE, useClass: PurchasesMarginSource },

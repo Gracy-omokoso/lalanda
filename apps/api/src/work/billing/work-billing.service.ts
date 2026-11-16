@@ -72,6 +72,12 @@ import {
   type WorkInvoiceLinkLean,
 } from './work-invoice-link.schema.js';
 import { opportunityProjectFilter } from './work-opportunity-events.js';
+// ADR-0077 § 1.5 et O3 : liens contrat ↔ projet lus en lecture seule.
+import {
+  contractBillsItself,
+  contractProjectOfOpportunity,
+  contractProjectOfQuote,
+} from './work-contract-links.js';
 
 /** Collections d'autres modules, lues en lecture seule. */
 const QUOTES = 'sales_quotes';
@@ -153,10 +159,12 @@ export interface OpportunityRead {
 }
 
 /** Tâche à créer avec un projet : jamais de montant. */
-interface TaskSeed {
+export interface TaskSeed {
   title: string;
   description: string;
   source: Record<string, unknown> | null;
+  /** ADR-0077 § 1.6 : jalon (échéance d'un contrat), avec sa date. */
+  milestone?: { dueDate: string };
 }
 
 /** « Quantité : 12 m² » — la quantité et l'unité, jamais un prix. */
@@ -268,6 +276,9 @@ export class WorkBillingService {
       .lean<{ _id: unknown }>()
       .exec();
     if (existing) this.alreadyExists(String(existing._id));
+    // ADR-0077 § 1.5 : un contrat issu de ce devis a déjà son projet.
+    const viaContract = await contractProjectOfQuote(this.connection, organizationId, body.quoteId);
+    if (viaContract) this.alreadyExists(viaContract);
     if (quote.status !== 'accepted') {
       conflict('WORK_QUOTE_NOT_ACCEPTED', 'Seul un devis accepté se transforme en projet.', {
         status: quote.status,
@@ -334,6 +345,13 @@ export class WorkBillingService {
       .lean<{ _id: unknown }>()
       .exec();
     if (existing) this.alreadyExistsForOpportunity(String(existing._id));
+    // ADR-0077 § 1.5 : un contrat de cette opportunité a déjà son projet.
+    const viaContract = await contractProjectOfOpportunity(
+      this.connection,
+      organizationId,
+      opportunityId,
+    );
+    if (viaContract) this.alreadyExistsForOpportunity(viaContract);
     if (opp.status !== 'won') {
       conflict(
         'WORK_OPPORTUNITY_NOT_WON',
@@ -411,7 +429,15 @@ export class WorkBillingService {
       .findOne(opportunityProjectFilter(organizationId, opportunityId.toLowerCase()), { _id: 1 })
       .lean<{ _id: unknown }>()
       .exec();
-    return { projectId: doc ? String(doc._id) : null };
+    if (doc) return { projectId: String(doc._id) };
+    // ADR-0077 § 1.5 : projet du contrat de cette opportunité.
+    return {
+      projectId: await contractProjectOfOpportunity(
+        this.connection,
+        organizationId,
+        opportunityId.toLowerCase(),
+      ),
+    };
   }
 
   private async opportunityOf(
@@ -497,7 +523,8 @@ export class WorkBillingService {
 
   // ── Création commune (devis, opportunité) ───────────────────────────────
 
-  private async assertProjectRoom(organizationId: string): Promise<void> {
+  /** Borne des projets non archivés (aussi utilisée par contrat → projet, ADR-0077). */
+  async assertProjectRoom(organizationId: string): Promise<void> {
     const active = await this.projectModel
       .countDocuments({ organizationId, status: { $ne: 'archived' } })
       .exec();
@@ -514,13 +541,14 @@ export class WorkBillingService {
    * Projet client, une tâche par graine (sans montant) et un jalon final
    * facultatif. Pas de projet à moitié créé : tout est retiré en cas d'échec.
    * Doublon (index unique) : `duplicate()` lève le 409 qui convient.
+   * ADR-0077 § 1.6 : aussi utilisée par contrat → projet (`source: null`, jalons d'échéance).
    */
-  private async materialize(
+  async materialize(
     organizationId: string,
     input: {
       name: string;
       links: { customerId: string | null; opportunityId: string | null; quoteIds: string[] };
-      source: Record<string, unknown>;
+      source: Record<string, unknown> | null;
       seeds: TaskSeed[];
       milestone: { title: string; dueDate: string } | undefined;
       activity: Record<string, unknown>;
@@ -601,8 +629,8 @@ export class WorkBillingService {
         title: seed.title.slice(0, WORK_LIMITS.taskTitleMax),
         description: seed.description,
         rank,
-        dueDate: null,
-        isMilestone: false,
+        dueDate: seed.milestone?.dueDate ?? null,
+        isMilestone: seed.milestone !== undefined,
         source: seed.source,
       };
     });
@@ -673,7 +701,9 @@ export class WorkBillingService {
       .findOne({ organizationId, 'source.kind': 'quote', 'source.quoteId': quoteId }, { _id: 1 })
       .lean<{ _id: unknown }>()
       .exec();
-    return { projectId: doc ? String(doc._id) : null };
+    if (doc) return { projectId: String(doc._id) };
+    // ADR-0077 § 1.5 : projet du contrat issu de ce devis.
+    return { projectId: await contractProjectOfQuote(this.connection, organizationId, quoteId) };
   }
 
   // ── Liens facture ↔ projet (§ 2.9) ───────────────────────────────────────
@@ -841,6 +871,15 @@ export class WorkBillingService {
       conflict(
         'WORK_MILESTONE_NOT_APPROVED',
         'Ce jalon est à valider : son brouillon de facture se prépare après l’approbation.',
+      );
+    }
+    // ADR-0077 O3 : un contrat à échéancier ou à abonnement facture lui-même.
+    const billedBy = await contractBillsItself(this.connection, organizationId, task.projectId);
+    if (billedBy) {
+      conflict(
+        'WORK_CONTRACT_BILLS_ITSELF',
+        `Ce projet suit le contrat ${billedBy.number} : sa facturation passe par le contrat.`,
+        { contractId: billedBy.contractId },
       );
     }
     const previous = await this.previousBilling(organizationId, task);

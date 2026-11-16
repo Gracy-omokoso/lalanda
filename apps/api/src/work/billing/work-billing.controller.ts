@@ -11,6 +11,9 @@
 //   GET    /work/projects/:projectId/margin                work.read + sales.read + treasury.read
 //   GET    /work/projects/:projectId/rebillable-expenses   work.read + sales.read + treasury.read
 //          (ADR-0051 — H14, § 7.3 : frais refacturables remboursés, sans nom, sans facture)
+//   POST   /work/projects/from-contract                    work.manage + sales.read (ADR-0077 § 1)
+//   GET    /work/contracts/:contractId/project             work.read + sales.read
+//   GET    /work/projects/:projectId/contract              work.read + sales.read
 //
 // Les actions listées sont TOUTES requises (sémantique conjonctive). Le brouillon
 // préparé n'est jamais émis ni normalisé : « Émettre » reste un geste de
@@ -29,6 +32,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  CreateProjectFromContractBody,
   CreateProjectFromOpportunityBody,
   CreateProjectFromQuoteBody,
   LinkInvoiceBody,
@@ -36,6 +40,8 @@ import {
   ProjectMarginQuery,
   type ProjectMarginView,
   type WorkInvoiceLinkView,
+  type WorkProjectContractView,
+  type WorkProjectFromContractView,
   type WorkProjectFromOpportunityView,
   type WorkProjectView,
 } from '@lalanda/shared/work';
@@ -59,6 +65,7 @@ import {
   type PreparedInvoiceView,
 } from './work-billing.service.js';
 import { RequireFeature } from '../../billing/feature.guard.js';
+import { WorkContractProjectsService } from './work-contract-projects.service.js';
 import { WorkVisibilityGuard } from '../work-visibility.guard.js';
 
 @Controller('work')
@@ -68,7 +75,45 @@ export class WorkBillingController {
   constructor(
     @Inject(WorkBillingService) private readonly billing: WorkBillingService,
     @Inject(ProjectMarginService) private readonly margins: ProjectMarginService,
+    @Inject(WorkContractProjectsService) private readonly contracts: WorkContractProjectsService,
   ) {}
+
+  /**
+   * ADR-0077 § 1 : contrat signé → projet (ou projet du devis / de l'opportunité relié),
+   * idempotent. Aucune facture, aucun montant recopié.
+   */
+  @Post('projects/from-contract')
+  @RequirePermission('work.manage', 'sales.read')
+  async createFromContract(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: BillingUser,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Body() body: unknown,
+  ): Promise<WorkProjectFromContractView> {
+    const parsed = CreateProjectFromContractBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.contracts.createFromContract(orgId, parsed.data, workActorOf(user, perms));
+  }
+
+  /** ADR-0077 § 1.7 : projet du contrat, ou `null`. */
+  @Get('contracts/:contractId/project')
+  @RequirePermission('work.read', 'sales.read')
+  async projectForContract(
+    @CurrentOrgId() orgId: string,
+    @Param('contractId', WorkIdPipe) contractId: string,
+  ): Promise<{ projectId: string | null }> {
+    return this.contracts.projectForContract(orgId, contractId);
+  }
+
+  /** ADR-0077 § 1.7 : contrat que suit le projet, sans montant, ou `null`. */
+  @Get('projects/:projectId/contract')
+  @RequirePermission('work.read', 'sales.read')
+  async contractOfProject(
+    @CurrentOrgId() orgId: string,
+    @Param('projectId', WorkIdPipe) projectId: string,
+  ): Promise<{ contract: WorkProjectContractView | null }> {
+    return this.contracts.contractOfProject(orgId, projectId);
+  }
 
   @Post('projects/from-quote')
   @RequirePermission('work.manage', 'sales.read')

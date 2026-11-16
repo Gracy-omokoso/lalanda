@@ -68,6 +68,7 @@ import {
   type WorkInvoiceLinkDocument,
   type WorkInvoiceLinkLean,
 } from '../billing/work-invoice-link.schema.js';
+import { contractInvoiceIdsOf } from '../billing/work-contract-links.js';
 
 /** Collections d'autres modules, lues en lecture seule. */
 const INVOICES = 'sales_invoices';
@@ -77,6 +78,8 @@ const EXPENSES = 'treasury_expenses';
 /** Statuts définitifs d'un document de vente (ADR-0031 § 2). */
 const FINAL_STATUSES: readonly string[] = ['issued', 'normalized'];
 const CREDIT_NOTE_TYPES: readonly string[] = ['FA', 'EA'];
+/** Factures de vente qu'un projet peut porter (motif de `LINKABLE_TYPES`). */
+const SALE_TYPES: readonly string[] = ['FV', 'EV'];
 
 export interface SalesDocRead {
   _id: unknown;
@@ -170,7 +173,15 @@ export class ProjectMarginService {
       .find({ organizationId, projectId })
       .lean<WorkInvoiceLinkLean[]>()
       .exec();
-    const invoiceIds = [...new Set(links.map((l) => l.invoiceId).filter(isWorkId))];
+    // ADR-0077 § 1.8 : plus les factures préparées par le contrat du projet, sans doublon.
+    const contractInvoiceIds = await contractInvoiceIdsOf(
+      this.connection,
+      organizationId,
+      projectId,
+    );
+    const invoiceIds = [
+      ...new Set([...links.map((l) => l.invoiceId), ...contractInvoiceIds].filter(isWorkId)),
+    ];
 
     const [invoiceDocs, creditNoteDocs, receipts, expenses, entries] = await Promise.all([
       invoiceIds.length === 0
@@ -276,8 +287,10 @@ export class ProjectMarginService {
     }
 
     // Un lien orphelin (brouillon supprimé) n'apporte rien : il est ignoré.
+    // ADR-0077 § 1.8 : seules les factures de vente (FV, EV) portent la recette, comme
+    // pour un lien manuel ; un acompte préparé par le contrat n'est pas compté deux fois.
     const invoices: WorkMarginInvoiceInput[] = invoiceDocs
-      .filter((d) => !CREDIT_NOTE_TYPES.includes(d.type))
+      .filter((d) => !CREDIT_NOTE_TYPES.includes(d.type) && SALE_TYPES.includes(d.type))
       .map((d) => {
         const id = String(d._id);
         const final = isFinal(d) && d.issuedAt !== null;
@@ -291,17 +304,20 @@ export class ProjectMarginService {
           taxGroups: taxGroupsOf(d),
         };
       });
-    const creditNotes: WorkMarginCreditNoteInput[] = creditNoteDocs.map((d) => {
-      const final = isFinal(d) && d.issuedAt !== null;
-      return {
-        id: String(d._id),
-        currency: d.currency,
-        final,
-        issuedOn: final ? kinshasaDayOf(new Date(d.issuedAt as Date)) : null,
-        payments: d.payments ?? [],
-        taxGroups: taxGroupsOf(d),
-      };
-    });
+    const saleIds = new Set(invoices.map((i) => i.id));
+    const creditNotes: WorkMarginCreditNoteInput[] = creditNoteDocs
+      .filter((d) => saleIds.has(d.creditNote?.originInvoiceId ?? ''))
+      .map((d) => {
+        const final = isFinal(d) && d.issuedAt !== null;
+        return {
+          id: String(d._id),
+          currency: d.currency,
+          final,
+          issuedOn: final ? kinshasaDayOf(new Date(d.issuedAt as Date)) : null,
+          payments: d.payments ?? [],
+          taxGroups: taxGroupsOf(d),
+        };
+      });
 
     const result = computeProjectMargin({
       invoices,

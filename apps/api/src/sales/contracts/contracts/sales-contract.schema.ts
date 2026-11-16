@@ -225,7 +225,10 @@ export class SalesContract {
   @Prop({ type: Object, default: null })
   cancellation!: StoredContractStep | null;
 
-  /** Projet RUN lié (ADR-0039) : non posé par ce lot. */
+  /**
+   * Projet RUN lié (ADR-0039) : posé par le module Projets (ADR-0077 § 1), jamais par les
+   * ventes ; `pending:<id>` pendant la création. Hors contenu figé (`contentSha256`).
+   */
   @Prop({ type: String, default: null })
   projectId!: string | null;
 
@@ -263,6 +266,11 @@ SalesContractSchema.index({ organizationId: 1, number: 1 }, { unique: true });
 SalesContractSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
 SalesContractSchema.index({ organizationId: 1, customerId: 1, createdAt: -1 });
 SalesContractSchema.index({ organizationId: 1, 'source.quoteId': 1 });
+// ADR-0077 § 1 : un projet suit au plus un contrat (la réservation `pending:<id>` est unique).
+SalesContractSchema.index(
+  { organizationId: 1, projectId: 1 },
+  { unique: true, partialFilterExpression: { projectId: { $type: 'string' } } },
+);
 
 /** Compteur annuel des contrats (Kinshasa) ; trous admis. */
 @Schema({ collection: 'sales_contract_counters', strict: true })
