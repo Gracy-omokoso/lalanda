@@ -10,7 +10,7 @@ import { WORK_LABEL_COLORS, type WorkLabelColor } from './constants.js';
 import { overviewHealth } from './overview.js';
 import type { WorkProjectKind, WorkProjectStatus } from './constants.js';
 import { addDays, isCalendarDay } from './scheduling.js';
-import type { WorkMemberRef } from './views.js';
+import type { WorkMemberRef, WorkProjectStatusView } from './views.js';
 
 /** Filtres de l'accueil : mes projets, tous les projets non archivés, archivés. */
 export const WORK_PORTFOLIO_SCOPES = ['mine', 'all', 'archived'] as const;
@@ -114,6 +114,8 @@ export interface WorkPortfolioProject {
   /** ADR-0060 : `private` affiche un cadenas. */
   visibility: 'organization' | 'private';
   updatedAt: string;
+  /** ADR-0076 § 5 : dernier statut déclaré par le chef ou l'adjoint, à côté de `health`. */
+  latestStatus?: WorkProjectStatusView | null;
 }
 
 export interface WorkPortfolioStats {

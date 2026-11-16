@@ -24,6 +24,11 @@ export const WORK_NOTIFICATION_EVENTS = [
   'task_status_changed',
   'added_to_project',
   'project_at_risk',
+  // ADR-0076 § 6 : collaboration, validation, statut du projet.
+  'task_collaborator_added',
+  'task_approval_requested',
+  'task_approval_decided',
+  'project_status_posted',
 ] as const;
 export type WorkNotificationEvent = (typeof WORK_NOTIFICATION_EVENTS)[number];
 
@@ -37,7 +42,22 @@ export const WORK_NOTIFICATION_EVENT_LABELS: Readonly<Record<WorkNotificationEve
   task_status_changed: 'Statut (colonne) d’une de mes tâches changé',
   added_to_project: 'Je suis ajouté à un projet',
   project_at_risk: 'Un de mes projets passe à risque',
+  task_collaborator_added: 'Je suis ajouté comme collaborateur d’une tâche',
+  task_approval_requested: 'Une tâche attend ma validation',
+  task_approval_decided: 'Ma tâche a été validée, renvoyée ou refusée',
+  project_status_posted: 'Nouveau statut d’un de mes projets',
 };
+
+/**
+ * ADR-0076 § 6 : événements ajoutés après ADR-0061 — FACULTATIFS dans
+ * `PUT /work/notification-preferences` (un client N-1 ne les envoie pas).
+ */
+export const WORK_NOTIFICATION_EVENTS_OPTIONAL: readonly WorkNotificationEvent[] = [
+  'task_collaborator_added',
+  'task_approval_requested',
+  'task_approval_decided',
+  'project_status_posted',
+];
 
 /** Type de notification (boîte commune) d'un événement. */
 export function notificationKindOf(event: WorkNotificationEvent): NotificationKind {
@@ -86,10 +106,20 @@ const EMAIL_BY_DEFAULT: readonly WorkNotificationEvent[] = [
   'task_assigned',
   'mentioned',
   'task_overdue',
+  // ADR-0076 § 6.
+  'task_collaborator_added',
+  'task_approval_requested',
+  'task_approval_decided',
 ];
 
 /** ADR-0064 § 4 : Slack activé par défaut pour l'assignation et la mention seulement. */
-export const SLACK_BY_DEFAULT: readonly WorkNotificationEvent[] = ['task_assigned', 'mentioned'];
+export const SLACK_BY_DEFAULT: readonly WorkNotificationEvent[] = [
+  'task_assigned',
+  'mentioned',
+  // ADR-0076 § 6.
+  'task_collaborator_added',
+  'task_approval_requested',
+];
 
 /**
  * ADR-0065 § 4 : WhatsApp activé par défaut pour l'assignation, la mention et l'échéance
@@ -99,6 +129,8 @@ export const WHATSAPP_BY_DEFAULT: readonly WorkNotificationEvent[] = [
   'task_assigned',
   'mentioned',
   'task_overdue',
+  // ADR-0076 § 6 : une validation attendue vaut un message.
+  'task_approval_requested',
 ];
 
 export function defaultWorkNotificationPreferences(): WorkNotificationPreferences {
@@ -166,10 +198,12 @@ export const PutWorkNotificationPreferencesBody = z
     expectedRevision: z.number({ error: 'Révision attendue : un entier.' }).int().min(0),
     events: z
       .object(
-        Object.fromEntries(WORK_NOTIFICATION_EVENTS.map((e) => [e, Channels])) as Record<
-          WorkNotificationEvent,
-          typeof Channels
-        >,
+        Object.fromEntries(
+          WORK_NOTIFICATION_EVENTS.map((e) => [
+            e,
+            WORK_NOTIFICATION_EVENTS_OPTIONAL.includes(e) ? Channels.optional() : Channels,
+          ]),
+        ) as Record<WorkNotificationEvent, typeof Channels>,
       )
       .strict(),
     digest: z

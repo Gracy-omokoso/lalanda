@@ -36,7 +36,8 @@ describe('WhatsApp — contrats (ADR-0065)', () => {
     const avec = Object.entries(d.events)
       .filter(([, c]) => c.whatsapp)
       .map(([e]) => e);
-    expect(avec).toEqual(['task_assigned', 'mentioned', 'task_overdue']);
+    // ADR-0076 § 6 : une validation attendue s'y ajoute.
+    expect(avec).toEqual(['task_assigned', 'mentioned', 'task_overdue', 'task_approval_requested']);
     const r = resolveWorkNotificationPreferences({ events: { mentioned: { bell: false } } });
     expect(r.events.mentioned).toEqual({ bell: false, email: true, slack: true, whatsapp: true });
   });

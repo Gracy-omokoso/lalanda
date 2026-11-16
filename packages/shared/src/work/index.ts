@@ -25,3 +25,5 @@ export * from './plan.js';
 export * from './slack.js';
 // ADR-0065 : notifications des Projets par WhatsApp (numéro vérifié, quota).
 export * from './whatsapp.js';
+// ADR-0076 : rôles dans le projet, droits sur le projet et les tâches.
+export * from './roles.js';

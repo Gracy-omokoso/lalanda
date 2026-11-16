@@ -22,6 +22,11 @@ export const NOTIFICATION_KINDS = [
   'work.task_status_changed',
   'work.added_to_project',
   'work.project_at_risk',
+  // ADR-0076 § 6 : collaborateur ajouté, validation demandée ou décidée, statut du projet.
+  'work.task_collaborator_added',
+  'work.task_approval_requested',
+  'work.task_approval_decided',
+  'work.project_status_posted',
   // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM. `crm.opportunity_won`
   // est déclaré ici et émis par le lot C7 (opportunité gagnée → projet).
   'crm.activity_assigned',

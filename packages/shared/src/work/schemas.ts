@@ -40,6 +40,8 @@ import { isCalendarDay } from './scheduling.js';
 import { workBehaviorFields } from './behavior.js';
 // ADR-0061 § 4 : couleur de carte (post-it).
 import { WORK_CARD_COLORS } from './card-colors.js';
+// ADR-0076 : collaborateurs, validation, liste de contrôle, statut du projet.
+import { WORK_COLLAB_LIMITS } from './roles.js';
 
 type RawIssue = z.core.$ZodRawIssue;
 type Ctx = z.RefinementCtx;
@@ -286,6 +288,8 @@ const projectFields = {
   description: optionalText(WORK_LIMITS.projectDescriptionMax).optional(),
   kind: z.enum(WORK_PROJECT_KINDS, fr('Nature : client ou internal.')),
   ownerUserId: WorkId.nullable().optional(),
+  // ADR-0076 § 1 : Adjoint du chef de projet (un seul).
+  deputyUserId: WorkId.nullable().optional(),
   startDate: WorkDay.nullable().optional(),
   dueDate: WorkDay.nullable().optional(),
   links: WorkProjectLinksSchema.optional(),
@@ -295,11 +299,29 @@ const projectFields = {
     .optional(),
 };
 
+/** ADR-0076 § 1 : le chef et l'adjoint sont deux personnes distinctes. */
+function checkLeads(
+  v: { ownerUserId?: string | null; deputyUserId?: string | null },
+  ctx: Ctx,
+): void {
+  if (v.ownerUserId && v.deputyUserId && v.ownerUserId === v.deputyUserId) {
+    issue(
+      ctx,
+      ['deputyUserId'],
+      'WORK_PROJECT_LEAD_NOT_ELIGIBLE',
+      'L’adjoint doit être une autre personne que le chef de projet.',
+    );
+  }
+}
+
 /** `POST /work/projects`. Colonnes absentes : celles des réglages. */
 export const CreateWorkProjectBody = z
   .object({ ...projectFields, columns: WorkColumnsSchema.optional() })
   .strict()
-  .superRefine(checkDates);
+  .superRefine((v, ctx) => {
+    checkDates(v, ctx);
+    checkLeads(v, ctx);
+  });
 export type CreateWorkProjectBody = z.output<typeof CreateWorkProjectBody>;
 
 /**
@@ -316,6 +338,7 @@ export const UpdateWorkProjectBody = z
       .enum(WORK_PROJECT_EDITABLE_STATUSES, fr('Statut : active, on_hold ou completed.'))
       .optional(),
     ownerUserId: projectFields.ownerUserId,
+    deputyUserId: projectFields.deputyUserId,
     startDate: projectFields.startDate,
     dueDate: projectFields.dueDate,
     links: projectFields.links,
@@ -323,7 +346,10 @@ export const UpdateWorkProjectBody = z
     visibility: projectFields.visibility,
   })
   .strict()
-  .superRefine(checkDates);
+  .superRefine((v, ctx) => {
+    checkDates(v, ctx);
+    checkLeads(v, ctx);
+  });
 export type UpdateWorkProjectBody = z.output<typeof UpdateWorkProjectBody>;
 
 /** `POST /work/projects/from-quote` (ADR-0039 § 6.1). Aucun montant n'est recopié. */
@@ -400,6 +426,16 @@ const taskFields = {
     .optional(),
   // ADR-0061 § 4 : `null` retire la couleur.
   color: z.enum(WORK_CARD_COLORS, fr('Couleur hors de la palette.')).nullable().optional(),
+  // ADR-0076 § 2 : collaborateurs (membres du projet, 10 au plus).
+  collaboratorUserIds: idList(WORK_COLLAB_LIMITS.collaboratorsMax).optional(),
+  // ADR-0076 § 3 : « à valider » et validateur désigné (absent : chef, puis adjoint).
+  approval: z
+    .object({
+      required: z.boolean(fr('Vrai ou faux attendu.')),
+      approverUserId: WorkId.nullable().optional(),
+    })
+    .strict()
+    .optional(),
 };
 
 /** Jalon : pas de date de début (durée nulle) ; échéance exigée à la création. */
@@ -456,6 +492,8 @@ export const PatchWorkTaskBody = z
     isMilestone: taskFields.isMilestone,
     estimateMinutes: taskFields.estimateMinutes,
     color: taskFields.color,
+    collaboratorUserIds: taskFields.collaboratorUserIds,
+    approval: taskFields.approval,
   })
   .strict()
   .superRefine((v, ctx) => {
@@ -479,6 +517,81 @@ export const MoveWorkTaskBody = z
     }
   });
 export type MoveWorkTaskBody = z.output<typeof MoveWorkTaskBody>;
+
+// ── Collaboration et validation (ADR-0076) ───────────────────────────────────
+
+/** Décisions d'un validateur (ADR-0076 § 3). */
+export const WORK_APPROVAL_DECISIONS = ['approve', 'request_changes', 'reject'] as const;
+export type WorkApprovalDecision = (typeof WORK_APPROVAL_DECISIONS)[number];
+
+/**
+ * `POST /work/tasks/:taskId/approval/decide` — motif OBLIGATOIRE pour « Demander des
+ * modifications » et « Refuser » (`FIELD_REQUIRED` sur `reason`).
+ */
+export const DecideWorkApprovalBody = z
+  .object({
+    expectedRevision,
+    decision: z.enum(WORK_APPROVAL_DECISIONS, fr('Décision : approve, request_changes ou reject.')),
+    reason: optionalText(WORK_COLLAB_LIMITS.approvalReasonMax).optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.decision !== 'approve' && !v.reason) {
+      issue(ctx, ['reason'], 'FIELD_REQUIRED', 'Indiquez le motif.');
+    }
+  });
+export type DecideWorkApprovalBody = z.output<typeof DecideWorkApprovalBody>;
+
+const ChecklistItemInput = z
+  .object({
+    /** Absent : nouvel élément (identifiant posé par le serveur). */
+    id: WorkId.optional(),
+    text: requiredText(WORK_COLLAB_LIMITS.checklistTextMax, 'Élément de la liste'),
+    done: z.boolean(fr('Vrai ou faux attendu.')),
+  })
+  .strict();
+
+/** `PUT /work/tasks/:taskId/checklist` — remplace la liste (30 éléments au plus). */
+export const PutWorkChecklistBody = z
+  .object({
+    expectedRevision,
+    items: z
+      .array(ChecklistItemInput, fr('Liste attendue.'))
+      .max(WORK_COLLAB_LIMITS.checklistItemsMax, {
+        message: `${WORK_COLLAB_LIMITS.checklistItemsMax} éléments au plus.`,
+      })
+      .superRefine((items, ctx) => {
+        const ids = items.map((i) => i.id).filter((i): i is string => i !== undefined);
+        if (new Set(ids).size !== ids.length) {
+          issue(ctx, [], 'WORK_ID_DUPLICATE', 'Un élément figure deux fois.');
+        }
+      }),
+  })
+  .strict();
+export type PutWorkChecklistBody = z.output<typeof PutWorkChecklistBody>;
+
+/** Statuts déclarés d'un projet (ADR-0076 § 5). */
+export const WORK_PROJECT_STATUS_VALUES = ['on_track', 'at_risk', 'off_track', 'done'] as const;
+export type WorkProjectStatusValue = (typeof WORK_PROJECT_STATUS_VALUES)[number];
+export const WORK_PROJECT_STATUS_LABELS: Readonly<Record<WorkProjectStatusValue, string>> = {
+  on_track: 'Dans les temps',
+  at_risk: 'À risque',
+  off_track: 'En retard',
+  done: 'Terminé',
+};
+
+/** `POST /work/projects/:projectId/status-updates` — date absente : aujourd'hui (Kinshasa). */
+export const PostWorkProjectStatusBody = z
+  .object({
+    status: z.enum(
+      WORK_PROJECT_STATUS_VALUES,
+      fr('Statut : on_track, at_risk, off_track ou done.'),
+    ),
+    text: requiredText(WORK_COLLAB_LIMITS.statusTextMax, 'Texte du statut'),
+    date: WorkDay.optional(),
+  })
+  .strict();
+export type PostWorkProjectStatusBody = z.output<typeof PostWorkProjectStatusBody>;
 
 /** `POST /work/tasks/:taskId/dependencies` — fin → début, même projet. */
 export const AddDependencyBody = z.object({ predecessorTaskId: WorkId }).strict();

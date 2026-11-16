@@ -70,7 +70,12 @@ export class WorkNotificationPreferencesService {
     // client), la valeur enregistrée est gardée au lieu de revenir au défaut.
     // ADR-0065 § 3 : même règle pour WhatsApp ; ALLUMER un événement exige un numéro
     // vérifié (garder une valeur déjà enregistrée, elle, est toujours permis).
-    const turnsOnWhatsApp = Object.entries(body.events).some(
+    // ADR-0076 § 6 : les événements récents sont facultatifs (client N-1) — absents, la
+    // valeur enregistrée est gardée.
+    const sent = Object.entries(body.events).filter(
+      (entry): entry is [string, NonNullable<(typeof entry)[1]>] => entry[1] !== undefined,
+    );
+    const turnsOnWhatsApp = sent.some(
       ([e, c]) => c.whatsapp === true && !current.events[e as keyof typeof current.events].whatsapp,
     );
     if (turnsOnWhatsApp && !(await this.whatsapp?.isVerified(organizationId, userId))) {
@@ -79,8 +84,9 @@ export class WorkNotificationPreferencesService {
         message: 'Vérifiez d’abord votre numéro WhatsApp pour activer cette notification.',
       });
     }
-    const events = Object.fromEntries(
-      Object.entries(body.events).map(([e, c]) => {
+    const events = Object.fromEntries([
+      ...Object.entries(current.events).filter(([e]) => !sent.some(([k]) => k === e)),
+      ...sent.map(([e, c]) => {
         const stored = current.events[e as keyof typeof current.events];
         return [
           e,
@@ -92,7 +98,7 @@ export class WorkNotificationPreferencesService {
           },
         ];
       }),
-    );
+    ]);
     const values = {
       events,
       digest: body.digest,

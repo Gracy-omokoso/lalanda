@@ -25,7 +25,13 @@ describe('Slack — contrats (ADR-0064)', () => {
     const avecSlack = Object.entries(d.events)
       .filter(([, c]) => c.slack)
       .map(([e]) => e);
-    expect(avecSlack).toEqual(['task_assigned', 'mentioned']);
+    // ADR-0076 § 6 : collaborateur ajouté et validation demandée s'y ajoutent.
+    expect(avecSlack).toEqual([
+      'task_assigned',
+      'mentioned',
+      'task_collaborator_added',
+      'task_approval_requested',
+    ]);
     // Document antérieur sans colonne Slack : complété par le défaut.
     const r = resolveWorkNotificationPreferences({ events: { mentioned: { bell: false } } });
     expect(r.events.mentioned).toEqual({ bell: false, email: true, slack: true, whatsapp: true });

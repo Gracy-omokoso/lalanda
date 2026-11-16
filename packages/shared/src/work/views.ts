@@ -34,6 +34,80 @@ import type {
 // ADR-0061 § 3 : comportement des projets.
 import type { WorkBehaviorSettings } from './behavior.js';
 import type { WorkCardColor } from './card-colors.js';
+// ADR-0076 : rôles, droits, validation, statut déclaré.
+import type { WorkProjectRights, WorkProjectRole, WorkTaskRights } from './roles.js';
+import type { WorkProjectStatusValue } from './schemas.js';
+
+/** ADR-0076 § 5 : statut déclaré d'un projet (chef ou adjoint). */
+export interface WorkProjectStatusView {
+  id: string;
+  projectId: string;
+  status: WorkProjectStatusValue;
+  text: string;
+  /** Jour de Kinshasa `AAAA-MM-JJ`. */
+  date: string;
+  author: WorkMemberRef;
+  createdAt: string;
+}
+
+/** ADR-0076 § 3 : états de la validation d'une tâche. */
+export const WORK_APPROVAL_STATES = [
+  'none',
+  'pending',
+  'changes_requested',
+  'rejected',
+  'approved',
+] as const;
+export type WorkApprovalState = (typeof WORK_APPROVAL_STATES)[number];
+
+export const WORK_APPROVAL_STATE_LABELS: Readonly<Record<WorkApprovalState, string>> = {
+  none: 'À soumettre',
+  pending: 'En attente de validation',
+  changes_requested: 'Modifications demandées',
+  rejected: 'Refusée',
+  approved: 'Validée',
+};
+
+/** Résumé de validation sur la vue allégée (`null` : tâche sans validation). */
+export interface WorkTaskApprovalSummary {
+  required: boolean;
+  state: WorkApprovalState;
+  /** Validateur désigné (`null` : chef, puis adjoint). */
+  approverUserId: string | null;
+  /** Validateur résolu à la soumission (état `pending`). */
+  pendingApproverUserId: string | null;
+}
+
+/** Détail de validation (`GET /work/tasks/:taskId`). */
+export interface WorkTaskApprovalView extends WorkTaskApprovalSummary {
+  approver: WorkMemberRef | null;
+  pendingApprover: WorkMemberRef | null;
+  submittedBy: WorkMemberRef | null;
+  submittedAt: string | null;
+  decidedBy: WorkMemberRef | null;
+  decidedAt: string | null;
+  /** Motif de la dernière décision (modifications demandées, refus). */
+  reason: string | null;
+}
+
+/** ADR-0076 § 4 : élément de la liste de contrôle d'une tâche. */
+export interface WorkChecklistItemView {
+  id: string;
+  text: string;
+  done: boolean;
+  doneBy: WorkMemberRef | null;
+  doneAt: string | null;
+}
+
+/** ADR-0076 § 2 et § 3 : droits de l'appelant sur une tâche, lus par l'écran. */
+export interface WorkTaskMyRights extends WorkTaskRights {
+  /** Soumettre à validation (responsable ou gestion), tâche « à valider ». */
+  canSubmit: boolean;
+  /** Décider d'une validation en attente (validateur ou gestion, jamais sa propre soumission). */
+  canDecide: boolean;
+  /** Régler la validation, supprimer la tâche (gestion du projet). */
+  canManage: boolean;
+}
 
 /** Avertissement non bloquant rendu avec une écriture réussie. */
 export interface WorkWarning {
@@ -112,6 +186,14 @@ export interface WorkProjectView {
   updatedBy: string;
   createdAt: string;
   updatedAt: string;
+  /** ADR-0076 § 1 : Adjoint du chef de projet (`owner`). */
+  deputy?: WorkMemberRef | null;
+  /** ADR-0076 § 1 : rôle de l'appelant dans le projet. */
+  myRole?: WorkProjectRole;
+  /** ADR-0076 § 1 : droits de l'appelant (le serveur reste juge). */
+  myRights?: WorkProjectRights;
+  /** ADR-0076 § 5 : dernier statut déclaré. */
+  latestStatus?: WorkProjectStatusView | null;
 }
 
 /**
@@ -200,6 +282,15 @@ export interface WorkTaskView {
    * tâche non terminée tombe pendant cette absence de l'assigné. Rien n'est déplacé.
    */
   dueDateAbsence?: WorkAbsenceSpanView | null;
+  /** ADR-0076 § 2 : collaborateurs (identifiants ; noms dans le détail). */
+  collaboratorUserIds?: string[];
+  /** ADR-0076 § 4 : progression de la liste de contrôle (« 3/5 »). */
+  checklistDone?: number;
+  checklistTotal?: number;
+  /** ADR-0076 § 3 : validation (`null` : sans validation). */
+  approval?: WorkTaskApprovalSummary | null;
+  /** Créateur de la tâche (règle « modifier », ADR-0076 § 2). */
+  createdBy?: string;
 }
 
 /** Période d'absence d'un membre (jours inclus), sans type ni motif (ADR-0045 § 6.2). */
@@ -240,6 +331,16 @@ export interface WorkTaskDetail extends WorkTaskView {
   billing: WorkTaskBilling;
   createdBy: string;
   createdAt: string;
+  /** ADR-0076 § 2 : collaborateurs. */
+  collaborators?: WorkMemberRef[];
+  /** ADR-0076 § 4 : liste de contrôle, dans l'ordre. */
+  checklist?: WorkChecklistItemView[];
+  /** ADR-0076 § 3 : validation détaillée (`null` : sans validation). */
+  approvalDetail?: WorkTaskApprovalView | null;
+  /** ADR-0076 : droits de l'appelant sur la tâche. */
+  myRights?: WorkTaskMyRights;
+  /** ADR-0076 : l'appelant suit la tâche (abonné). */
+  following?: boolean;
 }
 
 /** Réponse d'une écriture de tâche : la tâche, ses avertissements, ses suggestions. */
@@ -294,6 +395,10 @@ export interface MyTasksView {
    * dont l'échéance tombe pendant une absence de l'assigné.
    */
   absenceFindings?: WorkAbsenceFindingView[];
+  /** ADR-0076 § 2 : tâches non terminées dont l'appelant est collaborateur (« Je collabore »). */
+  collaborating?: MyTaskItem[];
+  /** ADR-0076 § 3 : tâches en attente de la validation de l'appelant (« À valider »). */
+  toApprove?: MyTaskItem[];
 }
 
 // ── Commentaires et pièces jointes ──────────────────────────────────────────

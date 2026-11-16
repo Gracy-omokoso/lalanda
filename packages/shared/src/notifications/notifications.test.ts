@@ -10,10 +10,12 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare neuf types work, cinq crm, un organization, sept purchases, vingt-quatre hr, cinq stock, deux assets, un documents et six sales, préfixés par leur module', () => {
+  it('déclare treize types work, cinq crm, un organization, sept purchases, vingt-quatre hr, cinq stock, deux assets, un documents et six sales, préfixés par leur module', () => {
     // ADR-0053 — P6 : `platform.announcement` s'ajoute, hors module d'organisation.
     // ADR-0061 § 2 : trois types work de plus (statut changé, ajout à un projet, projet à risque).
-    expect(NOTIFICATION_KINDS).toHaveLength(61);
+    // ADR-0076 § 6 : quatre types work de plus (collaborateur, validation demandée et décidée,
+    // statut du projet).
+    expect(NOTIFICATION_KINDS).toHaveLength(65);
     for (const kind of NOTIFICATION_KINDS) {
       if (kind === 'platform.announcement') continue;
       const module = kind.split('.')[0]!;

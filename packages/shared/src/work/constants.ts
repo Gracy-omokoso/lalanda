@@ -100,6 +100,15 @@ export const WORK_ACTIVITY_KINDS = [
   'invoice.linked',
   'invoice.unlinked',
   'invoice.prepared',
+  // ADR-0076 : rôles dans le projet, statut du projet, collaboration et validation des tâches.
+  'project.member_role_changed',
+  'project.status_posted',
+  'task.collaborators_changed',
+  'task.checklist_changed',
+  'task.approval_submitted',
+  'task.approval_approved',
+  'task.approval_changes_requested',
+  'task.approval_rejected',
 ] as const;
 export type WorkActivityKind = (typeof WORK_ACTIVITY_KINDS)[number];
 
@@ -223,6 +232,21 @@ export const WORK_ERROR_CODES = [
   'WORK_TIME_FOR_OTHER',
   'WORK_ATTACHMENT_TYPE',
   'EXPENSE_WORK_PROJECT_UNKNOWN',
+  // ADR-0076 : rôles dans le projet, collaboration, validation.
+  'WORK_PROJECT_MANAGE_FORBIDDEN',
+  'WORK_PROJECT_LEAD_NOT_ELIGIBLE',
+  'WORK_TASK_CREATE_FORBIDDEN',
+  'WORK_TASK_EDIT_FORBIDDEN',
+  'WORK_TASK_COMPLETE_FORBIDDEN',
+  'WORK_ASSIGNEE_VIEWER',
+  'WORK_COLLABORATOR_NOT_ELIGIBLE',
+  'WORK_CHECKLIST_FORBIDDEN',
+  'WORK_APPROVER_REQUIRED',
+  'WORK_TASK_APPROVAL_REQUIRED',
+  'WORK_APPROVAL_NOT_PENDING',
+  'WORK_APPROVAL_FORBIDDEN',
+  'WORK_SELF_APPROVAL_FORBIDDEN',
+  'WORK_MILESTONE_NOT_APPROVED',
 ] as const;
 export type WorkErrorCode = (typeof WORK_ERROR_CODES)[number];
 
