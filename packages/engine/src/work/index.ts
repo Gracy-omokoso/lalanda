@@ -15,3 +15,10 @@ export {
   type WorkAbsenceTaskInput,
   type WorkTaskAbsence,
 } from './absences.js';
+// ADR-0077 § 4.5 : part du temps validé, informative.
+export {
+  timeApprovalShare,
+  type ApprovedWeekInput,
+  type TimeApprovalEntryInput,
+  type TimeApprovalShare,
+} from './time-approval.js';

@@ -50,7 +50,8 @@ function input(
     sales: { invoices, truncated: false },
     cash: { status: 'to_fill' },
     dueDates: { status: 'unavailable' },
-    work: { status: 'known', tasks: [], truncated: false },
+    // ADR-0077 § 4.7 : connu et nul par défaut.
+    work: { status: 'known', tasks: [], truncated: false, timesheetApprovalCount: 0 },
     crm: { status: 'known', activities: [], openOpportunityCount: 0, truncated: false },
     purchases: {
       status: 'known',
@@ -490,7 +491,7 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
   });
 
   it('version mineure suivante (ADR-0044 § 6.4)', () => {
-    expect(brief([]).version).toBe('1.7.0');
+    expect(brief([]).version).toBe('1.8.0');
   });
 
   it('ADR-0076 § 3 : tâches à valider — connu, non disponible sans l’entrée, masqué', () => {
@@ -505,10 +506,10 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
     expect(fact({ work: 'hidden' })).toMatchObject({ status: 'hidden', value: null });
   });
 
-  it('les vingt règles ont des rangs uniques', () => {
+  it('les vingt et une règles ont des rangs uniques', () => {
     const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
     expect(new Set(ranks).size).toBe(ranks.length);
-    expect(ranks.length).toBe(20);
+    expect(ranks.length).toBe(21);
   });
 });
 
@@ -866,10 +867,10 @@ describe('ressources humaines — absences du jour, validations, échéances, R1
     }
   });
 
-  it('lecture bornée : le brief le dit ; version 1.7.0', () => {
+  it('lecture bornée : le brief le dit ; version 1.8.0', () => {
     const b = buildMorningBrief(input([], rh({ truncated: true })));
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.7.0');
+    expect(b.version).toBe('1.8.0');
   });
 });
 
@@ -1131,6 +1132,44 @@ describe('stocks, équipements, documents — faits et règles R16 à R18 (ADR-0
       }
     }
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.7.0');
+    expect(b.version).toBe('1.8.0');
+  });
+});
+
+describe('ADR-0077 § 4.7 — feuilles de temps à valider (1.8.0)', () => {
+  it('R21 : un nombre seulement, avec le lien vers la liste à valider', () => {
+    const b = buildMorningBrief(
+      input([], {
+        work: { status: 'known', tasks: [], truncated: false, timesheetApprovalCount: 2 },
+      }),
+    );
+    expect(fact(b.facts, 'mes_validations_temps.en_attente')).toMatchObject({
+      status: 'known',
+      value: '2',
+    });
+    const r = b.recommendations.find((x) => x.ruleId === 'validations_temps_en_attente');
+    expect(r).toMatchObject({
+      rank: 21,
+      severity: 'attention',
+      message: '2 semaines de temps attendent votre validation.',
+      actionPath: '/projets/mes-taches/temps/a-valider',
+    });
+  });
+
+  it('absent : non disponible ; null : masqué ; zéro : pas de règle', () => {
+    const absent = buildMorningBrief(
+      input([], { work: { status: 'known', tasks: [], truncated: false } }),
+    );
+    expect(fact(absent.facts, 'mes_validations_temps.en_attente').status).toBe('unavailable');
+    const masque = buildMorningBrief(
+      input([], {
+        work: { status: 'known', tasks: [], truncated: false, timesheetApprovalCount: null },
+      }),
+    );
+    expect(fact(masque.facts, 'mes_validations_temps.en_attente').status).toBe('hidden');
+    const zero = buildMorningBrief(input([]));
+    expect(zero.recommendations.some((x) => x.ruleId === 'validations_temps_en_attente')).toBe(
+      false,
+    );
   });
 });

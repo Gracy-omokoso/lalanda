@@ -242,6 +242,9 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
   // ADR-0051 § 7.6 : frais et avances à valider, remboursements à payer — des nombres.
   facts.push(...hrExpenseFacts(input.hr ?? { status: 'unavailable' }));
 
+  // ADR-0077 § 4.7 : semaines de temps à valider — un nombre seulement.
+  facts.push(timesheetFact(input.work));
+
   // ADR-0046 § 6.6 : stocks, équipements, documents — des nombres seulement.
   facts.push(...stockFacts(input.stock ?? { status: 'unavailable' }));
   facts.push(...assetsFacts(input.assets ?? { status: 'unavailable' }));
@@ -382,6 +385,32 @@ function workApprovalFact(work: BriefWorkInput): BriefFact {
     status: 'known',
     value: String(Math.max(0, Math.trunc(work.pendingApprovalCount))),
   };
+}
+
+// ── Feuilles de temps à valider (ADR-0077 § 4.7) ────────────────────────────
+
+const TIMESHEET_FACT: Omit<BriefFact, 'status' | 'value'> = Object.freeze({
+  id: 'mes_validations_temps.en_attente',
+  label: 'Feuilles de temps qui attendent ma validation',
+  kind: 'count',
+  currency: null,
+  source: {
+    module: 'run.work',
+    collection: 'work_timesheet_weeks',
+    rule: 'Semaines de temps soumises par les membres de votre équipe (ou sans manager, si vous gérez les projets), jamais les vôtres',
+    reference: 'ADR-0077 § 4.7',
+  },
+});
+
+function timesheetFact(work: BriefWorkInput): BriefFact {
+  if (work === 'hidden') return { ...TIMESHEET_FACT, status: 'hidden', value: null };
+  if (work.status === 'unavailable' || work.timesheetApprovalCount === undefined) {
+    return { ...TIMESHEET_FACT, status: 'unavailable', value: null };
+  }
+  const n = work.timesheetApprovalCount;
+  return n === null
+    ? { ...TIMESHEET_FACT, status: 'hidden', value: null }
+    : { ...TIMESHEET_FACT, status: 'known', value: String(Math.max(0, Math.trunc(n))) };
 }
 
 // ── Relances et pipeline du CRM (ADR-0040 — C4 § 5.5) ───────────────────────
@@ -1559,6 +1588,28 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
         recommendation: 'Ouvrir les frais à payer et enregistrer chaque paiement.',
         actionPath: '/rh/frais?vue=a-payer',
         factIds: ['rh.remboursements_a_payer'],
+      };
+    },
+  },
+  // ── ADR-0077 § 4.7 : feuilles de temps à valider ────────────────────────
+  {
+    id: 'validations_temps_en_attente',
+    rank: 21,
+    severity: 'attention',
+    requires: ['mes_validations_temps.en_attente'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('mes_validations_temps.en_attente');
+      if (n <= 0) return null;
+      return {
+        title: 'Feuilles de temps à valider',
+        message:
+          n > 1
+            ? `${n} semaines de temps attendent votre validation.`
+            : `${n} semaine de temps attend votre validation.`,
+        recommendation: 'Ouvrir les feuilles de temps à valider : approuver ou renvoyer chacune.',
+        actionPath: '/projets/mes-taches/temps/a-valider',
+        factIds: ['mes_validations_temps.en_attente'],
       };
     },
   },

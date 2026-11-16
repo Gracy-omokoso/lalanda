@@ -49,7 +49,12 @@ import type { CachedLevelInput, StockItemInput } from '../stock/types.js';
  * 1.7.0 (ADR-0076 § 3) : fait `mes_validations_taches.en_attente` (tâches soumises dont
  * l'appelant est le validateur) — un NOMBRE ; sans l'entrée, « non disponible ».
  */
-export const MORNING_BRIEF_VERSION = '1.7.0';
+/**
+ * 1.8.0 (ADR-0077 § 4.7) : fait `mes_validations_temps.en_attente` (semaines de temps
+ * soumises que l'appelant peut valider) — un NOMBRE seulement, jamais un nom ni une
+ * durée ; règle R21. Sans l'entrée, le fait est « non disponible » et R1 à R20 inchangées.
+ */
+export const MORNING_BRIEF_VERSION = '1.8.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -136,6 +141,12 @@ export type BriefWorkInput =
       truncated: boolean;
       /** ADR-0076 § 3 : tâches en attente de la validation de l'appelant ; absent : non disponible. */
       pendingApprovalCount?: number;
+      /**
+       * ADR-0077 § 4.7 : semaines de temps soumises que l'appelant peut valider (manager,
+       * ou `work.manage` pour un membre sans manager) ; `null` : masqué ; absent : non
+       * disponible.
+       */
+      timesheetApprovalCount?: number | null;
     };
 
 /**
