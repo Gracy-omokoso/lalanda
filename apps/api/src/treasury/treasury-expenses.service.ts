@@ -238,6 +238,8 @@ export class TreasuryExpensesService {
     if (query.currency) and.push({ currency: query.currency });
     if (query.accountId) and.push({ accountId: query.accountId });
     if (query.workProjectId) and.push({ workProjectId: query.workProjectId });
+    // ADR-0077 § 3 : filtre fiche fournisseur (une fiche d'autrui ne rend rien).
+    if (query.supplierId) and.push({ supplierId: query.supplierId });
     if (query.q !== undefined && query.q.trim() !== '') {
       const term = escapeRegex(query.q.trim());
       and.push({
@@ -289,12 +291,27 @@ export class TreasuryExpensesService {
     organizationId: string,
     views: ExpenseView[],
   ): Promise<ExpenseView[]> {
-    const ids = [
-      ...new Set(
-        views.flatMap((v) => (v.supplierId && isMongoId(v.supplierId) ? [v.supplierId] : [])),
-      ),
-    ];
-    if (ids.length === 0) return views;
+    const names = await this.cardNamesOf(
+      organizationId,
+      views.map((v) => v.supplierId),
+    );
+    if (names.size === 0) return views;
+    return views.map((v) => {
+      const name = v.supplierId ? names.get(v.supplierId) : undefined;
+      return name === undefined ? v : { ...v, supplierName: name };
+    });
+  }
+
+  /**
+   * Nom COURANT des fiches fournisseurs données, lues dans l'organisation (ADR-0075 (A),
+   * repris par les règles récurrentes, ADR-0077 § 2). Fiche introuvable : absente.
+   */
+  async cardNamesOf(
+    organizationId: string,
+    supplierIds: readonly (string | null)[],
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(supplierIds.filter((id): id is string => !!id && isMongoId(id)))];
+    if (ids.length === 0) return new Map();
     const cards = await this.connection
       .collection(SUPPLIERS)
       .find(
@@ -302,11 +319,7 @@ export class TreasuryExpensesService {
         { projection: { name: 1 } },
       )
       .toArray();
-    const names = new Map(cards.map((c) => [String(c._id), String(c['name'])]));
-    return views.map((v) => {
-      const name = v.supplierId ? names.get(v.supplierId) : undefined;
-      return name === undefined ? v : { ...v, supplierName: name };
-    });
+    return new Map(cards.map((c) => [String(c._id), String(c['name'])]));
   }
 
   /** Totaux par mois, devise et catégorie (moteur) — sans projet ni plan. */
@@ -1260,7 +1273,8 @@ export class TreasuryExpensesService {
    * Projet du RUN de l'organisation, non archivé (ADR-0039 § 2.10). Lu par la
    * connexion : la trésorerie n'importe pas le module « work ».
    */
-  private async assertWorkProject(organizationId: string, workProjectId: string): Promise<void> {
+  /** Projet du RUN de l'organisation, non archivé (aussi pour les règles récurrentes). */
+  async assertWorkProject(organizationId: string, workProjectId: string): Promise<void> {
     const project = Types.ObjectId.isValid(workProjectId)
       ? await this.connection
           .collection(WORK_PROJECTS)

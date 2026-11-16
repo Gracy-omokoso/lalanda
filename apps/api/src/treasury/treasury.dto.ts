@@ -171,6 +171,8 @@ export const ListExpensesQuerySchema = z
     currency: currency.optional(),
     accountId: objectId.optional(),
     workProjectId: objectId.optional(),
+    // ADR-0077 § 3 : dépenses d'une fiche fournisseur.
+    supplierId: objectId.optional(),
     status: z.enum(['recorded', 'cancelled', 'all']).default('recorded'),
     q: z.string().max(100).optional(),
     limit: z
@@ -198,6 +200,9 @@ export const RecurringExpenseSchema = z
     supplierName: optionalText(120),
     // ADR-0044 — P2 : fiche fournisseur, mêmes règles que sur une dépense.
     supplierId: objectId.nullable().optional(),
+    // ADR-0077 § 2 : projet du RUN. Absent : `null` à la création, inchangé à la
+    // modification ; `null` : détacher.
+    workProjectId: objectId.nullable().optional(),
     accountId: objectId
       .nullable()
       .optional()

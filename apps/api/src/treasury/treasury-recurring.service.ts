@@ -52,6 +52,8 @@ export interface RecurringExpenseView {
   supplierName: string | null;
   /** ADR-0044 — P2 : fiche fournisseur, ou `null`. */
   supplierId: string | null;
+  /** ADR-0077 § 2 : projet du RUN, ou `null`. */
+  workProjectId: string | null;
   accountId: string | null;
   frequency: RecurrenceFrequency;
   startDate: string;
@@ -93,7 +95,16 @@ export class TreasuryRecurringService {
       .lean<RuleLean[]>()
       .exec();
     const today = todayKinshasa();
-    return docs.map((d) => this.view(d, today));
+    // ADR-0077 § 2 (motif d'ADR-0075 (A)) : nom COURANT de la fiche, copie inchangée.
+    const names = await this.expenseService.cardNamesOf(
+      organizationId,
+      docs.map((d) => d.supplierId ?? null),
+    );
+    return docs.map((d) => {
+      const v = this.view(d, today);
+      const name = v.supplierId ? names.get(v.supplierId) : undefined;
+      return name === undefined ? v : { ...v, supplierName: name };
+    });
   }
 
   /** Règles au format moteur (prévision). */
@@ -135,12 +146,16 @@ export class TreasuryRecurringService {
     actor: TreasuryActor,
   ): Promise<RecurringExpenseView> {
     await this.assertAccount(organizationId, input);
+    // ADR-0077 § 2 : projet de l'organisation, non archivé.
+    const { workProjectId, ...fields } = input;
+    if (workProjectId) await this.expenseService.assertWorkProject(organizationId, workProjectId);
     // ADR-0044 — P2 : fiche fournisseur (même règle que les dépenses).
     const supplier = await this.expenseService.resolveSupplier(organizationId, input, null);
     const doc = await this.rules.create({
       organizationId,
-      ...input,
+      ...fields,
       ...supplier,
+      workProjectId: workProjectId ?? null,
       revision: 1,
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -153,7 +168,13 @@ export class TreasuryRecurringService {
       action: 'treasury.recurring.created',
       targetType: 'treasury_recurring_expense',
       targetId: String(doc._id),
-      metadata: { frequency: input.frequency, currency: input.currency },
+      metadata: {
+        frequency: input.frequency,
+        currency: input.currency,
+        // ADR-0077 § 2 : identifiants seulement, aucun nom.
+        supplierId: supplier.supplierId,
+        workProjectId: workProjectId ?? null,
+      },
     });
     return this.view(doc.toObject() as RuleLean, todayKinshasa());
   }
@@ -168,6 +189,10 @@ export class TreasuryRecurringService {
     const current = await this.requireOwn(organizationId, ruleId);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     await this.assertAccount(organizationId, input);
+    const { workProjectId, ...fields } = input;
+    if (workProjectId && workProjectId !== (current.workProjectId ?? null)) {
+      await this.expenseService.assertWorkProject(organizationId, workProjectId);
+    }
     // ADR-0044 — P2 : fiche fournisseur (posée, retirée, conservée ou rattachée).
     const supplier = await this.expenseService.resolveSupplier(organizationId, input, {
       supplierId: current.supplierId ?? null,
@@ -176,7 +201,15 @@ export class TreasuryRecurringService {
     const updated = await this.rules
       .findOneAndUpdate(
         { _id: current._id, organizationId, revision: expectedRevision },
-        { $set: { ...input, ...supplier, updatedBy: actor.userId }, $inc: { revision: 1 } },
+        {
+          $set: {
+            ...fields,
+            ...supplier,
+            ...(workProjectId !== undefined ? { workProjectId } : {}),
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
         { new: true },
       )
       .lean<RuleLean>()
@@ -189,7 +222,11 @@ export class TreasuryRecurringService {
       action: 'treasury.recurring.updated',
       targetType: 'treasury_recurring_expense',
       targetId: ruleId,
-      metadata: { active: input.active },
+      metadata: {
+        active: input.active,
+        supplierId: supplier.supplierId,
+        workProjectId: updated.workProjectId ?? null,
+      },
     });
     return this.view(updated, todayKinshasa());
   }
@@ -270,6 +307,8 @@ export class TreasuryRecurringService {
           supplierName: rule.supplierName ?? null,
           // ADR-0044 — P2 : l'occurrence porte la fiche de sa règle.
           supplierId: rule.supplierId ?? null,
+          // ADR-0077 § 2.3 : et son projet (archivé depuis : 409 WORK_PROJECT_ARCHIVED).
+          workProjectId: rule.workProjectId ?? null,
           accountId:
             overrides.accountId === undefined ? (rule.accountId ?? null) : overrides.accountId,
           deductibleVat: null,
@@ -337,6 +376,7 @@ export class TreasuryRecurringService {
       categoryLabel: CATEGORY_LABELS.get(d.category) ?? d.category,
       supplierName: d.supplierName ?? null,
       supplierId: d.supplierId ?? null,
+      workProjectId: d.workProjectId ?? null,
       accountId: d.accountId ?? null,
       frequency: d.frequency,
       startDate: d.startDate,

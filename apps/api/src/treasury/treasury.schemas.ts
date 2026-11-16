@@ -277,6 +277,13 @@ export class TreasuryRecurringExpense {
   @Prop({ type: String, default: null })
   supplierId!: string | null;
 
+  /**
+   * ADR-0077 § 2 : projet du RUN de la règle, hérité par chaque occurrence confirmée ;
+   * `null` par défaut (règles antérieures : aucune migration).
+   */
+  @Prop({ type: String, default: null })
+  workProjectId!: string | null;
+
   @Prop({ type: String, default: null })
   accountId!: string | null;
 
