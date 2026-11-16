@@ -16,6 +16,10 @@ import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
 // ADR-0050 — V6
 import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
+// ADR-0077 § 4.6
+import type { WorkTimesheetMyTaskItem } from '@lalanda/shared/work';
+
+import type { WorkActor } from './work.common.js';
 
 export const CRM_AGENDA_SOURCE = Symbol('WORK_CRM_AGENDA_SOURCE');
 
@@ -199,5 +203,29 @@ export interface SalesContractsAgendaReader {
 
 /** Sans module des contrats (tests) : aucun élément. */
 export const noSalesContractsAgenda: SalesContractsAgendaReader = {
+  agendaOf: async () => ({ items: [], truncated: false }),
+};
+
+// ── ADR-0077 § 4.6 : feuilles de temps à valider ─────────────────────────────
+//
+// Même motif : agrégées à la lecture, en lecture seule, par le fournisseur réel
+// `work/timesheets/work-timesheet-approvals.service.ts`. Appelé pour tout membre (un
+// manager n'a besoin d'aucune action : la relation suffit) ; l'audience (manager, ou
+// `work.manage` pour un membre sans manager) est jugée par le fournisseur.
+
+export const WORK_TIMESHEET_AGENDA_SOURCE = Symbol('WORK_TIMESHEET_AGENDA_SOURCE');
+
+export interface TimesheetAgendaPage {
+  items: WorkTimesheetMyTaskItem[];
+  /** Vrai si plus de `limit` semaines répondaient. */
+  truncated: boolean;
+}
+
+export interface TimesheetAgendaReader {
+  agendaOf(organizationId: string, actor: WorkActor, limit: number): Promise<TimesheetAgendaPage>;
+}
+
+/** Sans validation des feuilles de temps (tests) : aucune semaine. */
+export const noTimesheetAgenda: TimesheetAgendaReader = {
   agendaOf: async () => ({ items: [], truncated: false }),
 };

@@ -55,6 +55,20 @@ export interface WorkAbsencesSource {
     from: string,
     to: string,
   ): Promise<{ date: string; minutes: number }[] | null>;
+  /**
+   * ADR-0077 § 4.1, § 4.6 : relation de manager pour la validation des feuilles de temps,
+   * décidée par le moteur RH (`hrViewerScope`) sur les fiches. `teamUserIds` : comptes de
+   * l'équipe (directe et indirecte) de l'appelant ; `withManagerUserIds` : comptes dont
+   * la fiche a un manager relié à un compte (leur semaine va à ce manager, pas aux
+   * détenteurs de `work.manage`). Facultatif : absent, aucune relation.
+   */
+  managementOf?(organizationId: string, viewerUserId: string): Promise<WorkManagementView>;
+}
+
+/** Relation de manager vue depuis la validation des feuilles de temps (ADR-0077). */
+export interface WorkManagementView {
+  teamUserIds: string[];
+  withManagerUserIds: string[];
 }
 
 /** Semaine de travail par défaut sans module RH : lundi à vendredi (décision ouverte n° 5). */

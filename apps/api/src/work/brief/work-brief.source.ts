@@ -9,8 +9,11 @@
 // Isolation : `organizationId` vient de la session (brief) ou de la
 // membership vérifiée (e-mail), jamais d'une requête. Les projets archivés
 // sont exclus, comme dans « Mes tâches » (`GET /work/my-tasks`).
+//
+// ADR-0077 § 4.7 : plus le NOMBRE de semaines de temps soumises que le destinataire peut
+// valider (même audience que « Mes tâches ») ; jamais un nom ni une durée.
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -22,6 +25,7 @@ import { NO_OVERRIDES } from '../../authz/permissions.js';
 import { projectDocFilter } from '../work-access.js';
 import { WorkAccessService } from '../work-access.service.js';
 import { WorkMembersService } from '../work-members.service.js';
+import { WorkTimesheetApprovalsService } from '../timesheets/work-timesheet-approvals.service.js';
 import {
   WorkProject,
   WorkTask,
@@ -51,17 +55,25 @@ export class WorkBriefSource implements WorkSource {
     @InjectModel(WorkTask.name) private readonly tasks: Model<WorkTaskDocument>,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
+    @Optional()
+    @Inject(WorkTimesheetApprovalsService)
+    private readonly timesheets: WorkTimesheetApprovalsService | null = null,
   ) {}
 
   async workOf(organizationId: string, userId: string, now: Date): Promise<BriefWorkInput> {
     // ADR-0060 § 5 : seulement les projets que le destinataire peut ouvrir (écran et
     // e-mail). Droits relus à chaque brief : un ancien membre ne voit rien.
     const member = await this.members.permissionsOf(organizationId, userId);
-    const scope = await this.access.scopeOf(organizationId, {
-      userId,
-      role: member?.role,
-      context: member?.context ?? NO_OVERRIDES,
-    });
+    const actor = { userId, role: member?.role, context: member?.context ?? NO_OVERRIDES };
+    const scope = await this.access.scopeOf(organizationId, actor);
+    // ADR-0077 § 4.7 : sans module de validation (tests), le fait est « non disponible ».
+    const timesheetApprovalCount =
+      this.timesheets === null
+        ? undefined
+        : member
+          ? await this.timesheets.countFor(organizationId, actor)
+          : null;
+    const extra = timesheetApprovalCount === undefined ? {} : { timesheetApprovalCount };
     const projects = (await this.projects
       .find(
         { organizationId, status: { $ne: 'archived' }, ...projectDocFilter(scope) },
@@ -70,7 +82,7 @@ export class WorkBriefSource implements WorkSource {
       .lean()
       .exec()) as unknown as ProjectRow[];
     if (projects.length === 0) {
-      return { status: 'known', tasks: [], truncated: false, pendingApprovalCount: 0 };
+      return { status: 'known', tasks: [], truncated: false, pendingApprovalCount: 0, ...extra };
     }
 
     const active = new Set(projects.filter((p) => p.status === 'active').map((p) => String(p._id)));
@@ -108,6 +120,6 @@ export class WorkBriefSource implements WorkSource {
       mine: t.assigneeUserId === userId,
       projectActive: active.has(t.projectId),
     }));
-    return { status: 'known', tasks, truncated, pendingApprovalCount };
+    return { status: 'known', tasks, truncated, pendingApprovalCount, ...extra };
   }
 }

@@ -14,6 +14,10 @@
 // applicable à une saisie est celui dont `effectiveFrom` est le plus récent
 // ≤ `workedOn`. Le coût n'est jamais stocké : il se calcule à la lecture, dans le
 // moteur (lot L4a, marge). Journalisé dans `audit_events` (`work.rate.set|removed`).
+//
+// ADR-0077 § 4.3 : une semaine VALIDÉE verrouille les saisies du membre datées de cette
+// semaine (création, modification — vers ou depuis la semaine — et suppression) :
+// `409 WORK_TIMESHEET_LOCKED`, quel que soit l'auteur ; seule une réouverture le lève.
 
 import { projectIdFilter } from './work-access.js';
 import { WorkAccessService } from './work-access.service.js';
@@ -54,6 +58,7 @@ import { WorkActivityService } from './work-activity.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkTasksService } from './work-tasks.service.js';
+import { WorkTimesheetApprovalsService } from './timesheets/work-timesheet-approvals.service.js';
 import {
   WorkMemberRate,
   WorkTask,
@@ -84,6 +89,8 @@ export class WorkTimeService {
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    @Inject(WorkTimesheetApprovalsService)
+    private readonly timesheets: WorkTimesheetApprovalsService,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -301,6 +308,7 @@ export class WorkTimeService {
     await this.members.requireMember(organizationId, userId);
     this.assertNotFuture(body.workedOn);
     const id = await this.inTransaction(async (session) => {
+      await this.timesheets.assertWeekOpen(organizationId, userId, body.workedOn, session);
       await this.assertDayCapacity(organizationId, userId, body.workedOn, body.minutes, session);
       const [created] = await this.entries.create(
         [
@@ -354,6 +362,16 @@ export class WorkTimeService {
     const minutes = body.minutes ?? current.minutes;
     this.assertNotFuture(workedOn);
     await this.inTransaction(async (session) => {
+      // Ni depuis une semaine validée, ni vers elle.
+      await this.timesheets.assertWeekOpen(
+        organizationId,
+        current.userId,
+        current.workedOn,
+        session,
+      );
+      if (workedOn !== current.workedOn) {
+        await this.timesheets.assertWeekOpen(organizationId, current.userId, workedOn, session);
+      }
       await this.assertDayCapacity(
         organizationId,
         current.userId,
@@ -407,6 +425,12 @@ export class WorkTimeService {
     this.assertForOther(actor, current.userId);
     await this.taskService.requireWritable(organizationId, current.taskId);
     const removed = await this.inTransaction(async (session) => {
+      await this.timesheets.assertWeekOpen(
+        organizationId,
+        current.userId,
+        current.workedOn,
+        session,
+      );
       const res = await this.entries
         .updateOne(
           { _id: current._id, organizationId, deletedAt: null },

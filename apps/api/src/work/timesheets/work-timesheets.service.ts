@@ -14,6 +14,9 @@
 // `attendanceDay`) et constat `PROJECT_TIME_ABOVE_ATTENDANCE`, information seulement.
 // Rendue au membre lui-même, à son manager et aux lecteurs RH (`hr.read`) seulement
 // (§ 4 : les pointages ne se lisent pas au titre de `work.manage`).
+//
+// ADR-0077 § 4 : la vue porte l'état de validation de la semaine (`approval`) ; les
+// écritures de validation vivent dans `WorkTimesheetApprovalsService`.
 
 import { inScope, PRIVATE_PROJECT_LABEL } from '../work-access.js';
 import { WorkAccessService } from '../work-access.service.js';
@@ -37,6 +40,7 @@ import { WorkMembersService } from '../work-members.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import { actorCan, memberNotFound, type WorkActor } from '../work.common.js';
 import { WorkTimeEntry, type WorkTimeEntryDocument } from '../work.schemas.js';
+import { WorkTimesheetApprovalsService } from './work-timesheet-approvals.service.js';
 
 /** Lundi de la semaine qui contient `day` (`AAAA-MM-JJ`). */
 export function mondayOf(day: string): string {
@@ -54,6 +58,8 @@ export class WorkTimesheetsService {
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(WorkProjectsService) private readonly projects: WorkProjectsService,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    @Inject(WorkTimesheetApprovalsService)
+    private readonly approvals: WorkTimesheetApprovalsService,
     @Optional() @Inject(WORK_ABSENCES_SOURCE) absences: WorkAbsencesSource | null = null,
   ) {
     this.absences = absences ?? noWorkAbsences;
@@ -130,6 +136,15 @@ export class WorkTimesheetsService {
       })),
       totalMinutes: result.totalMinutes,
       findings: result.findings,
+      // ADR-0077 § 4 : validateur = manager ou `work.manage`, jamais soi-même.
+      approval: await this.approvals.approvalOf(
+        organizationId,
+        actor,
+        userId,
+        week,
+        userId !== actor.userId && (actorCan(actor, 'work.manage') || context.viewerIsManager),
+        now,
+      ),
     };
   }
 }

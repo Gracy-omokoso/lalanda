@@ -30,6 +30,7 @@
 
 import {
   computeProjectMargin,
+  timeApprovalShare,
   type WorkMarginCreditNoteInput,
   type WorkMarginInvoiceInput,
 } from '@lalanda/engine';
@@ -56,6 +57,8 @@ import {
   type WorkHrExpensesSource,
 } from './work-hr-expenses.port.js';
 import { WorkMembersService } from '../work-members.service.js';
+// ADR-0077 § 4.5 : part du temps validé, informative.
+import { WorkTimesheetApprovalsService } from '../timesheets/work-timesheet-approvals.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import {
   WorkMemberRate,
@@ -148,6 +151,9 @@ export class ProjectMarginService {
     @Optional() @Inject(WORK_STOCK_SOURCE) stock: WorkStockSource | null = null,
     // ADR-0051 — H14 : facultatif, fournisseur nul sans module RH.
     @Optional() @Inject(WORK_HR_EXPENSES_SOURCE) hrExpenses: WorkHrExpensesSource | null = null,
+    @Optional()
+    @Inject(WorkTimesheetApprovalsService)
+    private readonly timesheets: WorkTimesheetApprovalsService | null = null,
   ) {
     this.purchases = purchases ?? noWorkPurchases;
     this.stock = stock ?? noWorkStock;
@@ -354,6 +360,19 @@ export class ProjectMarginService {
       }));
     }
 
+    // ADR-0077 § 4.5 : minutes d'une semaine validée de leur auteur ; tout le temps saisi
+    // reste compté dans la marge (rien n'est soustrait ni filtré).
+    const timeApproval =
+      this.timesheets === null
+        ? undefined
+        : timeApprovalShare(
+            entries,
+            await this.timesheets.approvedWeeksOf(
+              organizationId,
+              entries.map((e) => e.userId),
+            ),
+          );
+
     return {
       projectId,
       version: result.version,
@@ -366,6 +385,7 @@ export class ProjectMarginService {
       purchases: result.purchases ?? null,
       materials: result.materials ?? null,
       pendingExpenseClaims: result.pendingExpenseClaims ?? null,
+      ...(timeApproval === undefined ? {} : { timeApproval }),
     };
   }
 }

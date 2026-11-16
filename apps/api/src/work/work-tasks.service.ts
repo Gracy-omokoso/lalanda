@@ -90,6 +90,10 @@ import {
   PURCHASES_AGENDA_SOURCE,
   SALES_CONTRACTS_AGENDA_SOURCE,
   STOCK_AGENDA_SOURCE,
+  // ADR-0077 § 4.6
+  WORK_TIMESHEET_AGENDA_SOURCE,
+  noTimesheetAgenda,
+  type TimesheetAgendaReader,
   noAssetsAgenda,
   noCrmAgenda,
   noHrAgenda,
@@ -252,6 +256,10 @@ export class WorkTasksService {
     @Optional()
     @Inject(SALES_CONTRACTS_AGENDA_SOURCE)
     salesContractsAgenda: SalesContractsAgendaReader | null = null,
+    // ADR-0077 § 4.6 : semaines de temps à valider (facultatif).
+    @Optional()
+    @Inject(WORK_TIMESHEET_AGENDA_SOURCE)
+    timesheetAgenda: TimesheetAgendaReader | null = null,
   ) {
     this.crmAgenda = crmAgenda ?? noCrmAgenda;
     this.purchasesAgenda = purchasesAgenda ?? noPurchasesAgenda;
@@ -259,6 +267,7 @@ export class WorkTasksService {
     this.stockAgenda = stockAgenda ?? noStockAgenda;
     this.assetsAgenda = assetsAgenda ?? noAssetsAgenda;
     this.salesContractsAgenda = salesContractsAgenda ?? noSalesContractsAgenda;
+    this.timesheetAgenda = timesheetAgenda ?? noTimesheetAgenda;
     this.absenceSource = absences;
   }
 
@@ -270,6 +279,7 @@ export class WorkTasksService {
   private readonly stockAgenda: StockAgendaReader;
   private readonly assetsAgenda: AssetsAgendaReader;
   private readonly salesContractsAgenda: SalesContractsAgendaReader;
+  private readonly timesheetAgenda: TimesheetAgendaReader;
 
   // ── Accès ────────────────────────────────────────────────────────────────
 
@@ -854,6 +864,12 @@ export class WorkTasksService {
           )
         : Promise.resolve({ items: [] as SalesContractMyTaskItem[], truncated: false }),
     ]);
+    // ADR-0077 § 4.6 : la relation de manager suffit ; l'audience est jugée par la source.
+    const timesheets = await this.timesheetAgenda.agendaOf(
+      organizationId,
+      actor,
+      MY_TASKS_MAX_PER_SOURCE,
+    );
     const workTruncated = docs.length > MY_TASKS_MAX_PER_SOURCE;
     // ADR-0076 § 2 et § 3 : « Je collabore » et « À valider », mêmes projets visibles.
     const sectionFilter = (extra: Record<string, unknown>): Record<string, unknown> => ({
@@ -905,6 +921,7 @@ export class WorkTasksService {
       ...stock.items,
       ...assets.items,
       ...salesContracts.items,
+      ...timesheets.items,
     ];
     const today = kinshasaDayOf(now);
     const { dueSoonDays, workingDays } = await this.settings.get(organizationId);
@@ -925,7 +942,8 @@ export class WorkTasksService {
         hr.truncated ||
         stock.truncated ||
         assets.truncated ||
-        salesContracts.truncated,
+        salesContracts.truncated ||
+        timesheets.truncated,
       collaborating,
       toApprove,
       // ADR-0045 — H5 (§ 6.2) : constats d'absence des tâches que l'appelant a créées.

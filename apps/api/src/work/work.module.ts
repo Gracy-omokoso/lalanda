@@ -32,10 +32,17 @@ import {
   HR_AGENDA_SOURCE,
   PURCHASES_AGENDA_SOURCE,
   STOCK_AGENDA_SOURCE,
+  WORK_TIMESHEET_AGENDA_SOURCE,
 } from './my-tasks.ports.js';
 import { WorkBriefSource } from './brief/work-brief.source.js';
 import { WorkTimesheetsController } from './timesheets/work-timesheets.controller.js';
 import { WorkTimesheetsService } from './timesheets/work-timesheets.service.js';
+// ADR-0077 § 4 : validation hebdomadaire des feuilles de temps.
+import { WorkTimesheetApprovalsService } from './timesheets/work-timesheet-approvals.service.js';
+import {
+  WorkTimesheetWeek,
+  WorkTimesheetWeekSchema,
+} from './timesheets/work-timesheet-week.schema.js';
 import { WORK_ABSENCES_SOURCE } from './work-absences.port.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
@@ -150,6 +157,8 @@ import {
       { name: WorkAiPlanLog.name, schema: WorkAiPlanLogSchema },
       // ADR-0076 § 5
       { name: WorkProjectStatusUpdate.name, schema: WorkProjectStatusUpdateSchema },
+      // ADR-0077 § 4
+      { name: WorkTimesheetWeek.name, schema: WorkTimesheetWeekSchema },
     ]),
   ],
   controllers: [
@@ -204,6 +213,9 @@ import {
     { provide: STOCK_AGENDA_SOURCE, useExisting: StockAgendaSource },
     { provide: ASSETS_AGENDA_SOURCE, useExisting: AssetsAgendaSource },
     WorkTimesheetsService,
+    // ADR-0077 § 4 : validation des semaines, verrou, « Mes tâches » du validateur.
+    WorkTimesheetApprovalsService,
+    { provide: WORK_TIMESHEET_AGENDA_SOURCE, useExisting: WorkTimesheetApprovalsService },
     WorkOverviewService,
     WorkPortfolioService,
     // ADR-0060 : portée des appelants, garde de visibilité, membres d'un projet.
@@ -230,6 +242,8 @@ import {
     WorkProjectsService,
     WorkTasksService,
     WorkBriefSource,
+    // ADR-0077 § 4.5 : part du temps validé dans la marge (`work/billing/**`).
+    WorkTimesheetApprovalsService,
     // ADR-0060 : la garde de visibilité sert aussi aux contrôleurs de `work/billing/**`.
     WorkAccessService,
     WorkVisibilityGuard,

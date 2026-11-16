@@ -19,6 +19,7 @@ import type { Connection } from 'mongoose';
 
 import type {
   WorkAbsencesSource,
+  WorkManagementView,
   WorkMemberAbsence,
   WorkTimesheetContext,
 } from '../../work/work-absences.port.js';
@@ -152,6 +153,47 @@ export class HrWorkAbsencesSource implements WorkAbsencesSource {
         recurring: h.recurring === true,
       })),
     };
+  }
+
+  /**
+   * ADR-0077 § 4.1, § 4.6 : équipe de l'appelant (moteur `hrViewerScope`, relation seule,
+   * sans droit) et comptes qui ont un manager relié à un compte. Ne lit que l'identité
+   * des fiches et leur manager : ni contrat, ni salaire.
+   */
+  async managementOf(organizationId: string, viewerUserId: string): Promise<WorkManagementView> {
+    const [rows, settingsDoc] = await Promise.all([
+      this.connection
+        .collection('hr_employees')
+        .find({ organizationId }, { projection: EMPLOYEE_PROJECTION })
+        .toArray() as unknown as Promise<EmployeeLean[]>,
+      this.connection.collection('hr_settings').findOne({ organizationId }),
+    ]);
+    const settings = hrSettingsViewOf(settingsDoc as Record<string, unknown> | null);
+    const employees = rows.map(engineEmployeeOf).filter((e) => e.status !== 'anonymized');
+    const scope = hrViewerScope({
+      viewerUserId,
+      employees,
+      effectiveActions: [],
+      settings: {
+        teamCalendarVisibility: settings.teamCalendarVisibility,
+        orgChartVisibility: settings.orgChartVisibility,
+      },
+    });
+    const byId = new Map(employees.map((e) => [e.id, e]));
+    const team = new Set(scope.teamEmployeeIds);
+    const teamUserIds = employees.flatMap((e) =>
+      team.has(e.id) && e.userId && e.userId !== viewerUserId ? [e.userId] : [],
+    );
+    const withManagerUserIds = employees.flatMap((e) => {
+      const manager = e.managerEmployeeId ? byId.get(e.managerEmployeeId) : undefined;
+      return e.userId &&
+        manager?.userId &&
+        manager.status !== 'exited' &&
+        manager.userId !== e.userId
+        ? [e.userId]
+        : [];
+    });
+    return { teamUserIds, withManagerUserIds };
   }
 
   /**
