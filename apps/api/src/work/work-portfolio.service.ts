@@ -30,6 +30,7 @@ import type { Connection, Model } from 'mongoose';
 import { isWorkId, oid, type WorkActor } from './work.common.js';
 import { projectDocFilter, type WorkProjectScope } from './work-access.js';
 import { WorkAccessService } from './work-access.service.js';
+import { WorkProjectsService } from './work-projects.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import {
   WorkProject,
@@ -61,6 +62,8 @@ export class WorkPortfolioService {
     @InjectConnection() private readonly connection: Connection,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    // ADR-0076 § 5 : dernier statut déclaré, à côté de la santé calculée.
+    @Inject(WorkProjectsService) private readonly projectsService: WorkProjectsService,
   ) {}
 
   async portfolio(
@@ -88,9 +91,10 @@ export class WorkPortfolioService {
     const page = docs.slice(0, WORK_PORTFOLIO_MAX);
     const ids = page.map((d) => String(d._id));
 
-    const [counters, stats] = await Promise.all([
+    const [counters, stats, statuses] = await Promise.all([
       this.counters(organizationId, ids, userId, today),
       this.stats(organizationId, today, scope),
+      this.projectsService.latestStatuses(organizationId, ids),
     ]);
     const countBy = new Map(counters.map((c) => [c._id, c]));
 
@@ -154,10 +158,11 @@ export class WorkPortfolioService {
         progressPercent: progressPercent(done, total),
         members,
         memberCount: memberIds.length,
-        mine: d.ownerUserId === userId || (c?.mine ?? 0) > 0,
+        mine: d.ownerUserId === userId || d.deputyUserId === userId || (c?.mine ?? 0) > 0,
         // ADR-0060 : cadenas des projets privés sur l'accueil.
         visibility: d.visibility ?? 'organization',
         updatedAt: new Date(d.updatedAt).toISOString(),
+        latestStatus: statuses.get(id) ?? null,
       };
     });
     if (query.scope === 'mine') items = items.filter((p) => p.mine);

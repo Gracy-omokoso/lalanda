@@ -836,6 +836,13 @@ export class WorkBillingService {
     if (!task.done) {
       conflict('WORK_MILESTONE_NOT_DONE', 'Terminez le jalon avant de préparer sa facture.');
     }
+    // ADR-0076 § 3 : un jalon « à valider » ne se facture qu'après son approbation.
+    if (task.approval?.required && task.approval.state !== 'approved') {
+      conflict(
+        'WORK_MILESTONE_NOT_APPROVED',
+        'Ce jalon est à valider : son brouillon de facture se prépare après l’approbation.',
+      );
+    }
     const previous = await this.previousBilling(organizationId, task);
 
     const quote =

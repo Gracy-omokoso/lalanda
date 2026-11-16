@@ -124,6 +124,8 @@ import { WorkOverviewController } from '../work/work-overview.controller.js';
 import { WorkPortfolioController } from '../work/work-portfolio.controller.js';
 // ADR-0060 : membres d'un projet et équipes.
 import { WorkProjectMembersController } from '../work/work-project-members.controller.js';
+// ADR-0076 § 5
+import { WorkProjectStatusController } from '../work/work-project-status.controller.js';
 import { HrTeamsController } from '../hr/teams/hr-teams.controller.js';
 // ADR-0061 : mes notifications des Projets.
 import { WorkNotificationPreferencesController } from '../work/preferences/work-notification-preferences.controller.js';
@@ -320,6 +322,8 @@ const CONTROLEURS = [
   WorkPortfolioController,
   // ADR-0060 : membres d'un projet (utilisateurs, équipes) ; équipes RH.
   WorkProjectMembersController,
+  // ADR-0076 § 5
+  WorkProjectStatusController,
   HrTeamsController,
   WorkNotificationPreferencesController,
   // ADR-0062 : import d'un fichier de tâches.
@@ -914,9 +918,10 @@ describe('couverture des routes par le RBAC', () => {
       'WorkProjectsController.list': ['work.read'],
       'WorkProjectsController.create': ['work.manage'],
       'WorkProjectsController.get': ['work.read'],
-      'WorkProjectsController.update': ['work.manage'],
-      'WorkProjectsController.archive': ['work.manage'],
-      'WorkProjectsController.restore': ['work.manage'],
+      // ADR-0076 § 1 : gestion du projet (chef, adjoint ou `work.manage`) tenue par le service.
+      'WorkProjectsController.update': ['work.update'],
+      'WorkProjectsController.archive': ['work.update'],
+      'WorkProjectsController.restore': ['work.update'],
       'WorkProjectsController.remove': ['work.manage'],
       'WorkProjectsController.activityOf': ['work.read'],
       'WorkOverviewController.overview': ['work.read'],
@@ -939,10 +944,18 @@ describe('couverture des routes par le RBAC', () => {
       'WorkTasksController.move': ['work.update'],
       'WorkTasksController.complete': ['work.update'],
       'WorkTasksController.reopen': ['work.update'],
-      'WorkTasksController.remove': ['work.manage'],
+      'WorkTasksController.remove': ['work.update'],
       'WorkTasksController.addDependency': ['work.update'],
       'WorkTasksController.removeDependency': ['work.update'],
       'WorkTasksController.activityOf': ['work.read'],
+      // ADR-0076 : validation, liste de contrôle, suivre une tâche, statut du projet.
+      'WorkTasksController.submitApproval': ['work.update'],
+      'WorkTasksController.decideApproval': ['work.update'],
+      'WorkTasksController.putChecklist': ['work.update'],
+      'WorkTasksController.follow': ['work.read'],
+      'WorkTasksController.unfollow': ['work.read'],
+      'WorkProjectStatusController.list': ['work.read'],
+      'WorkProjectStatusController.post': ['work.update'],
       'WorkCommentsController.list': ['work.read'],
       'WorkCommentsController.create': ['work.update'],
       'WorkCommentsController.update': ['work.update'],
@@ -3015,9 +3028,12 @@ describe('ADR-0060 et ADR-0061 : équipes, membres d’un projet, mes notificati
       // ADR-0060 : membres d'un projet ; équipes proposées aux Projets.
       'WorkProjectMembersController.teams': ['work.read'],
       'WorkProjectMembersController.get': ['work.read'],
-      'WorkProjectMembersController.add': ['work.manage'],
-      'WorkProjectMembersController.removeUser': ['work.manage'],
-      'WorkProjectMembersController.removeTeam': ['work.manage'],
+      // ADR-0076 § 1 : gestion du projet (chef, adjoint ou `work.manage`) tenue par le service.
+      'WorkProjectMembersController.add': ['work.update'],
+      'WorkProjectMembersController.removeUser': ['work.update'],
+      'WorkProjectMembersController.removeTeam': ['work.update'],
+      'WorkProjectMembersController.setUserRole': ['work.update'],
+      'WorkProjectMembersController.setTeamRole': ['work.update'],
       // ADR-0061 : préférences PERSONNELLES de l'appelant.
       'WorkNotificationPreferencesController.get': ['work.read'],
       'WorkNotificationPreferencesController.put': ['work.read'],

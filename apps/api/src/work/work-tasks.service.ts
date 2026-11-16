@@ -305,6 +305,38 @@ export class WorkTasksService {
     return this.access.rightsOn(organizationId, project, actor);
   }
 
+  /** ADR-0076 § 1 : 403 si l'appelant est Lecteur du projet (import de tâches). */
+  async assertCanCreateTasks(
+    organizationId: string,
+    projectId: string,
+    actor: WorkActor,
+  ): Promise<void> {
+    const project = await this.projects.requireOwn(organizationId, projectId);
+    if (!(await this.projectRightsOf(organizationId, project, actor)).canCreateTasks) {
+      forbidden(
+        'WORK_TASK_CREATE_FORBIDDEN',
+        'Vous êtes Lecteur de ce projet : vous pouvez lire et commenter, pas créer de tâche.',
+      );
+    }
+  }
+
+  /** ADR-0076 § 1 : 403 si l'appelant est Lecteur du projet de la tâche (saisie de temps). */
+  async assertCanLogTime(organizationId: string, taskId: string, actor: WorkActor): Promise<void> {
+    if (!isWorkId(taskId)) return; // le service du temps répondra 404
+    const task = await this.tasks
+      .findOne({ _id: oid(taskId), organizationId }, { projectId: 1 })
+      .lean<{ projectId: string }>()
+      .exec();
+    if (!task) return;
+    const project = await this.projects.requireOwn(organizationId, task.projectId);
+    if (!(await this.projectRightsOf(organizationId, project, actor)).canLogTime) {
+      forbidden(
+        'WORK_TASK_CREATE_FORBIDDEN',
+        'Vous êtes Lecteur de ce projet : vous ne saisissez pas de temps.',
+      );
+    }
+  }
+
   /** Droits de l'appelant sur une tâche (responsable de la parente lu au besoin). */
   async taskRightsOf(
     organizationId: string,

@@ -44,6 +44,7 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkTimeService } from './work-time.service.js';
+import { WorkTasksService } from './work-tasks.service.js';
 import { RequireFeature } from '../billing/feature.guard.js';
 import { WorkVisibilityGuard } from './work-visibility.guard.js';
 
@@ -53,7 +54,11 @@ type User = { id: string };
 @RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
 export class WorkTimeController {
-  constructor(@Inject(WorkTimeService) private readonly time: WorkTimeService) {}
+  constructor(
+    @Inject(WorkTimeService) private readonly time: WorkTimeService,
+    // ADR-0076 § 1 : le Lecteur d'un projet ne saisit pas de temps.
+    @Inject(WorkTasksService) private readonly tasks: WorkTasksService,
+  ) {}
 
   @Get('time-entries')
   @RequirePermission('work.read')
@@ -79,6 +84,7 @@ export class WorkTimeController {
   ): Promise<TimeEntryView> {
     const parsed = CreateTimeEntryBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
+    await this.tasks.assertCanLogTime(orgId, taskId, workActorOf(user, perms));
     return this.time.create(orgId, taskId, parsed.data, workActorOf(user, perms));
   }
 

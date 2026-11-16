@@ -50,6 +50,7 @@ import { invalidRequest } from '../sales/sales.errors.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { WorkIdPipe, isWorkId, workActorOf } from './work.common.js';
 import { WorkImportService } from './work-import.service.js';
+import { WorkTasksService } from './work-tasks.service.js';
 import { buildImportTemplateCsv, buildImportTemplateXlsx } from './work-import.template.js';
 import { WorkVisibilityGuard } from './work-visibility.guard.js';
 
@@ -101,7 +102,11 @@ const NewProjectQuery = z
 @RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard) // ADR-0060 : projet privé hors portée → 404
 export class WorkImportController {
-  constructor(@Inject(WorkImportService) private readonly imports: WorkImportService) {}
+  constructor(
+    @Inject(WorkImportService) private readonly imports: WorkImportService,
+    // ADR-0076 § 1 : le Lecteur d'un projet n'y importe pas de tâches.
+    @Inject(WorkTasksService) private readonly tasks: WorkTasksService,
+  ) {}
 
   @Get('import/template.xlsx')
   @RequirePermission('work.read')
@@ -200,6 +205,7 @@ export class WorkImportController {
     @Query('skipInvalid') skipInvalid: string | undefined,
     @Req() req: Request,
   ): Promise<WorkPlanApplyResult> {
+    await this.tasks.assertCanCreateTasks(orgId, projectId, workActorOf(user, perms));
     const { body, fileName } = await fileOf(req);
     return this.imports.importIntoProject(
       orgId,
