@@ -567,7 +567,7 @@ export function ImportFichier(): React.ReactElement {
                     </Field>
                     <Field
                       id="imp-resp"
-                      label="Responsable du projet"
+                      label="Chef de projet"
                       optional
                       size="md"
                       newRow

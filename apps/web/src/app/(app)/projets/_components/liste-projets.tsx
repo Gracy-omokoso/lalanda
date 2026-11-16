@@ -178,7 +178,7 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
         </Field>
         <Field
           id="pj-resp"
-          label="Responsable du projet"
+          label="Chef de projet"
           size="md"
           hint="Tapez pour chercher. Vide : aucun pour l’instant."
           error={champs['ownerUserId']}

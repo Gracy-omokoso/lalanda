@@ -15,6 +15,7 @@
 // à l'autre) : changer d'onglet ne relit rien.
 
 import type {
+  WorkProjectRights,
   WorkProjectOverview,
   WorkProjectView,
   WorkSettingsView,
@@ -82,7 +83,15 @@ export interface ContexteProjet {
   rafraichirApercu: () => void;
   /** Droits confirmés par le serveur (confort d'affichage). */
   travailler: boolean;
+  /** `work.manage` de l'organisation (direction, Managers). */
   gerer: boolean;
+  /**
+   * ADR-0076 § 1 : gestion de CE projet — chef, adjoint (dits par le serveur dans
+   * `project.myRights`) ou `work.manage`.
+   */
+  gererProjet: boolean;
+  /** ADR-0076 § 1 : droits de l'appelant sur le projet (`null` : instance N-1). */
+  droitsProjet: WorkProjectRights | null;
   /** Compte de l'utilisateur connecté, `null` tant que la session n'est pas lue. */
   moi: string | null;
   /** ADR-0066 § 2 : l'appelant n'assigne qu'à lui-même (Stagiaire), dit par le serveur. */
@@ -288,6 +297,9 @@ export function ProjetProvider({
       travailler:
         actions !== null && actions.includes('work.update') && project?.status !== 'archived',
       gerer: actions !== null && actions.includes('work.manage'),
+      gererProjet:
+        project?.myRights?.canManage ?? (actions !== null && actions.includes('work.manage')),
+      droitsProjet: project?.myRights ?? null,
       moi,
       assignerSoiSeulement,
     }),

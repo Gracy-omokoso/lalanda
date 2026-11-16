@@ -42,6 +42,13 @@ describe('onglets du projet (ADR-0057)', () => {
       'Chronologie',
       'Calendrier',
     ]);
+    // ADR-0076 § 1 : le chef de projet voit les Réglages de son projet sans `work.manage`.
+    expect(
+      ongletsVisibles(['work.read', 'work.update'], undefined, true).map((o) => o.segment),
+    ).toContain('reglages');
+    expect(ongletsVisibles(['work.read', 'work.update']).map((o) => o.segment)).not.toContain(
+      'reglages',
+    );
     const tous = ongletsVisibles(['work.read', 'docs.read', 'treasury.read', 'work.manage']);
     expect(tous.map((o) => o.segment)).toEqual([
       'apercu',

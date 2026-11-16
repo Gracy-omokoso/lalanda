@@ -46,10 +46,11 @@ export function EnteteProjet(): React.ReactElement {
     factureProposee,
     fermerPropositionFacture,
     apercu,
+    gererProjet,
   } = useProjet();
 
   const courant = ongletDuChemin(pathname) ?? ONGLET_DEFAUT;
-  const onglets = ongletsVisibles(actions);
+  const onglets = ongletsVisibles(actions, undefined, gererProjet);
 
   if (project === null) {
     return (
@@ -177,9 +178,15 @@ export function EnteteProjet(): React.ReactElement {
           </div>
         ) : null}
         <div className="flex gap-1">
-          <dt>Responsable :</dt>
+          <dt>Chef de projet :</dt>
           <dd className="text-[var(--foreground)]">{project.owner?.name ?? 'aucun'}</dd>
         </div>
+        {project.deputy ? (
+          <div className="flex gap-1">
+            <dt>Adjoint :</dt>
+            <dd className="text-[var(--foreground)]">{project.deputy.name}</dd>
+          </div>
+        ) : null}
         {project.startDate || project.dueDate ? (
           <div className="flex gap-1">
             <dt>Dates :</dt>

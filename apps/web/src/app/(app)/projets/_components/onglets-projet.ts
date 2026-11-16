@@ -67,12 +67,21 @@ export function ongletDEntree(
   return vueParDefaut ? defaultViewSegment(vueParDefaut) : ONGLET_DEFAUT;
 }
 
+/**
+ * `gererProjet` (ADR-0076 § 1) : le chef de projet et son adjoint voient les Réglages de
+ * LEUR projet sans `work.manage`.
+ */
 export function ongletsVisibles(
   actions: readonly OrgAction[] | null,
   onglets: readonly OngletProjet[] = ONGLETS_PROJET,
+  gererProjet = false,
 ): OngletProjet[] {
   return onglets.filter(
-    (o) => o.livre && (o.action === null || (actions !== null && actions.includes(o.action))),
+    (o) =>
+      o.livre &&
+      (o.action === null ||
+        (o.segment === 'reglages' && gererProjet) ||
+        (actions !== null && actions.includes(o.action))),
   );
 }
 

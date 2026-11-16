@@ -1,6 +1,7 @@
 'use client';
 
-// Onglet « Réglages » d'un projet (`work.manage`, ADR-0039 § 4 et § 8) :
+// Onglet « Réglages » d'un projet (chef, adjoint ou `work.manage` — ADR-0076 § 1 ;
+// ADR-0039 § 4 et § 8) :
 // informations du projet, colonnes du Kanban PROPRES AU PROJET, archivage et
 // suppression ; puis les étiquettes de l'organisation (`PUT /work/settings`),
 // palette fermée du design system.
@@ -64,22 +65,25 @@ const COULEURS: Record<WorkLabelColor, string> = {
 const OPTIONS_COULEUR = WORK_LABEL_COLORS.map((c) => ({ value: c, label: COULEURS[c] }));
 
 export function ReglagesProjet(): React.ReactElement {
-  const { project, gerer } = useProjet();
+  const { project, gerer, gererProjet } = useProjet();
   if (project === null) return <></>;
-  if (!gerer) {
+  // ADR-0076 § 1 : chef de projet, adjoint ou gestionnaire des projets.
+  if (!gererProjet) {
     return (
       <p className="text-sm text-[var(--foreground-muted)]">
-        Les réglages du projet sont réservés aux gestionnaires de projets.
+        Les réglages du projet sont réservés au chef de projet, à son adjoint et aux gestionnaires
+        de projets.
       </p>
     );
   }
   return (
     <div className="flex min-w-0 flex-col gap-8">
       <InfosProjet />
-      {/* ADR-0064 : canal Slack du projet. */}
-      <CanalSlack projectId={project.id} />
+      {/* ADR-0064 : canal Slack du projet (gestionnaires des projets). */}
+      {gerer ? <CanalSlack projectId={project.id} /> : null}
       <Colonnes />
-      <Etiquettes />
+      {/* Étiquettes de l'ORGANISATION : `work.manage`. */}
+      {gerer ? <Etiquettes /> : null}
       <CycleDeVie />
     </div>
   );
@@ -101,14 +105,17 @@ function Bloc({
 }
 
 function InfosProjet(): React.ReactElement {
-  const { project, members, setProject, signalerErreur } = useProjet();
+  const { project, members, setProject, signalerErreur, gerer } = useProjet();
   const p = project!;
+  // ADR-0076 § 1 : nommer le chef ou l'adjoint — gestionnaire des projets ou chef lui-même.
+  const nommer = gerer || p.myRole === 'lead';
   const [f, setF] = useState({
     name: p.name,
     description: p.description ?? '',
     kind: p.kind,
     status: (p.status === 'archived' ? 'active' : p.status) as WorkProjectEditableStatus,
     ownerUserId: p.owner?.userId ?? '',
+    deputyUserId: p.deputy?.userId ?? '',
     startDate: p.startDate ?? '',
     dueDate: p.dueDate ?? '',
   });
@@ -116,7 +123,8 @@ function InfosProjet(): React.ReactElement {
   const [ok, setOk] = useState(false);
   const archive = p.status === 'archived';
   const bloque = archive || envoi;
-  const responsables = members.filter((m) => m.canUpdate);
+  // ADR-0076 § 1 : chef et adjoint — membres internes (`canLead`) ; repli N-1 : `canUpdate`.
+  const responsables = members.filter((m) => m.canLead ?? m.canUpdate);
 
   async function enregistrer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -130,7 +138,9 @@ function InfosProjet(): React.ReactElement {
           description: f.description.trim() === '' ? null : f.description.trim(),
           kind: f.kind,
           status: f.status,
-          ownerUserId: f.ownerUserId || null,
+          ...(nommer
+            ? { ownerUserId: f.ownerUserId || null, deputyUserId: f.deputyUserId || null }
+            : {}),
           startDate: f.startDate || null,
           dueDate: f.dueDate || null,
         }),
@@ -179,19 +189,51 @@ function InfosProjet(): React.ReactElement {
             </Field>
             <Field
               id="rg-resp"
-              label="Responsable du projet"
+              label="Chef de projet"
               size="md"
-              hint="Tapez pour chercher parmi les membres qui peuvent modifier le projet."
+              hint={
+                nommer
+                  ? 'Membre interne (ni Invité externe, ni Stagiaire) : il gère le projet.'
+                  : 'Seuls le chef de projet et les gestionnaires changent le chef.'
+              }
             >
               <EntityPicker<WorkMemberOption>
                 value={responsables.find((m) => m.userId === f.ownerUserId) ?? null}
                 onChange={(m) => setF({ ...f, ownerUserId: m?.userId ?? '' })}
-                search={async (q) => responsables.filter((m) => correspondRecherche([m.name], q))}
+                search={async (q) =>
+                  responsables.filter(
+                    (m) => m.userId !== f.deputyUserId && correspondRecherche([m.name], q),
+                  )
+                }
                 refreshKey={responsables.length}
                 getKey={(m) => m.userId}
                 getLabel={(m) => m.name}
                 placeholder="Aucun"
-                disabled={bloque}
+                disabled={bloque || !nommer}
+                debounceMs={0}
+                emptyText="Aucun membre ne correspond."
+              />
+            </Field>
+            <Field
+              id="rg-adjoint"
+              label="Adjoint"
+              optional
+              size="md"
+              hint="Il gère le projet comme le chef (réglages, membres, validation)."
+            >
+              <EntityPicker<WorkMemberOption>
+                value={responsables.find((m) => m.userId === f.deputyUserId) ?? null}
+                onChange={(m) => setF({ ...f, deputyUserId: m?.userId ?? '' })}
+                search={async (q) =>
+                  responsables.filter(
+                    (m) => m.userId !== f.ownerUserId && correspondRecherche([m.name], q),
+                  )
+                }
+                refreshKey={responsables.length}
+                getKey={(m) => m.userId}
+                getLabel={(m) => m.name}
+                placeholder="Aucun"
+                disabled={bloque || !nommer}
                 debounceMs={0}
                 emptyText="Aucun membre ne correspond."
               />
@@ -537,7 +579,7 @@ function Etiquettes(): React.ReactElement {
 
 function CycleDeVie(): React.ReactElement {
   const router = useRouter();
-  const { project, setProject, signalerErreur } = useProjet();
+  const { project, setProject, signalerErreur, gerer } = useProjet();
   const p = project!;
   const [envoi, setEnvoi] = useState(false);
   const archive = p.status === 'archived';
@@ -577,20 +619,25 @@ function CycleDeVie(): React.ReactElement {
         >
           {archive ? 'Restaurer le projet' : 'Archiver le projet'}
         </Button>
-        <Button
-          variant="danger"
-          disabled={envoi}
-          onClick={() => {
-            if (!window.confirm(`Supprimer définitivement le projet « ${p.name} » et ses tâches ?`))
-              return;
-            void geste(async () => {
-              await workApi.deleteProject(p.id);
-              router.push(PROJETS_BASE);
-            }, 'Suppression impossible.');
-          }}
-        >
-          Supprimer le projet
-        </Button>
+        {/* Supprimer un projet reste réservé aux gestionnaires des projets (ADR-0076 § 1). */}
+        {gerer ? (
+          <Button
+            variant="danger"
+            disabled={envoi}
+            onClick={() => {
+              if (
+                !window.confirm(`Supprimer définitivement le projet « ${p.name} » et ses tâches ?`)
+              )
+                return;
+              void geste(async () => {
+                await workApi.deleteProject(p.id);
+                router.push(PROJETS_BASE);
+              }, 'Suppression impossible.');
+            }}
+          >
+            Supprimer le projet
+          </Button>
+        ) : null}
       </div>
     </Bloc>
   );
