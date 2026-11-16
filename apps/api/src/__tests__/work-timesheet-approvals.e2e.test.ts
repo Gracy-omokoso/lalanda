@@ -16,7 +16,7 @@ import { addDays, kinshasaDayOf } from '@lalanda/shared/work';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
 import { e2eSuite } from './e2e-utils.js';
 import { code, hrFixture, ok, type HrAccount, type HrFixture } from './hr-e2e-fixtures.js';
