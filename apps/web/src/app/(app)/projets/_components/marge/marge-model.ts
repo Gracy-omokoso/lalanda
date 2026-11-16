@@ -80,7 +80,33 @@ export function constatsFraisEnAttente(view: ProjectMarginView): ConstatAffiche[
  * (ADR-0051 — H14) les frais du personnel en attente de remboursement.
  */
 export function constats(view: ProjectMarginView): ConstatAffiche[] {
-  return [...constatsServis(view), ...constatsMateriel(view), ...constatsFraisEnAttente(view)];
+  return [
+    ...constatsServis(view),
+    ...constatsMateriel(view),
+    ...constatsFraisEnAttente(view),
+    ...constatsTempsValide(view),
+  ];
+}
+
+/**
+ * ADR-0077 § 4.5 : part du temps saisi dans une semaine validée, à titre informatif (tout
+ * le temps saisi reste compté). Absent, ou sans temps saisi : aucune phrase.
+ */
+export function constatsTempsValide(view: ProjectMarginView): ConstatAffiche[] {
+  const t = view.timeApproval;
+  if (!t || t.totalMinutes <= 0) return [];
+  const h = (m: number) => {
+    const heures = Math.floor(m / 60);
+    const reste = m % 60;
+    return reste === 0 ? `${heures} h` : `${heures} h ${String(reste).padStart(2, '0')}`;
+  };
+  return [
+    {
+      code: 'TIME_APPROVAL_SHARE',
+      ton: 'info',
+      texte: `Temps validé : ${h(t.approvedMinutes)} sur ${h(t.totalMinutes)} saisies (feuilles de temps validées). Tout le temps saisi compte dans la marge.`,
+    },
+  ];
 }
 
 function constatsServis(view: ProjectMarginView): ConstatAffiche[] {

@@ -32,6 +32,8 @@ import { formatJour } from '../../devis/_components/quote-model';
 import { formatQuantite } from '../../factures/_components/invoice-model';
 
 import { SectionAvenants } from './amendments-section';
+// ADR-0077 § 1.7 : « Créer le projet » ou « Ouvrir le projet ».
+import { ContractProjectBox } from './contract-project-box';
 import { FenetreContrat } from './contract-form';
 import {
   CONTRATS_BASE,
@@ -191,6 +193,14 @@ export function ContractDetail({ contractId }: { contractId: string }): React.Re
           ) : null}
         </p>
       </header>
+
+      <ContractProjectBox
+        contractId={vue.id}
+        status={vue.status}
+        projectId={vue.projectId}
+        echeancier={vue.billing.kind === 'schedule'}
+        actions={actions}
+      />
 
       <p role="note" className="rounded-md border border-[var(--warn)]/50 p-3 text-sm">
         {vue.banner}

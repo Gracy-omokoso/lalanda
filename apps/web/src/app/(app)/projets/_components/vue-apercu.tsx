@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 
 import { SANTE, libellesSemaines, phraseSante, pourcentTermine } from './apercu-model';
+import { BlocContratProjet } from './bloc-contrat-projet';
 import { Avatar, DateEcheance } from './elements';
 import { hrefProjet } from './projets-model';
 import { useProjet } from './project-context';
@@ -116,6 +117,9 @@ export function VueApercu(): React.ReactElement {
       </Bloc>
 
       <StatutDeclare />
+
+      {/* ADR-0077 § 1.7 : contrat suivi par le projet (sales.read), sans montant. */}
+      <BlocContratProjet projectId={project.id} />
 
       <Bloc titre="Avancement">
         {total === 0 ? (
