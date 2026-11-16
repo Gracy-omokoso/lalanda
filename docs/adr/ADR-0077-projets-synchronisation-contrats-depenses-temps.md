@@ -128,8 +128,10 @@ facturation (`none`) garde la préparation par jalon.
    `sales.read`, sans montant.
 8. **Marge** (O3 et lecture) : la marge du projet compte les factures liées au projet
    (`work_invoice_links`) **et** celles que le contrat a préparées (`sales_document_links.contractId`),
-   **sans doublon** (union par identifiant de facture) ; les avoirs suivent leur facture d'origine
-   comme avant. Aucun montant du contrat n'entre dans la marge : seule une facture définitive porte
+   **sans doublon** (union par identifiant de facture) ; seules les factures de vente `FV`/`EV`
+   portent la recette (un acompte préparé par le contrat n'est pas compté en plus de la facture
+   finale), les avoirs suivent leur facture d'origine comme avant. Les factures d'une commande
+   issue du contrat ne sont pas lues (lien manuel possible) — **à revoir avec Gracy**. Aucun montant du contrat n'entre dans la marge : seule une facture définitive porte
    de l'argent (ADR-0039 § 5). Moteur inchangé (`computeProjectMargin`).
 9. **Rien d'automatique** : signer un contrat ne crée aucun projet ; aucune facture n'est émise ni
    préparée par ce lot, aucun appel DGI.
@@ -216,8 +218,9 @@ Index unique `{ organizationId, userId, week }` ; index `{ organizationId, statu
    bulletin, ni `work_member_rates`.
 9. **Écran** (`feuille-temps.tsx`, `temps-model.ts`) : pastille de statut, « Soumettre la semaine »
    pour soi, « Approuver », « Renvoyer » (motif), « Rouvrir » (motif) pour le validateur ; la
-   page `/projets/mes-taches/temps/a-valider` liste les semaines à valider. Les saisies d'une
-   semaine approuvée ne proposent plus de modifier ni de supprimer.
+   page `/projets/mes-taches/temps/a-valider` liste les semaines à valider. Le panneau de
+   tâche (chantier parallèle) n'est pas modifié : une saisie refusée y affiche le message de
+   l'API (`WORK_TIMESHEET_LOCKED`) ; masquer ses boutons est une suite.
 
 ## Conséquences
 
