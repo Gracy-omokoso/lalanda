@@ -229,6 +229,7 @@ export const LIBELLE_MOI = 'Moi';
  *   - un rôle « assignation à soi seulement » (Stagiaire, dit par le serveur) : « Moi » ;
  *   - sinon, les membres qui peuvent être responsables (`canUpdate`) ET voient le
  *     projet (`seesProject`, absent = inconnu → proposé : le serveur tranche).
+ * ADR-0076 § 1 : jamais un Lecteur du projet (`projectRole: 'viewer'`).
  * Le serveur reste juge (`403 WORK_ASSIGN_SELF_ONLY`, `400 WORK_ASSIGNEE_NOT_MEMBER`).
  */
 export function responsablesProposes(
@@ -237,7 +238,7 @@ export function responsablesProposes(
 ): OptionResponsable[] {
   if (opts.soiSeulement) return opts.moi ? [{ userId: opts.moi, name: LIBELLE_MOI }] : [];
   return members
-    .filter((m) => m.canUpdate && m.seesProject !== false)
+    .filter((m) => m.canUpdate && m.seesProject !== false && m.projectRole !== 'viewer')
     .map((m) => ({ userId: m.userId, name: m.name }));
 }
 
