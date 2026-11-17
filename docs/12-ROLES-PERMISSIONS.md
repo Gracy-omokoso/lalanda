@@ -236,6 +236,38 @@ un **plafond** (sans `work.update`, rien n'est modifiable, quel que soit le rôl
   l'import en nouveau projet, l'IA, le canal Slack du projet et les liens de facture restent sous
   `work.manage`.
 
+### ADR-0078 — membres externes d'un projet (comptes hors organisation, aucune action ajoutée)
+
+[ADR-0078](adr/ADR-0078-projets-membres-externes.md) ouvre un projet à deux sortes de personnes
+**extérieures à l'organisation**, qui n'en sont **pas membres** et n'ont **aucun rôle
+d'organisation** : la matrice et ses actions sont inchangées.
+
+| Genre | Rattachement | Ce qu'il voit et fait (espace externe `/portail`) |
+|---|---|---|
+| **Contact client** | fiche client (obligatoire), compte CRM facultatif ; projets `kind: client` de cette fiche | ses projets ; tâches « visibles par le client » ; commentaires partagés (lire, écrire) ; approuver un livrable ou demander des modifications (motif) |
+| **Consultant** | fiche fournisseur (obligatoire), référent interne (obligatoire) | ses tâches (responsable ou collaborateur consultant), ou le projet si « peut ouvrir le projet » ; commentaires partagés ; son temps sur ses tâches ; soumettre sa semaine |
+
+- **Session distincte** : compte externe et code à six chiffres reçu par e-mail à chaque
+  connexion ; la session externe n'est pas une session better-auth : **aucune** route de l'ERP ne
+  lui répond (`401`), et une session interne n'ouvre pas l'espace externe.
+- **Jamais** dans l'espace externe : montant, marge, coût, taux, temps d'autrui, membre interne
+  autre que le **nom du chef de projet**.
+- **Qui gère** (routes `/work/...`) : inviter, régler « peut ouvrir le projet », retirer, régler
+  les tâches (visible par le client, validation client, consultants) et remettre une validation
+  client en attente : **gestion du projet** (chef, adjoint d'ADR-0076, `work.manage`) sous
+  `work.update` ; comptes, fermeture, conversion d'un Invité : `work.manage` ; taux d'achat d'un
+  consultant : `work.manage` + `purchase.manage` (lecture et récapitulatif : `work.read` +
+  `purchase.read`) ; consultants d'une fiche fournisseur : `work.read` + `purchase.read`.
+- **Visibilité d'un commentaire** : auteur ou gestion du projet ; celui d'un externe reste partagé.
+- **Feuille de temps d'un consultant** : validée par **son référent** ou `work.manage`, jamais par
+  lui-même (ADR-0077).
+- **Fermeture automatique** à l'archivage du projet, au retrait du membre, à la désactivation de la
+  fiche client ou fournisseur ; sessions révoquées sans accès restant.
+- Le rôle **Invité externe** (`guest`) reste disponible tel quel ; conversion manuelle, au cas par
+  cas, en contact client ou consultant (`work.manage`), sans toucher à son appartenance.
+- Correctif d'ADR-0076 : le **Lecteur** d'un projet ne modifie ni ne supprime ses saisies de temps
+  existantes (`403`).
+
 ### ADR-0040 — rôle Commercial et action `sales.quote` (appliqué, lot C0)
 
 > **Statut : appliqué** par le lot C0 d'[ADR-0040](adr/ADR-0040-crm-complet.md) § 4 (29 oct.

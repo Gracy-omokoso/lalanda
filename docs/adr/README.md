@@ -303,3 +303,15 @@ Décideurs :
   renvoi motivé par le manager ou `work.manage`, verrou `409 WORK_TIMESHEET_LOCKED`, réouverture
   tracée), part de temps validé informative dans la marge, « Mes tâches » et brief (R21, 1.8.0) ;
   paie non reliée (ADR-0070). Statut : **accepté** (16 nov. 2026).
+- [ADR-0078](ADR-0078-projets-membres-externes.md) — Projets : membres externes. Contact client relié
+  à la fiche client (projets `kind: client` de ce client seulement) et consultant relié à une fiche
+  fournisseur (référent interne, ses tâches ou « peut ouvrir le projet ») ; espace externe
+  `/portail` séparé de l'ERP, connexion par compte propre et code à six chiffres reçu par e-mail à
+  chaque connexion (haché, 10 min, 5 essais, usage unique, débit par adresse et par IP, session
+  distincte de better-auth : aucune route de l'ERP ne lui répond) ; tâches « visibles par le
+  client », commentaires internes ou partagés, validation des livrables par le client (jalon
+  facturé après son approbation) ; temps du consultant au taux d'achat dans la marge,
+  récapitulatif temps × taux (moteur, CSV), feuille validée par son référent ; fermeture
+  automatique (archivage, retrait, fiche désactivée) et sessions révoquées, audit par
+  identifiants ; `guest` conservé, conversion manuelle ; le Lecteur ne modifie plus ses saisies de
+  temps. Statut : **accepté** (17 nov. 2026 ; huit points « à revoir » listés).

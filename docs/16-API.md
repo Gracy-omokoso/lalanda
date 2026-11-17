@@ -1302,6 +1302,58 @@ Vues : `WorkTaskView` + `collaboratorUserIds`, `checklistDone`, `checklistTotal`
 (`task_collaborator_added`, `task_approval_requested`, `task_approval_decided`,
 `project_status_posted`).
 
+## Membres externes et espace externe (ADR-0078)
+
+« Gestion du projet » : comme ADR-0076. Contrats : `@lalanda/shared/work` (`external.ts`). Aucune
+réponse de l'espace externe ne porte de montant, de marge, de coût ni de temps d'autrui.
+
+**Côté ERP** (session interne, `AuthGuard` + `PermissionsGuard` + garde de visibilité) :
+
+| Route | Permission | Règle et réponse |
+|---|---|---|
+| `GET /work/projects/:projectId/external-members` | `work.read` | `{ projectId, canInviteClient, canManage, customerId, members[] }` |
+| `POST /work/projects/:projectId/external-members` | `work.update` + gestion | `{ kind: client \| consultant, email, name, customerId?, crmAccountId?, supplierId?, referentUserId?, canOpenProject? }` → `201` ; `409 WORK_EXTERNAL_PROJECT_NOT_CLIENT`, `400 WORK_EXTERNAL_CUSTOMER_MISMATCH`, `400 WORK_EXTERNAL_CRM_MISMATCH`, `409 WORK_EXTERNAL_RECORD_INACTIVE`, `400 WORK_EXTERNAL_REFERENT_NOT_ELIGIBLE`, `409 WORK_EXTERNAL_KIND_CONFLICT`, `409 WORK_EXTERNAL_RECORD_CONFLICT`, `409 WORK_EXTERNAL_ALREADY_MEMBER`, `409 WORK_EXTERNAL_LIMIT` ; e-mail d'invitation |
+| `PUT /work/projects/:projectId/external-members/:accountId` | `work.update` + gestion | `{ canOpenProject }` (consultant, sinon `400 WORK_EXTERNAL_NOT_CONSULTANT`) |
+| `DELETE /work/projects/:projectId/external-members/:accountId` | `work.update` + gestion | `204` ; accès fermé, sessions révoquées sans autre accès |
+| `GET /work/external-accounts` | `work.manage` | `{ items: WorkExternalAccountView[] }` (500 au plus) |
+| `PUT /work/external-accounts/:accountId` | `work.manage` | `{ name?, referentUserId? }` |
+| `POST /work/external-accounts/:accountId/close` | `work.manage` | accès et sessions fermés, `closedReason: manual` |
+| `GET` · `POST /work/external-accounts/:accountId/rates` · `DELETE …/rates/:rateId` | lecture `work.read` + `purchase.read` ; écriture `work.manage` + `purchase.manage` | `{ currency, hourlyRate, effectiveFrom }` (chaîne décimale) ; `409 WORK_RATE_DUPLICATE` ; rangé dans `work_member_rates` |
+| `GET /work/external-accounts/:accountId/time-recap(.csv)` | `work.read` + `purchase.read` | `?from&to` ; lignes mois × projet × devise, totaux, `minutesWithoutRate`, `version` (moteur) ; CSV « ; », UTF-8 avec BOM |
+| `GET /work/suppliers/:supplierId/consultants` | `work.read` + `purchase.read` | consultants de la fiche, projets, récapitulatif |
+| `GET /work/tasks/:taskId/external` | `work.read` | `WorkTaskExternalView` |
+| `PUT /work/tasks/:taskId/client-settings` | `work.update` + gestion | `{ expectedRevision, clientVisible?, clientApprovalRequired?, consultantAssigneeId?, consultantCollaboratorIds? }` ; `409 WORK_EXTERNAL_PROJECT_NOT_CLIENT`, `400 WORK_CLIENT_APPROVAL_NEEDS_VISIBLE`, `400 WORK_EXTERNAL_NOT_PROJECT_CONSULTANT` |
+| `POST /work/tasks/:taskId/client-approval/reset` | `work.update` + gestion | `{ expectedRevision }` → validation client `pending` |
+| `PUT /work/comments/:commentId/visibility` | `work.update` | `{ expectedRevision, visibility: internal \| shared }` ; auteur ou gestion (`403 WORK_COMMENT_VISIBILITY_FORBIDDEN`) ; commentaire d'un externe : `409 WORK_COMMENT_EXTERNAL_SHARED` |
+| `POST /work/tasks/:taskId/comments` | inchangée | + `visibility?` (défaut `internal`) |
+| `POST /work/tasks/:taskId/prepare-invoice` | inchangée | validation client requise non approuvée : `409 WORK_MILESTONE_NOT_CLIENT_APPROVED` |
+| `PUT` · `DELETE /work/time-entries/:entryId` | inchangée | Lecteur du projet : `403 WORK_TASK_CREATE_FORBIDDEN` (correctif) |
+| `GET /work/guests/:userId/projects` · `POST /work/guests/:userId/convert` | `work.manage` | `{ kind, projectIds, customerId? \| supplierId + referentUserId, canOpenProject? }` ; `400 WORK_EXTERNAL_NOT_GUEST`, `400 WORK_EXTERNAL_GUEST_NOT_MEMBER` |
+
+**Connexion** (publique, bornée ; aucune permission d'organisation) :
+
+| Route | Règle et réponse |
+|---|---|
+| `POST /portal/auth/request-code` | `{ email }` → `202 { sent: true }` dans tous les cas ; code à six chiffres, 10 min, envoyé à un compte actif seulement ; `429 EXTERNAL_RATE_LIMITED` (5 par adresse, 20 par IP, par 15 min) |
+| `POST /portal/auth/verify` | `{ email, code, organizationId? }` → `200 { me }` + cookie `lalanda_ext_session` (`httpOnly`, 12 h) ; `400 EXTERNAL_CODE_INVALID` (inconnu, faux, expiré, épuisé — 5 essais, usage unique) ; `409 EXTERNAL_ORGANIZATION_REQUIRED` (`details.organizations`) ; `429` (10 par adresse, 30 par IP) |
+| `POST /portal/auth/logout` | `204`, session révoquée, cookie effacé |
+
+**Espace externe** (cookie de session externe seulement ; `401 EXTERNAL_SESSION_REQUIRED` sinon ;
+hors portée : `404`) :
+
+| Route | Qui | Réponse |
+|---|---|---|
+| `GET /portal/me` | tous | `PortalMeView` |
+| `GET /portal/projects` · `GET /portal/projects/:projectId` | tous | ses projets ; tâches visibles par le client (contact) ou ses tâches / toutes si « peut ouvrir le projet » (consultant) |
+| `GET /portal/tasks/:taskId` | tous | tâche, description, validation client, commentaires **partagés**, ses saisies (consultant) |
+| `POST /portal/tasks/:taskId/comments` | tous | `{ body }` → commentaire partagé |
+| `POST /portal/tasks/:taskId/client-decision` | contact client | `{ expectedRevision, decision: approve \| request_changes, reason? }` (motif obligatoire pour des modifications) ; `409 WORK_CLIENT_APPROVAL_NOT_PENDING` ; consultant : `403` |
+| `POST /portal/tasks/:taskId/time-entries` · `PUT` · `DELETE /portal/time-entries/:entryId` | consultant | ses tâches et ses saisies seulement (`403 WORK_EXTERNAL_TIME_FORBIDDEN`), `userId` refusé, verrou `409 WORK_TIMESHEET_LOCKED` |
+| `GET /portal/timesheet?week=` · `POST /portal/timesheet/submit` | consultant | sa semaine ; `{ week, expectedRevision }` ; validée par son référent (`POST /work/timesheets/approve`) |
+
+Vues ajoutées : `WorkTaskView` + `clientVisible`, `clientApprovalState`, `consultantAssigneeId` ;
+`WorkCommentView` + `visibility` ; `WorkMemberRef` + `external?` (`client` · `consultant`).
+
 ## API publique
 
 Réservée aux offres compatibles. Clés à portée limitée, rotation, quotas, journal d’utilisation et documentation séparée. Aucune API publique avant stabilisation des contrats internes.
