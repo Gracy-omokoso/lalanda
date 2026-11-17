@@ -16,7 +16,11 @@ import { ObjectId } from 'mongodb';
 import request from 'supertest';
 import { beforeAll, expect, it, vi } from 'vitest';
 
+import { kinshasaDayOf } from '@lalanda/shared/work';
+
 import { MailTransport } from '../mail/mail.transport.js';
+import { WorkExternalAuthService } from '../work/external/work-external-auth.service.js';
+import { WorkMembersService } from '../work/work-members.service.js';
 import type { MailMessage } from '../mail/mail.types.js';
 import { e2eSuite } from './e2e-utils.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
@@ -72,7 +76,10 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
         .delete(path)
         .set('Cookie', [`${COOKIE}=${cookie}`]),
   });
-  const lastCodeFor = (email: string): string => {
+  // B1 : le code part APRÈS la réponse ; on attend la fin du travail en arrière-plan.
+  const settle = () => f.app().get(WorkExternalAuthService).settled();
+  const lastCodeFor = async (email: string): Promise<string> => {
+    await settle();
     const mail = [...sent].reverse().find((m) => m.to === email && /code/i.test(m.subject));
     expect(mail, `aucun code intercepté pour ${email}`).toBeDefined();
     const match = /Voici votre code[^:]*: (\d{6})/.exec(mail!.text);
@@ -85,7 +92,7 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
     );
     const res = await request(server())
       .post('/portal/auth/verify')
-      .send({ email, code: lastCodeFor(email) });
+      .send({ email, code: await lastCodeFor(email) });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     const raw = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
     const cookie = raw.find((c) => c.startsWith(`${COOKIE}=`));
@@ -244,8 +251,9 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
       .send({ email: CLIENT });
     expect(connue.status).toBe(202);
     expect(connue.body).toEqual(inconnue.body);
+    await settle();
     expect(sent.filter((m) => m.to === 'personne@exemple-externe.test')).toHaveLength(0);
-    const code = lastCodeFor(CLIENT);
+    const code = await lastCodeFor(CLIENT);
     const defi = await db
       .collection('work_external_challenges')
       .findOne({ email: CLIENT, consumedAt: null });
@@ -284,7 +292,7 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
 
   it('connexion : cinq essais au plus par code, code expiré refusé, débit borné', async () => {
     await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
-    const code = lastCodeFor(CONSULTANT);
+    const code = await lastCodeFor(CONSULTANT);
     const faux = code === '000000' ? '999999' : '000000';
     for (let i = 0; i < 5; i += 1) {
       await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code: faux });
@@ -295,7 +303,7 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
     expect(apres.status).toBe(400);
 
     await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
-    const code2 = lastCodeFor(CONSULTANT);
+    const code2 = await lastCodeFor(CONSULTANT);
     await db
       .collection('work_external_challenges')
       .updateMany(
@@ -755,5 +763,281 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
         (m) => m.userId === f.userId('guest'),
       )?.role,
     ).toBe('guest');
+  });
+
+  // ── Revue de sécurité (M1, M2, B1 à B8) ──────────────────────────────────
+
+  it('M1 : la gestion d’un projet ne rouvre pas un compte fermé ni ne change son référent', async () => {
+    const compte = async () =>
+      (
+        (await f.get('owner', '/work/external-accounts')).body.items as {
+          id: string;
+          status: string;
+          referent: { userId: string } | null;
+        }[]
+      ).find((a) => a.id === consultantId)!;
+    const invitation = (who: 'owner' | 'employee', referent: 'employee' | 'analyst') =>
+      f.post(who, `/work/projects/${p1}/external-members`, {
+        kind: 'consultant',
+        email: CONSULTANT,
+        name: 'M. Tshisekedi',
+        supplierId: supplier,
+        referentUserId: f.userId(referent),
+      });
+    // Le chef rouvre l'accès au projet, mais le référent du compte reste le même.
+    const chef = await invitation('employee', 'analyst');
+    expect(chef.status, JSON.stringify(chef.body)).toBe(201);
+    expect((await compte()).referent?.userId).toBe(f.userId('employee'));
+    // Invitation refusée (déjà membre) : rien n'a changé, même par un gestionnaire.
+    const deja = await invitation('owner', 'analyst');
+    expect(deja.status).toBe(409);
+    expect(deja.body.code).toBe('WORK_EXTERNAL_ALREADY_MEMBER');
+    expect((await compte()).referent?.userId).toBe(f.userId('employee'));
+    // Compte fermé : le chef ne le rouvre pas ; un gestionnaire le peut.
+    expect(
+      (await f.post('owner', `/work/external-accounts/${consultantId}/close`, {})).status,
+    ).toBe(201);
+    const ferme = await invitation('employee', 'employee');
+    expect(ferme.status).toBe(409);
+    expect(ferme.body.code).toBe('WORK_EXTERNAL_ACCOUNT_CLOSED');
+    expect((await compte()).status).toBe('closed');
+    const rouvert = await invitation('owner', 'analyst');
+    expect(rouvert.status, JSON.stringify(rouvert.body)).toBe(201);
+    const apres = await compte();
+    expect(apres.status).toBe('active');
+    expect(apres.referent?.userId).toBe(f.userId('analyst'));
+    await f.put('owner', `/work/external-accounts/${consultantId}`, {
+      referentUserId: f.userId('employee'),
+    });
+  });
+
+  it('M2 et B1 : réponse immédiate, délai de 60 s, le code précédent reste valable', async () => {
+    const svc = f.app().get(WorkExternalAuthService);
+    const r = svc.requestCode('quelquun@exemple-externe.test');
+    expect(r).toEqual({ sent: true });
+    expect(r instanceof Promise).toBe(false);
+    await settle();
+
+    sent.length = 0;
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    const code1 = await lastCodeFor(CONSULTANT);
+    // Dans le délai minimal : aucun nouveau code, le code vivant n'est pas remplacé.
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    await settle();
+    expect(sent.filter((m) => m.to === CONSULTANT)).toHaveLength(1);
+    // Après le délai : un second code, et le premier reste valable.
+    await db
+      .collection('work_external_challenges')
+      .updateMany(
+        { email: CONSULTANT, consumedAt: null },
+        { $set: { createdAt: new Date(Date.now() - 120_000) } },
+      );
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    const code2 = await lastCodeFor(CONSULTANT);
+    expect(sent.filter((m) => m.to === CONSULTANT)).toHaveLength(2);
+    // B6 : les e-mails de l'espace externe sont masqués dans les journaux.
+    expect(sent.filter((m) => m.to === CONSULTANT).every((m) => m.redactInLogs === true)).toBe(
+      true,
+    );
+    const ok = await request(server())
+      .post('/portal/auth/verify')
+      .send({ email: CONSULTANT, code: code1 });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    // Un code juste consomme aussi son jumeau.
+    const jumeau = await request(server())
+      .post('/portal/auth/verify')
+      .send({ email: CONSULTANT, code: code2 });
+    expect(jumeau.status).toBe(400);
+    const raw = ([] as string[]).concat(ok.headers['set-cookie'] ?? []);
+    consultantCookie = raw
+      .find((c) => c.startsWith(`${COOKIE}=`))!
+      .split(';')[0]!
+      .slice(COOKIE.length + 1);
+  });
+
+  it('B2 et B3 : verrou après 20 échecs du jour (audit, avertissement), essais épuisés refusés', async () => {
+    // B3 : un défi aux essais épuisés ne s'ouvre plus, même avec le bon code.
+    await db
+      .collection('work_external_challenges')
+      .updateMany({ email: CONSULTANT }, { $set: { consumedAt: new Date() } });
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    const code = await lastCodeFor(CONSULTANT);
+    await db
+      .collection('work_external_challenges')
+      .updateMany({ email: CONSULTANT, consumedAt: null }, { $set: { attempts: 5 } });
+    expect(
+      (await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code }))
+        .status,
+    ).toBe(400);
+
+    // B2 : 19 échecs déjà comptés aujourd'hui ; le 20ᵉ verrouille le compte.
+    await db
+      .collection('work_external_challenges')
+      .updateMany({ email: CONSULTANT }, { $set: { consumedAt: new Date() } });
+    await db
+      .collection('work_external_accounts')
+      .updateOne(
+        { _id: new ObjectId(consultantId) },
+        { $set: { authFailureDay: kinshasaDayOf(new Date()), authFailureCount: 19 } },
+      );
+    sent.length = 0;
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    const bon = await lastCodeFor(CONSULTANT);
+    const faux = bon === '000000' ? '111111' : '000000';
+    expect(
+      (await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code: faux }))
+        .status,
+    ).toBe(400);
+    const verrou = await db
+      .collection('work_external_accounts')
+      .findOne({ _id: new ObjectId(consultantId) });
+    expect(verrou?.['lockedUntil']).toBeInstanceOf(Date);
+    expect(
+      sent.some((m) => m.to === CONSULTANT && /suspendue/.test(m.subject) && m.redactInLogs),
+    ).toBe(true);
+    expect(
+      await db
+        .collection('audit_events')
+        .findOne({ action: 'work.external.locked', targetId: consultantId }),
+    ).not.toBeNull();
+    // Verrouillé : même le bon code est refusé, et aucun nouveau code ne part.
+    expect(
+      (await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code: bon }))
+        .status,
+    ).toBe(400);
+    sent.length = 0;
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    await settle();
+    expect(sent).toHaveLength(0);
+    await db
+      .collection('work_external_accounts')
+      .updateOne(
+        { _id: new ObjectId(consultantId) },
+        { $set: { lockedUntil: null, authFailureCount: 0 } },
+      );
+  });
+
+  it('B4 : retirer une validation client en attente d’un jalon exige un motif, tracé à l’audit', async () => {
+    const j = await f.post('owner', `/work/projects/${p1}/tasks`, {
+      title: 'Livraison V2',
+      isMilestone: true,
+      dueDate: '2027-01-20',
+    });
+    const id = j.body.task.id as string;
+    await f.put('owner', `/work/tasks/${id}/client-settings`, {
+      expectedRevision: await rev(id),
+      clientVisible: true,
+      clientApprovalRequired: true,
+    });
+    const sans = await f.put('owner', `/work/tasks/${id}/client-settings`, {
+      expectedRevision: await rev(id),
+      clientApprovalRequired: false,
+    });
+    expect(sans.status).toBe(400);
+    expect(f.issueCodes(sans)).toContain('WORK_CLIENT_APPROVAL_REASON_REQUIRED');
+    const avec = await f.put('owner', `/work/tasks/${id}/client-settings`, {
+      expectedRevision: await rev(id),
+      clientApprovalRequired: false,
+      reason: 'Le client valide par courrier signé.',
+    });
+    expect(avec.status, JSON.stringify(avec.body)).toBe(200);
+    const audit = await db
+      .collection('audit_events')
+      .findOne({ action: 'work.external.client_approval_removed', targetId: id });
+    expect(audit?.['metadata']).toMatchObject({ fromState: 'pending', isMilestone: true });
+  });
+
+  it('B5 : un compte externe n’est nommé que dans SON organisation', async () => {
+    const members = f.app().get(WorkMembersService);
+    expect((await members.refs([consultantId], f.orgId())).get(consultantId)?.name).toBe(
+      'M. Tshisekedi',
+    );
+    expect((await members.refs([consultantId], f.orgB())).get(consultantId)?.name).toBe(
+      'Ancien membre',
+    );
+    expect((await members.refs([consultantId])).get(consultantId)?.external).toBeUndefined();
+  });
+
+  it('B7 : récapitulatif limité aux projets visibles de l’appelant ; CSV neutralisé', async () => {
+    const prive = await f.post('owner', '/work/projects', {
+      name: '=HYPERLINK("http://x")',
+      kind: 'internal',
+      visibility: 'private',
+    });
+    expect(prive.status, JSON.stringify(prive.body)).toBe(201);
+    const p4 = prive.body.id as string;
+    expect(
+      (
+        await f.post('owner', `/work/projects/${p4}/external-members`, {
+          kind: 'consultant',
+          email: CONSULTANT,
+          name: 'M. Tshisekedi',
+          supplierId: supplier,
+          referentUserId: f.userId('employee'),
+        })
+      ).status,
+    ).toBe(201);
+    const t = await f.post('owner', `/work/projects/${p4}/tasks`, { title: 'Étude privée' });
+    const tid = t.body.task.id as string;
+    await f.put('owner', `/work/tasks/${tid}/client-settings`, {
+      expectedRevision: await rev(tid),
+      consultantAssigneeId: consultantId,
+    });
+    const saisie = await portal(consultantCookie).post(`/portal/tasks/${tid}/time-entries`, {
+      workedOn: '2026-11-16',
+      minutes: 30,
+    });
+    expect(saisie.status, JSON.stringify(saisie.body)).toBe(201);
+
+    const vuParLaDirection = await f.get(
+      'owner',
+      `/work/external-accounts/${consultantId}/time-recap`,
+    );
+    expect(vuParLaDirection.body.hiddenMinutes).toBe(0);
+    expect(
+      (vuParLaDirection.body.rows as { projectId: string }[]).some((r) => r.projectId === p4),
+    ).toBe(true);
+    const vuParLeComptable = await f.get(
+      'accountant',
+      `/work/external-accounts/${consultantId}/time-recap`,
+    );
+    expect(vuParLeComptable.status, JSON.stringify(vuParLeComptable.body)).toBe(200);
+    expect(vuParLeComptable.body.hiddenMinutes).toBe(30);
+    expect(
+      (vuParLeComptable.body.rows as { projectId: string }[]).some((r) => r.projectId === p4),
+    ).toBe(false);
+    expect(JSON.stringify(vuParLeComptable.body)).not.toContain('HYPERLINK');
+    const fiche = await f.get('accountant', `/work/suppliers/${supplier}/consultants`);
+    expect(JSON.stringify(fiche.body)).not.toContain(p4);
+
+    const csv = await f.get('owner', `/work/external-accounts/${consultantId}/time-recap.csv`);
+    expect(csv.text).toContain(`'=HYPERLINK`);
+    expect(csv.text).not.toMatch(/;=HYPERLINK/);
+  });
+
+  it('B8 : écritures du portail refusées hors de l’origine WEB_URL ou hors JSON', async () => {
+    const autre = await request(server())
+      .post('/portal/auth/request-code')
+      .set('Origin', 'https://site-hostile.test')
+      .send({ email: CONSULTANT });
+    expect(autre.status).toBe(403);
+    expect(autre.body.code).toBe('EXTERNAL_ORIGIN_FORBIDDEN');
+    const formulaire = await request(server())
+      .post('/portal/auth/request-code')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send(`email=${encodeURIComponent(CONSULTANT)}`);
+    expect(formulaire.status).toBe(415);
+    const commentaire = await request(server())
+      .post(`/portal/tasks/${consultantTask}/comments`)
+      .set('Cookie', [`${COOKIE}=${consultantCookie}`])
+      .set('Origin', 'https://site-hostile.test')
+      .send({ body: 'x' });
+    expect(commentaire.status).toBe(403);
+    const ok = await request(server())
+      .post('/portal/auth/request-code')
+      .set('Origin', 'http://localhost:3000')
+      .send({ email: 'inconnu@exemple-externe.test' });
+    expect(ok.status).toBe(202);
+    await settle();
   });
 });

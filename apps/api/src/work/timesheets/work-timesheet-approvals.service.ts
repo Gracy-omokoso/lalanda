@@ -180,10 +180,10 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
   ): Promise<TimesheetApprovalView> {
     const doc = await this.find(organizationId, userId, week);
     const status = doc?.status ?? 'open';
-    const refs = await this.members.refs([
-      doc?.decidedBy ?? null,
-      ...(doc?.history ?? []).map((h) => h.by),
-    ]);
+    const refs = await this.members.refs(
+      [doc?.decidedBy ?? null, ...(doc?.history ?? []).map((h) => h.by)],
+      organizationId,
+    );
     const currentMonday = mondayOfDay(kinshasaDayOf(now));
     return {
       status,
@@ -500,7 +500,10 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
     docs: readonly WorkTimesheetWeekLean[],
   ): Promise<PendingTimesheetView[]> {
     const [refs, minutes] = await Promise.all([
-      this.members.refs(docs.map((d) => d.userId)),
+      this.members.refs(
+        docs.map((d) => d.userId),
+        organizationId,
+      ),
       Promise.all(docs.map((d) => this.minutesOf(organizationId, d.userId, d.week))),
     ]);
     return docs.map((d, i) => ({

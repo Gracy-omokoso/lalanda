@@ -44,13 +44,20 @@ import { AuditService } from '../../authz/audit.service.js';
 import { can } from '../../authz/permissions.js';
 import { MailService } from '../../mail/mail.service.js';
 import { isDuplicateKey } from '../../sales/sales.errors.js';
-import { isLeadEligibleRole, isProjectScopedRole } from '../work-access.js';
+import { toCsv } from '../../crm/crm-csv.js';
+import {
+  inScope,
+  isLeadEligibleRole,
+  isProjectScopedRole,
+  type WorkProjectScope,
+} from '../work-access.js';
 import { WorkAccessService } from '../work-access.service.js';
 import { WorkActivityService } from '../work-activity.service.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import { WorkTasksService } from '../work-tasks.service.js';
 import {
+  actorCan,
   conflict,
   invalid,
   isWorkId,
@@ -160,7 +167,10 @@ export class WorkExternalMembersService {
         organizationId,
         docs.map((d) => d.supplierId),
       ),
-      this.members.refs(docs.map((d) => d.referentUserId)),
+      this.members.refs(
+        docs.map((d) => d.referentUserId),
+        organizationId,
+      ),
       this.memberships
         .find(
           { organizationId, accountId: { $in: ids }, status: 'active' },
@@ -216,7 +226,10 @@ export class WorkExternalMembersService {
     const views = new Map(
       (await this.accountViews(organizationId, accounts)).map((v) => [v.id, v]),
     );
-    const refs = await this.members.refs(rows.map((r) => r.invitedBy));
+    const refs = await this.members.refs(
+      rows.map((r) => r.invitedBy),
+      organizationId,
+    );
     return rows
       .filter((r) => views.has(r.accountId))
       .map((r) => ({
@@ -316,8 +329,13 @@ export class WorkExternalMembersService {
   // ── Invitation ───────────────────────────────────────────────────────────
 
   /**
-   * Compte de l'adresse dans l'organisation : réutilisé (même genre, même fiche ; rouvert
-   * s'il était fermé) ou créé.
+   * Compte de l'adresse dans l'organisation : réutilisé (même genre, même fiche) ou créé.
+   *
+   * Revue de sécurité (M1) : une invitation par la gestion d'UN projet ne touche pas au
+   * compte pour toute l'organisation. Un compte FERMÉ ne se rouvre qu'avec `work.manage`
+   * (`409 WORK_EXTERNAL_ACCOUNT_CLOSED` sinon) ; le référent d'un compte existant ne change
+   * qu'avec `work.manage` ; avec `projectId`, l'accès déjà ouvert et les bornes sont
+   * vérifiés AVANT toute écriture (une invitation refusée ne laisse aucune trace).
    */
   private async ensureAccount(
     organizationId: string,
@@ -332,11 +350,14 @@ export class WorkExternalMembersService {
       convertedFromUserId?: string | null;
     },
     actor: WorkActor,
+    projectId?: string,
   ): Promise<WorkExternalAccountLean> {
     const existing = await this.accounts
       .findOne({ organizationId, email: input.email })
       .lean<WorkExternalAccountLean>()
       .exec();
+    const manager = actorCan(actor, 'work.manage');
+    if (projectId) await this.precheckMembership(organizationId, existing, projectId);
     if (existing) {
       if (existing.kind !== input.kind) {
         conflict(
@@ -359,12 +380,23 @@ export class WorkExternalMembersService {
           { accountId: String(existing._id) },
         );
       }
-      const set: Record<string, unknown> = { updatedBy: actor.userId };
+      if (existing.status === 'closed' && !manager) {
+        conflict(
+          'WORK_EXTERNAL_ACCOUNT_CLOSED',
+          'Le compte externe de cette adresse est fermé : seul un gestionnaire des projets le rouvre.',
+          { accountId: String(existing._id) },
+        );
+      }
+      const set: Record<string, unknown> = {};
       if (existing.status === 'closed') {
         Object.assign(set, { status: 'active', closedAt: null, closedReason: null });
       }
-      if (input.referentUserId) set['referentUserId'] = input.referentUserId;
-      if (input.crmAccountId) set['crmAccountId'] = input.crmAccountId;
+      if (manager && input.referentUserId && input.referentUserId !== existing.referentUserId) {
+        set['referentUserId'] = input.referentUserId;
+      }
+      if (input.crmAccountId && !existing.crmAccountId) set['crmAccountId'] = input.crmAccountId;
+      if (Object.keys(set).length === 0) return existing;
+      set['updatedBy'] = actor.userId;
       const updated = await this.accounts
         .findOneAndUpdate(
           { _id: existing._id, organizationId },
@@ -429,6 +461,37 @@ export class WorkExternalMembersService {
         );
       }
       throw err;
+    }
+  }
+
+  /** Accès déjà ouvert et bornes, vérifiés AVANT toute écriture (M1). */
+  private async precheckMembership(
+    organizationId: string,
+    account: WorkExternalAccountLean | null,
+    projectId: string,
+  ): Promise<void> {
+    const memberCount = await this.memberships
+      .countDocuments({ organizationId, projectId, status: 'active' })
+      .exec();
+    if (memberCount >= WORK_EXTERNAL_LIMITS.membersPerProjectMax) {
+      conflict('WORK_EXTERNAL_LIMIT', 'Ce projet a déjà le nombre maximal de membres externes.');
+    }
+    if (!account) return;
+    const accountId = String(account._id);
+    const active = await this.memberships
+      .countDocuments({ organizationId, accountId, projectId, status: 'active' })
+      .exec();
+    if (active > 0) {
+      conflict('WORK_EXTERNAL_ALREADY_MEMBER', 'Cette personne a déjà accès à ce projet.');
+    }
+    if (
+      (await this.lifecycle.openProjectsOf(organizationId, accountId)).length >=
+      WORK_EXTERNAL_LIMITS.projectsPerAccountMax
+    ) {
+      conflict(
+        'WORK_EXTERNAL_LIMIT',
+        'Ce compte externe a déjà le nombre maximal de projets ouverts.',
+      );
     }
   }
 
@@ -599,6 +662,7 @@ export class WorkExternalMembersService {
         referentUserId: body.kind === 'consultant' ? body.referentUserId! : null,
       },
       actor,
+      String(project._id),
     );
     const id = String(project._id);
     await this.openMembership(organizationId, account, id, body.canOpenProject === true, actor);
@@ -846,20 +910,27 @@ export class WorkExternalMembersService {
     });
   }
 
-  /** Récapitulatif temps × taux d'achat par mois et par projet (moteur). */
+  /**
+   * Récapitulatif temps × taux d'achat par mois et par projet (moteur). Revue de sécurité
+   * (B7) : seuls les projets que l'APPELANT voit sont détaillés ; le temps des autres est
+   * compté à part (`hiddenMinutes`), jamais nommé ni valorisé.
+   */
   async recap(
     organizationId: string,
     accountId: string,
     query: ConsultantRecapQuery,
+    actor: WorkActor,
   ): Promise<ConsultantRecapView> {
     const account = await this.requireConsultant(organizationId, accountId);
-    return this.recapOf(organizationId, account, query);
+    const scope = await this.access.scopeOf(organizationId, actor);
+    return this.recapOf(organizationId, account, query, scope);
   }
 
   private async recapOf(
     organizationId: string,
     account: WorkExternalAccountLean,
     query: ConsultantRecapQuery,
+    scope: WorkProjectScope,
   ): Promise<ConsultantRecapView> {
     const accountId = String(account._id);
     const and: Record<string, unknown>[] = [{ organizationId, userId: accountId, deletedAt: null }];
@@ -881,8 +952,14 @@ export class WorkExternalMembersService {
         .exec(),
       this.namesOf('suppliers', organizationId, [account.supplierId]),
     ]);
+    let hiddenMinutes = 0;
+    const visible = entries.filter((e) => {
+      if (inScope(scope, String(e['projectId']))) return true;
+      hiddenMinutes += Number(e['minutes']);
+      return false;
+    });
     const result = consultantTimeRecap({
-      entries: entries.map((e) => ({
+      entries: visible.map((e) => ({
         userId: accountId,
         projectId: String(e['projectId']),
         workedOn: String(e['workedOn']),
@@ -908,46 +985,57 @@ export class WorkExternalMembersService {
       rows: result.rows.map((r) => ({ ...r, projectName: names.get(r.projectId) ?? '' })),
       totals: result.totals,
       minutesWithoutRate: result.minutesWithoutRate,
+      hiddenMinutes,
       version: result.version,
     };
   }
 
-  /** Récapitulatif en CSV (séparateur « ; », minutes et heures, montant HT au taux d'achat). */
+  /**
+   * Récapitulatif en CSV (« ; », UTF-8 avec BOM) par l'utilitaire du dépôt (`toCsv`) : une
+   * cellule qui commence par = + - @, une tabulation ou un retour chariot est neutralisée (B7).
+   */
   async recapCsv(
     organizationId: string,
     accountId: string,
     query: ConsultantRecapQuery,
+    actor: WorkActor,
   ): Promise<string> {
-    const recap = await this.recap(organizationId, accountId, query);
-    const esc = (v: string) => (/[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const lines = [
-      ['Mois', 'Projet', 'Minutes', 'Heures', 'Devise', 'Montant HT'].join(';'),
-      ...recap.rows.map((r) =>
-        [
+    const recap = await this.recap(organizationId, accountId, query, actor);
+    return toCsv(
+      ['Mois', 'Projet', 'Minutes', 'Heures', 'Devise', 'Montant HT'],
+      [
+        ...recap.rows.map((r) => [
           r.period,
-          esc(r.projectName),
+          r.projectName,
           String(r.minutes),
           (r.minutes / 60).toFixed(2),
           r.currency ?? '',
           r.amount ?? 'sans taux',
-        ].join(';'),
-      ),
-      ...recap.totals.map((t) =>
-        ['Total', '', String(t.minutes), (t.minutes / 60).toFixed(2), t.currency, t.amount].join(
-          ';',
-        ),
-      ),
-    ];
-    return `\uFEFF${lines.join('\r\n')}\r\n`;
+        ]),
+        ...recap.totals.map((t) => [
+          'Total',
+          '',
+          String(t.minutes),
+          (t.minutes / 60).toFixed(2),
+          t.currency,
+          t.amount,
+        ]),
+        ...(recap.hiddenMinutes > 0
+          ? [['Autres projets (non visibles)', '', String(recap.hiddenMinutes), '', '', '']]
+          : []),
+      ],
+    );
   }
 
-  /** `GET /work/suppliers/:supplierId/consultants` — fiche fournisseur. */
+  /** `GET /work/suppliers/:supplierId/consultants` — fiche fournisseur (projets visibles). */
   async supplierConsultants(
     organizationId: string,
     supplierId: string,
     query: ConsultantRecapQuery,
+    actor: WorkActor,
   ): Promise<SupplierConsultantsView> {
     if (!isWorkId(supplierId)) notFound('SUPPLIER_NOT_FOUND', 'Fiche introuvable.');
+    const scope = await this.access.scopeOf(organizationId, actor);
     const accounts = await this.accounts
       .find({ organizationId, kind: 'consultant', supplierId })
       .sort({ name: 1 })
@@ -957,10 +1045,12 @@ export class WorkExternalMembersService {
     const views = await this.accountViews(organizationId, accounts);
     const out: SupplierConsultantsView['consultants'] = [];
     for (const [i, account] of accounts.entries()) {
-      const rows = await this.memberships
-        .find({ organizationId, accountId: String(account._id) })
-        .lean<WorkExternalMembershipLean[]>()
-        .exec();
+      const rows = (
+        await this.memberships
+          .find({ organizationId, accountId: String(account._id) })
+          .lean<WorkExternalMembershipLean[]>()
+          .exec()
+      ).filter((r) => inScope(scope, r.projectId));
       const names = await this.projects.namesOf(
         organizationId,
         rows.map((r) => r.projectId),
@@ -972,7 +1062,7 @@ export class WorkExternalMembersService {
           projectName: names.get(r.projectId) ?? '',
           status: r.status,
         })),
-        recap: await this.recapOf(organizationId, account, query),
+        recap: await this.recapOf(organizationId, account, query, scope),
       });
     }
     return { supplierId, consultants: out };
@@ -1007,12 +1097,15 @@ export class WorkExternalMembersService {
     const rights = await this.access.rightsOn(organizationId, project, actor);
     const consultants = await this.activeConsultants(organizationId, task.projectId);
     const ca = task.clientApproval ?? null;
-    const refs = await this.members.refs([
-      ...consultants,
-      task.consultantAssigneeId ?? null,
-      ...(task.consultantCollaboratorIds ?? []),
-      ca?.decidedBy ?? null,
-    ]);
+    const refs = await this.members.refs(
+      [
+        ...consultants,
+        task.consultantAssigneeId ?? null,
+        ...(task.consultantCollaboratorIds ?? []),
+        ca?.decidedBy ?? null,
+      ],
+      organizationId,
+    );
     const ref = (id: string) => WorkMembersService.refOf(refs, id);
     return {
       taskId: String(task._id),
@@ -1072,6 +1165,21 @@ export class WorkExternalMembersService {
         'Cette personne n’est pas consultant de ce projet : invitez-la d’abord.',
       );
     }
+    // B4 : retirer une validation client en cours sur un jalon facturable exige un motif.
+    const fromState = task.clientApproval?.required ? task.clientApproval.state : 'none';
+    const removing = currentRequired && !required;
+    if (
+      removing &&
+      task.isMilestone &&
+      (fromState === 'pending' || fromState === 'changes_requested') &&
+      !body.reason
+    ) {
+      invalid(
+        'reason',
+        'WORK_CLIENT_APPROVAL_REASON_REQUIRED',
+        'Indiquez pourquoi la validation du client est retirée de ce jalon.',
+      );
+    }
     const set: Record<string, unknown> = { clientVisible: visible, updatedBy: actor.userId };
     if (required !== currentRequired) {
       set['clientApproval'] = required
@@ -1093,6 +1201,24 @@ export class WorkExternalMembersService {
       .exec();
     if (res.matchedCount !== 1)
       staleRevision((await this.taskService.requireOwn(organizationId, taskId)).revision);
+    if (required !== currentRequired) {
+      await this.audit.record({
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role ?? 'unknown',
+        action: removing
+          ? 'work.external.client_approval_removed'
+          : 'work.external.client_approval_required',
+        targetType: 'work_task',
+        targetId: String(task._id),
+        metadata: {
+          projectId: task.projectId,
+          fromState,
+          isMilestone: task.isMilestone,
+          ...(body.reason ? { reason: body.reason.slice(0, 500) } : {}),
+        },
+      });
+    }
     await this.activity.record(organizationId, {
       projectId: task.projectId,
       taskId: String(task._id),
@@ -1157,6 +1283,15 @@ export class WorkExternalMembersService {
       kind: 'task.client_approval_reset',
       data: { from: task.clientApproval.state },
     });
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role ?? 'unknown',
+      action: 'work.external.client_approval_reset',
+      targetType: 'work_task',
+      targetId: String(task._id),
+      metadata: { projectId: task.projectId, fromState: task.clientApproval.state },
+    });
     return this.taskExternalView(
       organizationId,
       await this.taskService.requireOwn(organizationId, taskId),
@@ -1188,7 +1323,7 @@ export class WorkExternalMembersService {
         'Seul un membre au rôle « Invité externe » se convertit en membre externe.',
       );
     }
-    const identity = (await this.members.refs([guestUserId])).get(guestUserId);
+    const identity = (await this.members.refs([guestUserId], organizationId)).get(guestUserId);
     const emailDoc = await this.connection
       .collection('user')
       .findOne(

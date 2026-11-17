@@ -193,6 +193,50 @@ moteur** (`consultantTimeRecap`, `packages/engine/src/work/consultant-recap.ts`)
    l'organisation et son rôle `guest` ne sont **pas** touchés : le retrait reste un geste de
    l'écran Membres (`organization.manage`). Aucune migration automatique.
 
+### 3 bis. Durcissement après revue de sécurité (17 nov. 2026)
+
+Une revue indépendante de la branche (aucune faille critique ni haute) a conduit aux règles
+suivantes, toutes testées (`work-external.e2e.test.ts`, `work-external-throttler.guard.test.ts`,
+`mail.transport.test.ts`) :
+
+1. **M1 — invitation sans effet sur le compte entier.** La gestion d'un projet (chef, adjoint)
+   invite sur SON projet sans toucher au compte de l'organisation : un compte **fermé** ne se
+   rouvre qu'avec `work.manage` (`409 WORK_EXTERNAL_ACCOUNT_CLOSED` sinon) ; le **référent** d'un
+   compte existant ne change qu'avec `work.manage` (sinon le référent demandé est ignoré) ; un
+   compte CRM n'est posé que s'il n'y en avait aucun ; l'accès déjà ouvert
+   (`WORK_EXTERNAL_ALREADY_MEMBER`) et les bornes sont vérifiés **avant toute écriture**.
+2. **M2 — pas de déni de connexion par un tiers.** Les seaux de débit par adresse deviennent des
+   seaux par **(adresse + IP)** : un tiers qui tourne d'IP n'épuise plus le quota du titulaire.
+   Une nouvelle demande **ne remplace plus** le code vivant : délai minimal de **60 s** entre deux
+   codes d'une adresse (dans ce délai, rien n'est créé ni envoyé, même réponse), **deux codes
+   vivants** au plus (le précédent reste valable), un code juste consomme son jumeau. Plafond
+   **par compte**, tenu en base : **30 demandes par jour** (au-delà, aucun envoi, audit
+   `work.external.code_requests_capped`).
+3. **B1 — durée de réponse égale.** `request-code` répond **avant** tout accès à la base ; la
+   recherche des comptes, le défi, l'e-mail et l'audit se font ensuite, en arrière-plan.
+4. **B2 — verrouillage.** **20 codes faux** dans la journée (Kinshasa) verrouillent le compte
+   **24 h** (`lockedUntil`) : codes vivants invalidés, audit `work.external.locked`, e-mail
+   d'avertissement au titulaire (`renderExternalLockWarning`) ; pendant le verrou, aucun code ne
+   part et même un bon code est refusé (message unique). Une connexion réussie remet le compteur
+   à zéro. *À revoir avec l'expert sécurité* : le verrou peut être déclenché par un tiers qui
+   connaît l'adresse (compromis assumé contre la devinette du code).
+5. **B3** — la vérification ne lit que les défis dont les essais restent (`attempts < 5`).
+6. **B4** — retirer la validation client d'un **jalon** en attente ou « modifications
+   demandées » exige un **motif** (`400 WORK_CLIENT_APPROVAL_REASON_REQUIRED`) ; ajouter ou retirer
+   une validation client et la remettre en attente sont audités
+   (`work.external.client_approval_required|removed|reset`, motif borné à 500 caractères).
+7. **B5** — un nom de compte externe n'est résolu que dans **son** organisation
+   (`WorkMembersService.refs(ids, organizationId)`).
+8. **B6** — invitation, code et avertissement partent avec `redactInLogs` : adresse masquée et
+   objet remplacé par un libellé dans les journaux.
+9. **B7** — le récapitulatif temps × taux (JSON, CSV) et la vue de la fiche fournisseur ne
+   détaillent que les projets **visibles** par l'appelant ; le reste est compté à part
+   (`hiddenMinutes`), jamais nommé ni valorisé. Le CSV passe par l'utilitaire du dépôt (`toCsv`,
+   cellule commençant par `= + - @`, tabulation ou retour chariot neutralisée).
+10. **B8** — toute écriture `/portal/*` (connexion comprise) est refusée si l'en-tête `Origin` est
+    présent et différent de `WEB_URL` (`403 EXTERNAL_ORIGIN_FORBIDDEN`) ; un corps doit être du
+    JSON (`415 EXTERNAL_JSON_REQUIRED`).
+
 ### 4. Correctif d'ADR-0076/0077
 
 Un **Lecteur** du projet ne modifie plus ni ne supprime ses saisies de temps existantes sur ce
@@ -266,8 +310,9 @@ projet (`403 WORK_TASK_CREATE_FORBIDDEN`, comme la création) : `PUT` et `DELETE
 5. **Droits des taux d'achat** : poser `work.manage` + `purchase.manage`, lire `work.read` +
    `purchase.read` (prix d'achat, pas donnée salariale ; les taux des membres restent sous
    `treasury.manage`). *À revoir avec Gracy.*
-6. **Durées et bornes** : code 10 min, 5 essais, session 12 h, débits ci-dessus. *Usage courant ;
-   à revoir avec l'expert sécurité.*
+6. **Durées et bornes** : code 10 min, 5 essais, session 12 h, débits ci-dessus, 60 s entre deux
+   codes, 30 demandes et 20 échecs par jour et par compte, verrou de 24 h. *Usage courant ; à
+   revoir avec l'expert sécurité.*
 7. **Fiscalité du récapitulatif** : montants **HT** au taux d'achat, sans TVA ni retenue à la
    source (IBP/IRL sur prestations de non-salariés, à confirmer selon le statut du consultant en
    RDC) : le récapitulatif n'est qu'une **base** ; la facture fournisseur et ses taxes restent

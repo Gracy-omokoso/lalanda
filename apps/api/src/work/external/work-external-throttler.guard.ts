@@ -1,7 +1,9 @@
 // Limites de débit de la connexion à l'espace externe — ADR-0078 § 3.
 //
-// Quatre seaux (motif de `lead-form-throttler.guard.ts`) : demandes de code par adresse
-// et par IP, vérifications par adresse et par IP. Les clés sont des EMPREINTES salées
+// Quatre seaux (motif de `lead-form-throttler.guard.ts`) : demandes de code et
+// vérifications, par IP et par couple (adresse + IP). Revue de sécurité (M2) : aucun seau
+// n'est partagé entre un tiers et le titulaire d'une adresse ; le plafond par COMPTE est
+// tenu en base (`work-external-auth.service.ts` : demandes et échecs du jour, verrou). Les clés sont des EMPREINTES salées
 // (`emailBucket`, `ipBucket`) : ni adresse ni IP en clair, même en mémoire. Comptés
 // AVANT toute lecture de la base ; s'ajoutent au garde global (100 req/min par IP).
 // Le nombre d'essais PAR CODE est tenu à part, en base (`attempts` du défi).
@@ -70,7 +72,8 @@ export class ExternalRequestEmailThrottlerGuard extends ExternalAuthThrottlerGua
   protected readonly limit = WORK_EXTERNAL_AUTH.requestsPerEmail;
   protected readonly bucket = 'request-email';
   protected trackerOf(req: Record<string, unknown>): string {
-    return emailBucket(emailOf(req));
+    // M2 : (adresse + IP) — un tiers qui tourne d'IP n'épuise pas le seau du titulaire.
+    return `${emailBucket(emailOf(req))}:${ipBucket(clientIpOf(req as { ips?: string[]; ip?: string }))}`;
   }
 }
 
@@ -88,6 +91,7 @@ export class ExternalVerifyEmailThrottlerGuard extends ExternalAuthThrottlerGuar
   protected readonly limit = WORK_EXTERNAL_AUTH.verifiesPerEmail;
   protected readonly bucket = 'verify-email';
   protected trackerOf(req: Record<string, unknown>): string {
-    return emailBucket(emailOf(req));
+    // M2 : (adresse + IP) — un tiers qui tourne d'IP n'épuise pas le seau du titulaire.
+    return `${emailBucket(emailOf(req))}:${ipBucket(clientIpOf(req as { ips?: string[]; ip?: string }))}`;
   }
 }

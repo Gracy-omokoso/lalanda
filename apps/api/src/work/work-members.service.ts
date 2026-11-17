@@ -98,8 +98,15 @@ export class WorkMembersService {
     return m !== undefined && can(m.role, action, m.context);
   }
 
-  /** Noms courants (nom, à défaut e-mail) ; un inconnu devient « Ancien membre ». */
-  async refs(userIds: readonly (string | null | undefined)[]): Promise<Map<string, WorkMemberRef>> {
+  /**
+   * Noms courants (nom, à défaut e-mail) ; un inconnu devient « Ancien membre ».
+   * ADR-0078 : avec `organizationId`, un identifiant inconnu des comptes internes est
+   * cherché parmi les comptes externes DE CETTE organisation seulement.
+   */
+  async refs(
+    userIds: readonly (string | null | undefined)[],
+    organizationId?: string,
+  ): Promise<Map<string, WorkMemberRef>> {
     const ids = [...new Set(userIds.filter((u): u is string => typeof u === 'string'))];
     const identities = await this.members.identitiesOf(ids);
     const out = new Map<string, WorkMemberRef>();
@@ -110,18 +117,23 @@ export class WorkMembersService {
       out.set(id, { userId: id, name: who?.name ?? who?.email ?? FORMER_MEMBER });
     }
     // ADR-0078 : un identifiant inconnu des comptes internes peut être un compte externe.
-    for (const [id, ext] of await this.externalNames(unknown)) out.set(id, ext);
+    if (organizationId) {
+      for (const [id, ext] of await this.externalNames(organizationId, unknown)) out.set(id, ext);
+    }
     return out;
   }
 
   /** Noms des comptes externes (`work_external_accounts`) parmi ces identifiants. */
-  private async externalNames(ids: readonly string[]): Promise<Map<string, WorkMemberRef>> {
+  private async externalNames(
+    organizationId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, WorkMemberRef>> {
     const valid = ids.filter((id) => /^[0-9a-f]{24}$/i.test(id));
     if (valid.length === 0 || !this.connection) return new Map();
     const docs = await this.connection
       .collection('work_external_accounts')
       .find(
-        { _id: { $in: valid.map((id) => new Types.ObjectId(id)) } },
+        { organizationId, _id: { $in: valid.map((id) => new Types.ObjectId(id)) } },
         { projection: { name: 1, kind: 1 } },
       )
       .toArray();

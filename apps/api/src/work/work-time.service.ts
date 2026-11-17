@@ -117,7 +117,10 @@ export class WorkTimeService {
             .find({ organizationId, _id: { $in: taskIds.map(oid) } }, { number: 1, title: 1 })
             .lean<{ _id: unknown; number: number; title: string }[]>()
             .exec(),
-      this.members.refs(docs.map((d) => d.userId)),
+      this.members.refs(
+        docs.map((d) => d.userId),
+        organizationId,
+      ),
     ]);
     const byId = new Map(tasks.map((t) => [String(t._id), t]));
     return docs.map((d) => ({
@@ -212,7 +215,7 @@ export class WorkTimeService {
             .find({ organizationId, _id: { $in: taskIds.map(oid) } }, { number: 1, title: 1 })
             .lean<{ _id: unknown; number: number; title: string }[]>()
             .exec(),
-      this.members.refs([...byMember.keys()]),
+      this.members.refs([...byMember.keys()], organizationId),
     ]);
     const taskInfo = new Map(tasks.map((t) => [String(t._id), t]));
     return {
@@ -508,7 +511,10 @@ export class WorkTimeService {
   // ── Taux horaires datés ──────────────────────────────────────────────────
 
   private async rateViews(docs: readonly WorkMemberRateLean[]): Promise<WorkMemberRateView[]> {
-    const refs = await this.members.refs(docs.map((d) => d.userId));
+    const refs = await this.members.refs(
+      docs.map((d) => d.userId),
+      docs[0]?.organizationId,
+    );
     return docs.map((d) => ({
       id: String(d._id),
       user: WorkMembersService.refOf(refs, d.userId),

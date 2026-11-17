@@ -124,10 +124,13 @@ export class WorkCommentsService {
             .find({ organizationId, _id: { $in: attachmentIds.map(oid) }, deletedAt: null })
             .lean<WorkAttachmentLean[]>()
             .exec();
-    const refs = await this.members.refs([
-      ...docs.flatMap((d) => [d.authorUserId, ...(d.mentionedUserIds ?? [])]),
-      ...attachments.map((a) => a.uploadedBy),
-    ]);
+    const refs = await this.members.refs(
+      [
+        ...docs.flatMap((d) => [d.authorUserId, ...(d.mentionedUserIds ?? [])]),
+        ...attachments.map((a) => a.uploadedBy),
+      ],
+      organizationId,
+    );
     const byId = new Map(attachments.map((a) => [String(a._id), a]));
     return docs.map((d) => ({
       id: String(d._id),
@@ -274,7 +277,10 @@ export class WorkCommentsService {
     newComment: boolean,
   ): Promise<void> {
     const taskId = String(task._id);
-    const who = WorkMembersService.refOf(await this.members.refs([actor.userId]), actor.userId);
+    const who = WorkMembersService.refOf(
+      await this.members.refs([actor.userId], organizationId),
+      actor.userId,
+    );
     const label = `#${task.number} ${task.title}`;
     await this.notifier.taskEvent({
       organizationId,
@@ -427,7 +433,9 @@ export class WorkCommentsService {
         'Seuls l’auteur, le chef de projet, son adjoint et les gestionnaires changent la visibilité d’un commentaire.',
       );
     }
-    const author = (await this.members.refs([current.authorUserId])).get(current.authorUserId);
+    const author = (await this.members.refs([current.authorUserId], organizationId)).get(
+      current.authorUserId,
+    );
     if (author?.external && body.visibility === 'internal') {
       conflict(
         'WORK_COMMENT_EXTERNAL_SHARED',

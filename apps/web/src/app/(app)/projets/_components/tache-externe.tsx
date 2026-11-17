@@ -7,7 +7,7 @@
 // les consultants du projet). Réglables par la gestion du projet ; lus par les autres.
 
 import type { WorkTaskDetail, WorkTaskExternalView } from '@lalanda/shared/work';
-import { Button, Field, Select, StatusPill, Switch } from '@lalanda/ui';
+import { Button, Field, Select, StatusPill, Switch, TextArea } from '@lalanda/ui';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { workExternalApi } from '@/lib/work-external-api';
@@ -30,6 +30,9 @@ export function TacheExterne({
   const [vue, setVue] = useState<WorkTaskExternalView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
+  // Revue B4 : retirer une validation client en cours sur un jalon exige un motif.
+  const [retrait, setRetrait] = useState<{ masquer: boolean } | null>(null);
+  const [motif, setMotif] = useState('');
 
   const charger = useCallback(() => {
     workExternalApi
@@ -64,6 +67,10 @@ export function TacheExterne({
   }
 
   const etat = etatValidationClient(vue.clientApproval.state);
+  const motifRequis =
+    detail.isMilestone &&
+    vue.clientApproval.required &&
+    (vue.clientApproval.state === 'pending' || vue.clientApproval.state === 'changes_requested');
   const options = [
     { value: AUCUN, label: 'Aucun consultant' },
     ...vue.consultants.map((c) => ({ value: c.userId, label: c.name })),
@@ -87,25 +94,73 @@ export function TacheExterne({
           <Switch
             checked={vue.clientVisible}
             disabled={!vue.canManage || envoi}
-            onChange={(v) =>
+            onChange={(v) => {
+              if (!v && motifRequis) {
+                setRetrait({ masquer: true });
+                return;
+              }
               void regler({
                 expectedRevision: vue.revision,
                 clientVisible: v,
                 ...(v ? {} : { clientApprovalRequired: false }),
-              })
-            }
+              });
+            }}
             label="Visible par le client"
             description="Le contact client voit le titre, l’échéance, l’état et les commentaires partagés — jamais de montant ni de temps."
           />
           <Switch
             checked={vue.clientApproval.required}
             disabled={!vue.canManage || envoi || !vue.clientVisible}
-            onChange={(v) =>
-              void regler({ expectedRevision: vue.revision, clientApprovalRequired: v })
-            }
+            onChange={(v) => {
+              if (!v && motifRequis) {
+                setRetrait({ masquer: false });
+                return;
+              }
+              void regler({ expectedRevision: vue.revision, clientApprovalRequired: v });
+            }}
             label="Validation client requise"
             description="Le client approuve ou demande des modifications. Pour un jalon facturable, le brouillon de facture attend son approbation."
           />
+          {retrait ? (
+            <div className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+              <Field
+                id={`${id}-motif`}
+                label="Motif du retrait de la validation client"
+                required
+                size="full"
+                hint="Ce jalon attend la validation du client : le motif est tracé."
+              >
+                <TextArea
+                  rows={2}
+                  maxLength={500}
+                  value={motif}
+                  onChange={(e) => setMotif(e.target.value)}
+                />
+              </Field>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={envoi || motif.trim() === ''}
+                  onClick={() => {
+                    void regler({
+                      expectedRevision: vue.revision,
+                      clientApprovalRequired: false,
+                      ...(retrait.masquer ? { clientVisible: false } : {}),
+                      reason: motif.trim(),
+                    }).then(() => {
+                      setRetrait(null);
+                      setMotif('');
+                    });
+                  }}
+                >
+                  Retirer la validation
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setRetrait(null)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          ) : null}
           {vue.clientApproval.required ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <StatusPill tone={etat.ton}>{etat.libelle}</StatusPill>

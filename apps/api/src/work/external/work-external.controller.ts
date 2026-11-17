@@ -215,12 +215,14 @@ export class WorkExternalController {
   @RequirePermission('work.read', 'purchase.read')
   async recap(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: Perms,
     @Param('accountId', WorkIdPipe) accountId: string,
     @Query() query: unknown,
   ): Promise<ConsultantRecapView> {
     const parsed = ConsultantRecapQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
-    return this.externals.recap(orgId, accountId, parsed.data);
+    return this.externals.recap(orgId, accountId, parsed.data, workActorOf(user, perms));
   }
 
   @Get('external-accounts/:accountId/time-recap.csv')
@@ -230,24 +232,33 @@ export class WorkExternalController {
   @RequirePermission('work.read', 'purchase.read')
   async recapCsv(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: Perms,
     @Param('accountId', WorkIdPipe) accountId: string,
     @Query() query: unknown,
   ): Promise<string> {
     const parsed = ConsultantRecapQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
-    return this.externals.recapCsv(orgId, accountId, parsed.data);
+    return this.externals.recapCsv(orgId, accountId, parsed.data, workActorOf(user, perms));
   }
 
   @Get('suppliers/:supplierId/consultants')
   @RequirePermission('work.read', 'purchase.read')
   async supplierConsultants(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: Perms,
     @Param('supplierId', WorkIdPipe) supplierId: string,
     @Query() query: unknown,
   ): Promise<SupplierConsultantsView> {
     const parsed = ConsultantRecapQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
-    return this.externals.supplierConsultants(orgId, supplierId, parsed.data);
+    return this.externals.supplierConsultants(
+      orgId,
+      supplierId,
+      parsed.data,
+      workActorOf(user, perms),
+    );
   }
 
   // ── Réglages externes d'une tâche ────────────────────────────────────────

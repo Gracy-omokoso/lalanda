@@ -12,6 +12,7 @@ import { OrganizationsModule } from '../../organizations/organizations.module.js
 import { WorkModule } from '../work.module.js';
 import { ExternalAuthGuard } from './external-auth.guard.js';
 import { PortalAuthController } from './portal-auth.controller.js';
+import { PortalOriginGuard } from './portal-origin.guard.js';
 import { PortalController } from './portal.controller.js';
 import { WorkExternalAuthService } from './work-external-auth.service.js';
 import { WorkExternalController } from './work-external.controller.js';
@@ -36,6 +37,7 @@ import { WorkPortalService } from './work-portal.service.js';
     WorkExternalAuthService,
     WorkPortalService,
     ExternalAuthGuard,
+    PortalOriginGuard,
     ExternalRequestIpThrottlerGuard,
     ExternalRequestEmailThrottlerGuard,
     ExternalVerifyIpThrottlerGuard,

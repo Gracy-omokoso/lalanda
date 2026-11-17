@@ -28,6 +28,7 @@ import type { Request, Response } from 'express';
 
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { cookieOf } from './external-auth.guard.js';
+import { PortalOriginGuard } from './portal-origin.guard.js';
 import { WorkExternalAuthService } from './work-external-auth.service.js';
 import {
   ExternalRequestEmailThrottlerGuard,
@@ -51,6 +52,8 @@ export function externalCookieOptions(expires?: Date): Record<string, unknown> {
 }
 
 @Controller('portal/auth')
+// B8 : origine `WEB_URL` et corps JSON pour toute écriture.
+@UseGuards(PortalOriginGuard)
 export class PortalAuthController {
   constructor(@Inject(WorkExternalAuthService) private readonly auth: WorkExternalAuthService) {}
 

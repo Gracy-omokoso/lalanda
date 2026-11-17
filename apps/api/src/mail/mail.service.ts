@@ -23,6 +23,7 @@ import {
   renderEmailVerification,
   renderExternalAccessCode,
   renderExternalInvitation,
+  renderExternalLockWarning,
   renderInvitation,
   renderMorningBrief,
   renderNormalizationAlert,
@@ -135,6 +136,13 @@ export interface ExternalAccessCodeMail {
   expiresInMinutes: number;
 }
 
+/** ADR-0078 (revue B2) : avertissement d'un verrouillage après trop d'échecs de code. */
+export interface ExternalLockWarningMail {
+  to: string;
+  name?: string | null | undefined;
+  lockedUntil: Date;
+}
+
 /** ADR-0078 : invitation d'un contact client ou d'un consultant sur un projet. */
 export interface ExternalInvitationMail {
   to: string;
@@ -167,6 +175,7 @@ export abstract class MailService {
   abstract sendWorkDigest(input: WorkDigestMail): Promise<MailDeliveryResult>;
   abstract sendExternalAccessCode(input: ExternalAccessCodeMail): Promise<MailDeliveryResult>;
   abstract sendExternalInvitation(input: ExternalInvitationMail): Promise<MailDeliveryResult>;
+  abstract sendExternalLockWarning(input: ExternalLockWarningMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -286,6 +295,9 @@ export class TemplatedMailService extends MailService {
   async sendExternalAccessCode(input: ExternalAccessCodeMail): Promise<MailDeliveryResult> {
     return this.transport.send({
       to: input.to,
+      // Revue de sécurité (B6) : ni adresse en clair ni objet dans les journaux.
+      redactInLogs: true,
+      redactLabel: '(code de l’espace externe)',
       ...renderExternalAccessCode({
         url: externalPortalUrl(),
         code: input.code,
@@ -298,12 +310,27 @@ export class TemplatedMailService extends MailService {
   async sendExternalInvitation(input: ExternalInvitationMail): Promise<MailDeliveryResult> {
     return this.transport.send({
       to: input.to,
+      redactInLogs: true,
+      redactLabel: '(invitation de l’espace externe)',
       ...renderExternalInvitation({
         url: externalPortalUrl(),
         organizationName: input.organizationName,
         projectName: input.projectName,
         kindLabel: input.kindLabel,
         name: input.name ?? null,
+      }),
+    });
+  }
+
+  async sendExternalLockWarning(input: ExternalLockWarningMail): Promise<MailDeliveryResult> {
+    return this.transport.send({
+      to: input.to,
+      redactInLogs: true,
+      redactLabel: '(avertissement de l’espace externe)',
+      ...renderExternalLockWarning({
+        url: externalPortalUrl(),
+        name: input.name ?? null,
+        lockedUntil: input.lockedUntil,
       }),
     });
   }

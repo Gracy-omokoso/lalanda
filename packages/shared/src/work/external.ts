@@ -49,6 +49,16 @@ export const WORK_EXTERNAL_AUTH = {
   verifiesPerIp: 30,
   /** Fenêtre des limites de débit, en millisecondes (15 minutes). */
   windowMs: 15 * 60_000,
+  /** Délai minimal entre deux codes d'une même adresse (un code vivant n'est pas remplacé). */
+  minRequestIntervalSeconds: 60,
+  /** Codes vivants au plus par adresse (le précédent reste valable). */
+  liveChallengesMax: 2,
+  /** Demandes de code par compte et par jour (plafond en base, au-dessus des seaux). */
+  codeRequestsPerDayMax: 30,
+  /** Échecs de code par compte et par jour avant verrouillage. */
+  failuresPerDayMax: 20,
+  /** Durée du verrouillage. */
+  lockHours: 24,
 } as const;
 
 /** Bornes des données (ADR-0078). */
@@ -266,6 +276,11 @@ export const PutTaskExternalSettingsBody = z
       .array(WorkId)
       .max(WORK_EXTERNAL_LIMITS.consultantCollaboratorsMax)
       .optional(),
+    /**
+     * Motif du retrait d'une validation client — OBLIGATOIRE pour un jalon dont la validation
+     * est en attente ou « modifications demandées » (revue de sécurité B4) ; tracé à l'audit.
+     */
+    reason: reason.optional(),
   })
   .strict()
   .superRefine((v, ctx) => {
@@ -459,6 +474,8 @@ export interface ConsultantRecapView {
   rows: ConsultantRecapRow[];
   totals: { currency: 'CDF' | 'USD'; minutes: number; amount: string }[];
   minutesWithoutRate: number;
+  /** Minutes sur des projets que l'appelant ne voit pas (ni détaillées ni valorisées). */
+  hiddenMinutes: number;
   /** Version du calcul (moteur). */
   version: string;
 }

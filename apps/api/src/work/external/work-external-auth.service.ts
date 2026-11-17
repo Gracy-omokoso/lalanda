@@ -23,10 +23,11 @@
 
 import {
   WORK_EXTERNAL_AUTH,
+  kinshasaDayOf,
   type PortalMeView,
   type PortalOrganizationChoice,
 } from '@lalanda/shared/work';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
 
@@ -82,6 +83,8 @@ export function sessionEnded(): never {
 
 @Injectable()
 export class WorkExternalAuthService {
+  private readonly logger = new Logger('WorkExternalAuth');
+
   constructor(
     @InjectModel(WorkExternalAccount.name)
     private readonly accounts: Model<WorkExternalAccountDocument>,
@@ -95,8 +98,27 @@ export class WorkExternalAuthService {
     @Inject(WorkExternalLifecycle) private readonly lifecycle: WorkExternalLifecycle,
   ) {}
 
-  /** Comptes UTILISABLES de l'adresse : actifs, fiche active, au moins un projet ouvert. */
-  private async usableAccounts(email: string): Promise<WorkExternalAccountLean[]> {
+  /** Travaux de demande de code en cours (après la réponse, B1) ; attendus par les tests. */
+  private readonly background = new Set<Promise<void>>();
+
+  /** Attend la fin des demandes de code traitées en arrière-plan (tests, arrêt propre). */
+  async settled(): Promise<void> {
+    await Promise.allSettled([...this.background]);
+  }
+
+  /** Compte verrouillé (trop d'échecs du jour, B2) ? */
+  private locked(account: WorkExternalAccountLean, now: Date): boolean {
+    return !!account.lockedUntil && new Date(account.lockedUntil).getTime() > now.getTime();
+  }
+
+  /**
+   * Comptes UTILISABLES de l'adresse : actifs, fiche active, au moins un projet ouvert, non
+   * verrouillés.
+   */
+  private async usableAccounts(
+    email: string,
+    now = new Date(),
+  ): Promise<WorkExternalAccountLean[]> {
     const docs = await this.accounts
       .find({ email, status: 'active' })
       .limit(20)
@@ -104,6 +126,7 @@ export class WorkExternalAuthService {
       .exec();
     const out: WorkExternalAccountLean[] = [];
     for (const d of docs) {
+      if (this.locked(d, now)) continue;
       if (!(await this.lifecycle.ensureUsable(d))) continue;
       if ((await this.lifecycle.openProjectsOf(d.organizationId, String(d._id))).length === 0) {
         continue;
@@ -113,20 +136,75 @@ export class WorkExternalAuthService {
     return out;
   }
 
-  /** `POST /portal/auth/request-code` — réponse identique dans tous les cas. */
-  async requestCode(email: string, now = new Date()): Promise<{ sent: true }> {
-    const accounts = await this.usableAccounts(email);
-    // Les codes encore valables de l'adresse ne servent plus (un seul code vivant).
-    await this.challenges
-      .updateMany({ email, consumedAt: null }, { $set: { consumedAt: now } })
+  /**
+   * `POST /portal/auth/request-code` — réponse identique dans tous les cas, rendue AVANT tout
+   * accès à la base (revue B1) : le travail (comptes, défi, e-mail, audit) se fait ensuite,
+   * en arrière-plan ; la durée de la réponse ne dit rien de l'existence d'un compte.
+   */
+  requestCode(email: string, now = new Date()): { sent: true } {
+    const work = this.processCodeRequest(email, now)
+      .catch((err: unknown) => {
+        this.logger.error(
+          `Demande de code de l'espace externe en échec : ${err instanceof Error ? err.message : String(err)}`,
+        );
+      })
+      .finally(() => this.background.delete(work));
+    this.background.add(work);
+    return { sent: true };
+  }
+
+  private async processCodeRequest(email: string, now: Date): Promise<void> {
+    const accounts = await this.usableAccounts(email, now);
+    if (accounts.length === 0) return;
+    // M2 : une nouvelle demande ne tue plus le code vivant. Délai minimal entre deux codes
+    // (60 s) : dans ce délai, rien n'est créé ni envoyé (même réponse au demandeur).
+    const latest = await this.challenges
+      .findOne({ email, consumedAt: null, expiresAt: { $gt: now } })
+      .sort({ createdAt: -1 })
+      .lean<WorkExternalChallengeLean>()
       .exec();
-    if (accounts.length === 0) return { sent: true };
+    if (
+      latest &&
+      now.getTime() - new Date(latest.createdAt).getTime() <
+        WORK_EXTERNAL_AUTH.minRequestIntervalSeconds * 1000
+    ) {
+      return;
+    }
+    // Plafond par compte et par jour, tenu en base (au-dessus des seaux par adresse et IP).
+    const day = kinshasaDayOf(now);
+    const allowed: WorkExternalAccountLean[] = [];
+    for (const a of accounts) {
+      const count = a.codeRequestDay === day ? (a.codeRequestCount ?? 0) : 0;
+      await this.accounts
+        .updateOne(
+          { _id: a._id },
+          { $set: { codeRequestDay: day, codeRequestCount: count + 1 } },
+          { timestamps: false },
+        )
+        .exec();
+      if (count + 1 > WORK_EXTERNAL_AUTH.codeRequestsPerDayMax) {
+        if (count === WORK_EXTERNAL_AUTH.codeRequestsPerDayMax) {
+          await this.audit.record({
+            organizationId: a.organizationId,
+            actorUserId: String(a._id),
+            actorRole: externalAuditRole(a.kind),
+            action: 'work.external.code_requests_capped',
+            targetType: 'work_external_account',
+            targetId: String(a._id),
+            metadata: { day, max: WORK_EXTERNAL_AUTH.codeRequestsPerDayMax },
+          });
+        }
+        continue;
+      }
+      allowed.push(a);
+    }
+    if (allowed.length === 0) return;
     const code = newExternalCode();
     const _id = new Types.ObjectId();
     await this.challenges.create({
       _id,
       email,
-      accountIds: accounts.map((a) => String(a._id)),
+      accountIds: allowed.map((a) => String(a._id)),
       codeHash: hashExternalCode(String(_id), code),
       expiresAt: new Date(now.getTime() + WORK_EXTERNAL_AUTH.codeTtlMinutes * 60_000),
       attempts: 0,
@@ -134,15 +212,25 @@ export class WorkExternalAuthService {
       createdAt: now,
       _schemaVersion: 1,
     });
-    // Envoi NON attendu : la durée de la réponse ne trahit pas l'existence d'un compte
-    // (`MailService` ne lève jamais ; un échec d'envoi est journalisé par le transport).
-    void this.mail.sendExternalAccessCode({
+    // Au plus deux codes vivants : les plus anciens ne servent plus.
+    const live = await this.challenges
+      .find({ email, consumedAt: null }, { _id: 1 })
+      .sort({ createdAt: -1, _id: -1 })
+      .lean<{ _id: Types.ObjectId }[]>()
+      .exec();
+    const stale = live.slice(WORK_EXTERNAL_AUTH.liveChallengesMax).map((c) => c._id);
+    if (stale.length > 0) {
+      await this.challenges
+        .updateMany({ _id: { $in: stale }, consumedAt: null }, { $set: { consumedAt: now } })
+        .exec();
+    }
+    await this.mail.sendExternalAccessCode({
       to: email,
       code,
-      name: accounts[0]!.name,
+      name: allowed[0]!.name,
       expiresInMinutes: WORK_EXTERNAL_AUTH.codeTtlMinutes,
     });
-    for (const a of accounts) {
+    for (const a of allowed) {
       await this.audit.record({
         organizationId: a.organizationId,
         actorUserId: String(a._id),
@@ -153,7 +241,53 @@ export class WorkExternalAuthService {
         metadata: { challengeId: String(_id) },
       });
     }
-    return { sent: true };
+  }
+
+  /**
+   * B2 : un échec de code compte pour chaque compte du défi ; au-delà de 20 par jour, le
+   * compte est verrouillé 24 h (audit, e-mail d'avertissement au titulaire).
+   */
+  private async recordFailure(challenge: WorkExternalChallengeLean, now: Date): Promise<void> {
+    const ids = challenge.accountIds.filter((i) => /^[0-9a-f]{24}$/i.test(i));
+    if (ids.length === 0) return;
+    const day = kinshasaDayOf(now);
+    const accounts = await this.accounts
+      .find({ _id: { $in: ids.map((i) => new Types.ObjectId(i)) } })
+      .lean<WorkExternalAccountLean[]>()
+      .exec();
+    for (const a of accounts) {
+      const count = (a.authFailureDay === day ? (a.authFailureCount ?? 0) : 0) + 1;
+      const lock = count >= WORK_EXTERNAL_AUTH.failuresPerDayMax && !this.locked(a, now);
+      const lockedUntil = new Date(now.getTime() + WORK_EXTERNAL_AUTH.lockHours * 3_600_000);
+      await this.accounts
+        .updateOne(
+          { _id: a._id },
+          {
+            $set: {
+              authFailureDay: day,
+              authFailureCount: count,
+              ...(lock ? { lockedUntil } : {}),
+            },
+          },
+          { timestamps: false },
+        )
+        .exec();
+      if (!lock) continue;
+      await this.audit.record({
+        organizationId: a.organizationId,
+        actorUserId: String(a._id),
+        actorRole: externalAuditRole(a.kind),
+        action: 'work.external.locked',
+        targetType: 'work_external_account',
+        targetId: String(a._id),
+        metadata: { failures: count, lockedUntil: lockedUntil.toISOString() },
+      });
+      // Les codes encore vivants de l'adresse tombent avec le verrou.
+      await this.challenges
+        .updateMany({ email: challenge.email, consumedAt: null }, { $set: { consumedAt: now } })
+        .exec();
+      await this.mail.sendExternalLockWarning({ to: a.email, name: a.name, lockedUntil });
+    }
   }
 
   /**
@@ -166,37 +300,51 @@ export class WorkExternalAuthService {
     organizationId: string | undefined,
     now = new Date(),
   ): Promise<{ token: string; expiresAt: Date; me: PortalMeView }> {
-    const challenge = await this.challenges
-      .findOne({ email, consumedAt: null, expiresAt: { $gt: now } })
-      .sort({ createdAt: -1 })
-      .lean<WorkExternalChallengeLean>()
+    // Au plus deux codes vivants (M2), essais restants seulement (B3).
+    const candidates = await this.challenges
+      .find({
+        email,
+        consumedAt: null,
+        expiresAt: { $gt: now },
+        attempts: { $lt: WORK_EXTERNAL_AUTH.maxAttempts },
+      })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(WORK_EXTERNAL_AUTH.liveChallengesMax)
+      .lean<WorkExternalChallengeLean[]>()
       .exec();
-    if (!challenge) {
+    if (candidates.length === 0) {
       // Même coût qu'une vraie comparaison, même réponse.
       sameHash(hashExternalCode('0'.repeat(24), code), '00');
       codeInvalid();
     }
-    const id = String(challenge._id);
-    if (!sameHash(hashExternalCode(id, code), challenge.codeHash)) {
-      const attempts = challenge.attempts + 1;
+    // Toutes les empreintes sont comparées (temps constant, pas d'arrêt au premier égal).
+    let challenge: WorkExternalChallengeLean | undefined;
+    for (const c of candidates) {
+      if (sameHash(hashExternalCode(String(c._id), code), c.codeHash) && !challenge) challenge = c;
+    }
+    if (!challenge) {
+      const latest = candidates[0]!;
+      const attempts = latest.attempts + 1;
       await this.challenges
         .updateOne(
-          { _id: challenge._id, consumedAt: null },
+          { _id: latest._id, consumedAt: null },
           {
             $inc: { attempts: 1 },
             ...(attempts >= WORK_EXTERNAL_AUTH.maxAttempts ? { $set: { consumedAt: now } } : {}),
           },
         )
         .exec();
-      await this.auditForChallenge(challenge, 'work.external.code_failed', {
-        challengeId: id,
+      await this.auditForChallenge(latest, 'work.external.code_failed', {
+        challengeId: String(latest._id),
         attempts,
         exhausted: attempts >= WORK_EXTERNAL_AUTH.maxAttempts,
       });
+      await this.recordFailure(latest, now);
       codeInvalid();
     }
-    // Code juste : comptes encore utilisables parmi ceux du défi.
-    const accounts = (await this.usableAccounts(email)).filter((a) =>
+    const id = String(challenge._id);
+    // Code juste : comptes encore utilisables (et non verrouillés) parmi ceux du défi.
+    const accounts = (await this.usableAccounts(email, now)).filter((a) =>
       challenge.accountIds.includes(String(a._id)),
     );
     if (accounts.length === 0) {
@@ -221,11 +369,15 @@ export class WorkExternalAuthService {
         { organizations: choices },
       );
     }
-    // Consommation ATOMIQUE : deux vérifications concurrentes n'ouvrent qu'une session.
+    // Consommation ATOMIQUE : deux vérifications concurrentes n'ouvrent qu'une session ; le
+    // code jumeau éventuel tombe aussi (un code juste consomme les codes vivants).
     const consumed = await this.challenges
       .updateOne({ _id: challenge._id, consumedAt: null }, { $set: { consumedAt: now } })
       .exec();
     if (consumed.modifiedCount !== 1) codeInvalid();
+    await this.challenges
+      .updateMany({ email, consumedAt: null }, { $set: { consumedAt: now } })
+      .exec();
 
     const token = newSessionToken();
     const expiresAt = new Date(now.getTime() + WORK_EXTERNAL_AUTH.sessionHours * 3_600_000);
@@ -240,7 +392,11 @@ export class WorkExternalAuthService {
       _schemaVersion: 1,
     });
     await this.accounts
-      .updateOne({ _id: account._id }, { $set: { lastLoginAt: now } }, { timestamps: false })
+      .updateOne(
+        { _id: account._id },
+        { $set: { lastLoginAt: now, authFailureCount: 0 } },
+        { timestamps: false },
+      )
       .exec();
     await this.audit.record({
       organizationId: account.organizationId,

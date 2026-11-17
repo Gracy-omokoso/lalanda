@@ -81,6 +81,26 @@ export class WorkExternalAccount {
   @Prop({ type: Date, default: null })
   lastLoginAt!: Date | null;
 
+  // ── Revue de sécurité (M2, B2) : compteurs du jour et verrou, tenus en base ──
+
+  /** Jour (Kinshasa) des échecs de code comptés. */
+  @Prop({ type: String, default: null })
+  authFailureDay?: string | null;
+
+  @Prop({ type: Number, default: 0 })
+  authFailureCount?: number;
+
+  /** Connexion suspendue jusqu'à cette date (trop d'échecs du jour). */
+  @Prop({ type: Date, default: null })
+  lockedUntil?: Date | null;
+
+  /** Jour (Kinshasa) des demandes de code comptées. */
+  @Prop({ type: String, default: null })
+  codeRequestDay?: string | null;
+
+  @Prop({ type: Number, default: 0 })
+  codeRequestCount?: number;
+
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;
 

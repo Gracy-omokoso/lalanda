@@ -129,6 +129,11 @@ export function ConsultantsFournisseur({
               </tbody>
             </table>
           )}
+          {c.recap.hiddenMinutes > 0 ? (
+            <p className="text-xs text-[var(--foreground-muted)]">
+              {duree(c.recap.hiddenMinutes)} sur des projets que vous ne voyez pas (non détaillés).
+            </p>
+          ) : null}
           {c.recap.minutesWithoutRate > 0 ? (
             <Alert tone="warning">
               {duree(c.recap.minutesWithoutRate)} sans taux d’achat : posez le taux du consultant

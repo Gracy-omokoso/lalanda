@@ -645,3 +645,26 @@ export function renderExternalInvitation(input: {
     subject: `${PRODUCT} — ${input.organizationName} vous ouvre le projet « ${input.projectName} »`,
   };
 }
+
+/**
+ * ADR-0078 (revue de sécurité B2) : l'accès à l'espace externe est suspendu après trop de
+ * codes faux dans la journée. Le message ne dit ni d'où viennent les essais, ni le code.
+ */
+export function renderExternalLockWarning(input: {
+  url: string;
+  name?: string | null;
+  lockedUntil: Date;
+}): RenderedMail {
+  const rendered = layout({
+    heading: 'Connexion suspendue',
+    paragraphs: [
+      greeting(input.name),
+      `Trop de codes erronés ont été saisis pour votre espace ${PRODUCT} aujourd'hui. Par précaution, la connexion est suspendue jusqu'au ${formatDateFr(input.lockedUntil)}.`,
+      "Si ces essais ne viennent pas de vous, quelqu'un connaît peut-être votre adresse : aucun accès n'a été ouvert sans code valable. Prévenez votre interlocuteur dans l'organisation.",
+    ],
+    ctaLabel: 'Ouvrir la page de connexion',
+    ctaUrl: input.url,
+    footnotes: ['Vous pourrez demander un nouveau code après cette date.'],
+  });
+  return { ...rendered, subject: `${PRODUCT} — connexion à votre espace suspendue` };
+}

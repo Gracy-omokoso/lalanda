@@ -507,6 +507,29 @@ describe('document de vente (ADR-0042)', () => {
   });
 });
 
+describe('espace externe (ADR-0078, revue B6)', () => {
+  it('journaux : adresse masquée, libellé propre à la place de l’objet (code inclus)', async () => {
+    const { Logger } = await import('@nestjs/common');
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      await new SmtpMailTransport(new StubCredentials(null)).send({
+        ...message,
+        to: 'contact.client@exemple.cd',
+        subject: 'Lalanda — votre code de connexion 123456',
+        redactInLogs: true,
+        redactLabel: '(code de l’espace externe)',
+      });
+      const ligne = String(warn.mock.calls[0]?.[0] ?? '');
+      expect(ligne).toContain('c***@exemple.cd');
+      expect(ligne).toContain('(code de l’espace externe)');
+      expect(ligne).not.toContain('contact.client');
+      expect(ligne).not.toContain('123456');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
 describe('maskAddress et withDisplayName', () => {
   it('masque et compose sans changer l’adresse', async () => {
     const { maskAddress, withDisplayName } = await import('./mail.transport.js');

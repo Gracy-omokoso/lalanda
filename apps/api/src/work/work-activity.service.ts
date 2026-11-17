@@ -76,7 +76,10 @@ export class WorkActivityService {
       .lean<WorkActivityLean[]>()
       .exec();
     const page = docs.slice(0, limit);
-    const refs = await this.members.refs(page.map((d) => d.actorUserId));
+    const refs = await this.members.refs(
+      page.map((d) => d.actorUserId),
+      organizationId,
+    );
     const last = page[page.length - 1];
     return {
       items: page.map((d) => ({

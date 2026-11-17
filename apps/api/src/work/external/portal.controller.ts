@@ -48,6 +48,7 @@ import {
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { WorkIdPipe } from '../work.common.js';
 import { CurrentExternal, ExternalAuthGuard } from './external-auth.guard.js';
+import { PortalOriginGuard } from './portal-origin.guard.js';
 import { WorkExternalAuthService, type ExternalContext } from './work-external-auth.service.js';
 import { WorkPortalService } from './work-portal.service.js';
 
@@ -55,7 +56,7 @@ import { WorkPortalService } from './work-portal.service.js';
 const PortalCreateTimeBody = CreateTimeEntryBody.omit({ userId: true });
 
 @Controller('portal')
-@UseGuards(ExternalAuthGuard)
+@UseGuards(PortalOriginGuard, ExternalAuthGuard)
 export class PortalController {
   constructor(
     @Inject(WorkPortalService) private readonly portal: WorkPortalService,

@@ -41,6 +41,8 @@ export interface MailMessage {
    * transport masque le destinataire et tait l'objet. L'audit garde le détail.
    */
   redactInLogs?: boolean;
+  /** Libellé journalisé à la place de l'objet quand `redactInLogs` (défaut : document de vente). */
+  redactLabel?: string;
 }
 
 /** Pièce jointe ordinaire (non référencée dans le HTML). */

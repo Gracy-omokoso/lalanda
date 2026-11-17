@@ -125,7 +125,7 @@ export class WorkTimesheetsService {
       { today, attendance },
     );
     const [refs, names, scope] = await Promise.all([
-      this.members.refs([userId]),
+      this.members.refs([userId], organizationId),
       this.projects.namesOf(
         organizationId,
         result.projects.map((p) => p.projectId),

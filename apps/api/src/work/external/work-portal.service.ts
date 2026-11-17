@@ -249,7 +249,10 @@ export class WorkPortalService {
   }
 
   private async leadNames(projects: readonly WorkProjectLean[]): Promise<Map<string, string>> {
-    const refs = await this.members.refs(projects.map((p) => p.ownerUserId ?? null));
+    const refs = await this.members.refs(
+      projects.map((p) => p.ownerUserId ?? null),
+      projects[0]?.organizationId,
+    );
     return new Map(
       projects
         .filter((p) => p.ownerUserId)
@@ -321,10 +324,10 @@ export class WorkPortalService {
     project: WorkProjectLean,
     docs: readonly WorkCommentLean[],
   ): Promise<PortalCommentView[]> {
-    const refs = await this.members.refs([
-      project.ownerUserId ?? null,
-      ...docs.map((d) => d.authorUserId),
-    ]);
+    const refs = await this.members.refs(
+      [project.ownerUserId ?? null, ...docs.map((d) => d.authorUserId)],
+      ctx.organizationId,
+    );
     return docs.map((d) => {
       const ref = WorkMembersService.refOf(refs, d.authorUserId);
       const name =

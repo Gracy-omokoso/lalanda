@@ -351,7 +351,10 @@ export class ProjectMarginService {
 
     let byMember: ProjectMarginView['byMember'] = null;
     if (actorCan(actor, 'treasury.manage')) {
-      const refs = await this.members.refs(result.byMember.map((m) => m.userId));
+      const refs = await this.members.refs(
+        result.byMember.map((m) => m.userId),
+        organizationId,
+      );
       byMember = result.byMember.map((m) => ({
         user: WorkMembersService.refOf(refs, m.userId),
         currency: m.currency,

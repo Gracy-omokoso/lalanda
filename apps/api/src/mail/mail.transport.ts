@@ -116,7 +116,9 @@ export class SmtpMailTransport extends MailTransport {
     const creds = await this.credentials.resolve();
     // ADR-0042 § 7 : adresse masquée et objet tu pour un document envoyé à un client.
     const to = message.redactInLogs ? maskAddress(message.to) : message.to;
-    const subject = message.redactInLogs ? '(document de vente)' : `"${message.subject}"`;
+    const subject = message.redactInLogs
+      ? (message.redactLabel ?? '(document de vente)')
+      : `"${message.subject}"`;
 
     if (!creds) {
       // Repli : ni jeton ni corps dans le journal (cf. en-tête de fichier).
