@@ -2037,8 +2037,9 @@ export class WorkTasksService {
       });
     }
     // ADR-0079 § 3 : terminée ou rouverte — le chef, l'adjoint et les abonnés (le
-    // responsable et les collaborateurs ont déjà « statut changé »).
-    if (nowDone !== current.done) {
+    // responsable et les collaborateurs ont déjà « statut changé »). Un jalon terminé
+    // s'annonce par « jalon atteint » (ci-dessous), pas deux fois.
+    if (nowDone !== current.done && !(nowDone && current.isMilestone)) {
       const concerned = new Set(
         [current.assigneeUserId, ...(current.collaboratorUserIds ?? [])].filter(Boolean),
       );

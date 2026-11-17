@@ -87,7 +87,7 @@ seule — à revoir avec l'expert.*
 | Tâches | créée (`work.task_created`, **nouveau**) | chef, adjoint | Atténué · info |
 | | assignée (`work.task_assigned`) | nouveau responsable | Essentiel · urgent |
 | | échéance modifiée (`work.task_due_date_changed`, **nouveau**) | responsable, collaborateurs, chef, adjoint | Essentiel · info |
-| | terminée (`work.task_completed`, **nouveau**) | chef, adjoint, abonnés (hors responsable et collaborateurs) | Atténué · info |
+| | terminée (`work.task_completed`, **nouveau**) — un jalon s'annonce par « jalon atteint » | chef, adjoint, abonnés (hors responsable et collaborateurs) | Atténué · info |
 | | rouverte (`work.task_reopened`, **nouveau**) | chef, adjoint (hors responsable) | Atténué · info |
 | | statut (colonne) changé (`work.task_status_changed`) | responsable, collaborateurs | Essentiel · info |
 | | échéance proche (`work.task_due_soon`) | responsable | Essentiel · important |

@@ -373,7 +373,10 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
       await job.run(now);
       await job.run(now);
       await job.run(now);
-      const mine = () => f.notifications.filter((n) => n.source.entityId === soon.id);
+      // ADR-0079 § 3 : changer l'échéance notifie aussi (geste, `actorUserId` posé) ; seuls
+      // les RAPPELS (sans auteur) sont comptés ici.
+      const mine = () =>
+        f.notifications.filter((n) => n.source.entityId === soon.id && n.actorUserId === null);
       expect(mine().map((n) => n.kind)).toEqual(['work.task_due_soon']);
       expect(mine()[0]!.dedupeKey).toBe(`work.task_due_soon:${soon.id}:2026-10-30`);
       expect(mine()[0]!.actorUserId).toBeNull();
