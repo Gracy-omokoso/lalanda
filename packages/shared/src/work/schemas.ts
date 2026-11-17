@@ -607,7 +607,12 @@ const commentFields = {
 
 /** `POST /work/tasks/:taskId/comments`. Une mention s'écrit `@[userId]` dans le texte. */
 export const CreateWorkCommentBody = z
-  .object({ ...commentFields, attachmentIds: idList(WORK_LIMITS.commentAttachmentsMax).optional() })
+  .object({
+    ...commentFields,
+    attachmentIds: idList(WORK_LIMITS.commentAttachmentsMax).optional(),
+    // ADR-0078 § 1.4 : absent → `internal` (jamais vu de l'espace externe).
+    visibility: z.enum(['internal', 'shared'], fr('Visibilité : internal ou shared.')).optional(),
+  })
   .strict();
 export type CreateWorkCommentBody = z.output<typeof CreateWorkCommentBody>;
 

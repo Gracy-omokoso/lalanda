@@ -435,6 +435,32 @@ export class WorkTaskApprovalDoc {
 }
 const WorkTaskApprovalSchema = SchemaFactory.createForClass(WorkTaskApprovalDoc);
 
+/** ADR-0078 § 1.5 : validation d'un livrable par le client (absente : aucune). */
+@Schema({ _id: false, strict: true })
+export class WorkTaskClientApprovalDoc {
+  @Prop({ type: Boolean, required: true, default: false })
+  required!: boolean;
+
+  @Prop({
+    type: String,
+    required: true,
+    enum: ['none', 'pending', 'approved', 'changes_requested'],
+    default: 'none',
+  })
+  state!: 'none' | 'pending' | 'approved' | 'changes_requested';
+
+  /** Compte externe (contact client) qui a décidé. */
+  @Prop({ type: String, default: null })
+  decidedBy!: string | null;
+
+  @Prop({ type: Date, default: null })
+  decidedAt!: Date | null;
+
+  @Prop({ type: String, default: null })
+  reason!: string | null;
+}
+const WorkTaskClientApprovalSchema = SchemaFactory.createForClass(WorkTaskClientApprovalDoc);
+
 @Schema({ collection: 'work_tasks', timestamps: true, strict: true, minimize: false })
 export class WorkTask {
   @Prop({ type: String, required: true })
@@ -532,6 +558,24 @@ export class WorkTask {
   @Prop({ type: WorkTaskRemindersSchema, default: () => ({}) })
   reminders!: WorkTaskReminders;
 
+  // ── ADR-0078 : membres externes (champs additifs, absents = valeurs par défaut) ──
+
+  /** § 1.3 : visible dans l'espace du client (absent : non). */
+  @Prop({ type: Boolean, default: undefined })
+  clientVisible?: boolean;
+
+  /** § 1.5 : validation par le client (absent : aucune). */
+  @Prop({ type: WorkTaskClientApprovalSchema, default: undefined })
+  clientApproval?: WorkTaskClientApprovalDoc | null;
+
+  /** § 2 : consultant responsable (compte externe), en plus du responsable interne. */
+  @Prop({ type: String, default: undefined })
+  consultantAssigneeId?: string | null;
+
+  /** § 2 : consultants collaborateurs (comptes externes). */
+  @Prop({ type: [String], default: undefined })
+  consultantCollaboratorIds?: string[];
+
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;
 
@@ -564,6 +608,15 @@ WorkTaskSchema.index({
   'approval.pendingApproverUserId': 1,
   'approval.state': 1,
 });
+// ADR-0078 § 2 : tâches d'un consultant (espace externe).
+WorkTaskSchema.index(
+  { organizationId: 1, consultantAssigneeId: 1 },
+  { partialFilterExpression: { consultantAssigneeId: { $type: 'string' } } },
+);
+WorkTaskSchema.index(
+  { organizationId: 1, consultantCollaboratorIds: 1 },
+  { partialFilterExpression: { consultantCollaboratorIds: { $type: 'array' } } },
+);
 
 // ── Statut déclaré d'un projet (ADR-0076 § 5, en ajout seulement) ───────────
 
@@ -630,6 +683,10 @@ export class WorkComment {
 
   @Prop({ type: Date, default: null })
   deletedAt!: Date | null;
+
+  /** ADR-0078 § 1.4 : `shared` = vu de l'espace externe ; absent = `internal`. */
+  @Prop({ type: String, enum: ['internal', 'shared'], default: undefined })
+  visibility?: 'internal' | 'shared';
 
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;

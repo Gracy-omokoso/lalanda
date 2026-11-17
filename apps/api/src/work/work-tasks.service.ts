@@ -641,6 +641,10 @@ export class WorkTasksService {
       checklistTotal: (d.checklist ?? []).length,
       approval: approvalSummaryOf(d),
       createdBy: d.createdBy,
+      // ADR-0078 : visibilité client, validation client, consultant responsable.
+      clientVisible: d.clientVisible === true,
+      clientApprovalState: d.clientApproval?.required ? d.clientApproval.state : 'none',
+      consultantAssigneeId: d.consultantAssigneeId ?? null,
       // ADR-0045 — H5 (§ 6.2) : présent seulement avec le module RH.
       ...(ctx.absences === null
         ? {}

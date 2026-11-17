@@ -873,6 +873,14 @@ export class WorkBillingService {
         'Ce jalon est à valider : son brouillon de facture se prépare après l’approbation.',
       );
     }
+    // ADR-0078 § 1.5 : un jalon à « validation client requise » ne se facture qu'après
+    // l'approbation du client (en plus de l'approbation interne d'ADR-0076).
+    if (task.clientApproval?.required && task.clientApproval.state !== 'approved') {
+      conflict(
+        'WORK_MILESTONE_NOT_CLIENT_APPROVED',
+        'Ce jalon attend la validation du client : son brouillon de facture se prépare après son approbation.',
+      );
+    }
     // ADR-0077 O3 : un contrat à échéancier ou à abonnement facture lui-même.
     const billedBy = await contractBillsItself(this.connection, organizationId, task.projectId);
     if (billedBy) {

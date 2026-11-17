@@ -296,16 +296,23 @@ export class WorkTimeService {
     }
   }
 
+  /**
+   * ADR-0078 § 2.3 : `opts.external` — saisie d'un CONSULTANT depuis l'espace externe,
+   * pour lui-même (`actor.userId` = son compte externe). L'appelant (service de l'espace
+   * externe) a déjà vérifié que la tâche est la sienne ; l'appartenance à l'organisation
+   * n'est alors pas exigée. Mêmes règles sinon : date, 1 440 minutes, verrou de semaine.
+   */
   async create(
     organizationId: string,
     taskId: string,
     body: CreateTimeEntryBody,
     actor: WorkActor,
+    opts: { external?: boolean } = {},
   ): Promise<TimeEntryView> {
     const { task } = await this.taskService.requireWritable(organizationId, taskId);
-    const userId = body.userId ?? actor.userId;
+    const userId = opts.external ? actor.userId : (body.userId ?? actor.userId);
     this.assertForOther(actor, userId);
-    await this.members.requireMember(organizationId, userId);
+    if (!opts.external) await this.members.requireMember(organizationId, userId);
     this.assertNotFuture(body.workedOn);
     const id = await this.inTransaction(async (session) => {
       await this.timesheets.assertWeekOpen(organizationId, userId, body.workedOn, session);
@@ -353,9 +360,15 @@ export class WorkTimeService {
     entryId: string,
     body: UpdateTimeEntryBody,
     actor: WorkActor,
+    opts: { external?: boolean } = {},
   ): Promise<TimeEntryView> {
     const current = await this.requireOwn(organizationId, entryId);
     this.assertForOther(actor, current.userId);
+    // ADR-0078 § 4 (correctif d'ADR-0076/0077) : le Lecteur du projet ne modifie plus ses
+    // saisies existantes sur ce projet (seule la création était refusée).
+    if (!opts.external) {
+      await this.taskService.assertCanLogTime(organizationId, current.taskId, actor);
+    }
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
     await this.taskService.requireWritable(organizationId, current.taskId);
     const workedOn = body.workedOn ?? current.workedOn;
@@ -420,9 +433,18 @@ export class WorkTimeService {
     return (await this.views(organizationId, [await this.requireOwn(organizationId, entryId)]))[0]!;
   }
 
-  async remove(organizationId: string, entryId: string, actor: WorkActor): Promise<void> {
+  async remove(
+    organizationId: string,
+    entryId: string,
+    actor: WorkActor,
+    opts: { external?: boolean } = {},
+  ): Promise<void> {
     const current = await this.requireOwn(organizationId, entryId);
     this.assertForOther(actor, current.userId);
+    // ADR-0078 § 4 : ni suppression par un Lecteur du projet.
+    if (!opts.external) {
+      await this.taskService.assertCanLogTime(organizationId, current.taskId, actor);
+    }
     await this.taskService.requireWritable(organizationId, current.taskId);
     const removed = await this.inTransaction(async (session) => {
       await this.timesheets.assertWeekOpen(

@@ -109,6 +109,14 @@ export const WORK_ACTIVITY_KINDS = [
   'task.approval_approved',
   'task.approval_changes_requested',
   'task.approval_rejected',
+  // ADR-0078 : membres externes, validation par le client, visibilité des commentaires.
+  'project.external_member_added',
+  'project.external_member_removed',
+  'task.external_settings_changed',
+  'task.client_approval_approved',
+  'task.client_approval_changes_requested',
+  'task.client_approval_reset',
+  'comment.visibility_changed',
 ] as const;
 export type WorkActivityKind = (typeof WORK_ACTIVITY_KINDS)[number];
 

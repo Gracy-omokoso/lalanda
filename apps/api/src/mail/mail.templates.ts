@@ -588,3 +588,60 @@ export function renderSalesDocumentMail(input: SalesDocumentMailContent): Render
 
   return { subject: input.subject, html, text };
 }
+
+/**
+ * ADR-0078 § 3 : code de connexion à l'espace externe (contact client, consultant).
+ *
+ * Envoyé seulement à une adresse qui a un compte externe ACTIF ; la réponse de l'API est
+ * la même dans tous les cas. Le code est dans le message (c'est son objet), jamais dans
+ * le lien. Le message ne nomme ni organisation, ni projet, ni montant.
+ */
+export function renderExternalAccessCode(input: {
+  url: string;
+  code: string;
+  name?: string | null;
+  expiresInMinutes: number;
+}): RenderedMail {
+  const rendered = layout({
+    heading: 'Votre code de connexion',
+    paragraphs: [
+      greeting(input.name),
+      `Voici votre code pour ouvrir votre espace ${PRODUCT} : ${input.code}`,
+      'Saisissez-le sur la page de connexion. Un nouveau code est demandé à chaque connexion.',
+    ],
+    ctaLabel: 'Ouvrir la page de connexion',
+    ctaUrl: input.url,
+    footnotes: [
+      `Ce code est valable ${input.expiresInMinutes} minutes et ne sert qu'une seule fois.`,
+      "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : personne n'entre sans ce code.",
+    ],
+  });
+  return { ...rendered, subject: `${PRODUCT} — votre code de connexion` };
+}
+
+/** ADR-0078 § 1.1 et § 2 : invitation d'un membre externe sur un projet. */
+export function renderExternalInvitation(input: {
+  url: string;
+  organizationName: string;
+  projectName: string;
+  kindLabel: string;
+  name?: string | null;
+}): RenderedMail {
+  const rendered = layout({
+    heading: `${input.organizationName} vous ouvre un projet`,
+    paragraphs: [
+      greeting(input.name),
+      `« ${input.organizationName} » vous invite sur le projet « ${input.projectName} » (${input.kindLabel.toLowerCase()}).`,
+      `Pour vous connecter, saisissez cette adresse sur la page de connexion : ${PRODUCT} vous enverra un code par e-mail à chaque connexion. Aucun mot de passe n'est nécessaire.`,
+    ],
+    ctaLabel: 'Ouvrir mon espace',
+    ctaUrl: input.url,
+    footnotes: [
+      "Cette invitation n'est valable que pour cette adresse. Si vous ne connaissez pas cette organisation, ignorez ce message.",
+    ],
+  });
+  return {
+    ...rendered,
+    subject: `${PRODUCT} — ${input.organizationName} vous ouvre le projet « ${input.projectName} »`,
+  };
+}

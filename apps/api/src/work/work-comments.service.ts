@@ -14,6 +14,7 @@
 
 import {
   type CreateWorkCommentBody,
+  type PutCommentVisibilityBody,
   type UpdateWorkCommentBody,
   type WorkAttachmentView,
   type WorkCommentView,
@@ -146,6 +147,8 @@ export class WorkCommentsService {
       deletedAt: iso(d.deletedAt),
       revision: d.revision,
       createdAt: new Date(d.createdAt).toISOString(),
+      // ADR-0078 § 1.4 : absent (commentaires d'avant) = interne.
+      visibility: d.visibility === 'shared' ? 'shared' : 'internal',
     }));
   }
 
@@ -228,6 +231,7 @@ export class WorkCommentsService {
       attachmentIds,
       editedAt: null,
       deletedAt: null,
+      visibility: body.visibility ?? 'internal',
       revision: 1,
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -248,7 +252,12 @@ export class WorkCommentsService {
       taskId: id,
       actorUserId: actor.userId,
       kind: 'comment.added',
-      data: { commentId, mentions: mentions.length, attachments: attachmentIds.length },
+      data: {
+        commentId,
+        mentions: mentions.length,
+        attachments: attachmentIds.length,
+        visibility: body.visibility ?? 'internal',
+      },
     });
     await this.notify(organizationId, task, mentions, actor, true);
     const [view] = await this.views(organizationId, [
@@ -396,5 +405,58 @@ export class WorkCommentsService {
       kind: 'comment.deleted',
       data: { commentId, byAuthor: current.authorUserId === actor.userId },
     });
+  }
+
+  /**
+   * ADR-0078 § 1.4 : bascule interne ↔ partagé — l'auteur ou la gestion du projet (chef,
+   * adjoint, `work.manage`). Le commentaire d'un compte externe reste partagé.
+   */
+  async setVisibility(
+    organizationId: string,
+    commentId: string,
+    body: PutCommentVisibilityBody,
+    actor: WorkActor,
+  ): Promise<WorkCommentView> {
+    const current = await this.requireOwn(organizationId, commentId);
+    if (current.deletedAt) conflict('WORK_COMMENT_DELETED', 'Ce commentaire est supprimé.');
+    const { project } = await this.tasks.requireWritable(organizationId, current.taskId);
+    const rights = await this.tasks.projectRightsOf(organizationId, project, actor);
+    if (current.authorUserId !== actor.userId && !rights.canManage) {
+      forbidden(
+        'WORK_COMMENT_VISIBILITY_FORBIDDEN',
+        'Seuls l’auteur, le chef de projet, son adjoint et les gestionnaires changent la visibilité d’un commentaire.',
+      );
+    }
+    const author = (await this.members.refs([current.authorUserId])).get(current.authorUserId);
+    if (author?.external && body.visibility === 'internal') {
+      conflict(
+        'WORK_COMMENT_EXTERNAL_SHARED',
+        'Le commentaire d’un membre externe reste partagé avec l’espace externe.',
+      );
+    }
+    if (current.revision !== body.expectedRevision) staleRevision(current.revision);
+    const from = current.visibility === 'shared' ? 'shared' : 'internal';
+    if (from !== body.visibility) {
+      const res = await this.comments
+        .updateOne(
+          { _id: current._id, organizationId, revision: body.expectedRevision, deletedAt: null },
+          { $set: { visibility: body.visibility, updatedBy: actor.userId }, $inc: { revision: 1 } },
+        )
+        .exec();
+      if (res.matchedCount !== 1) {
+        staleRevision((await this.requireOwn(organizationId, commentId)).revision);
+      }
+      await this.activity.record(organizationId, {
+        projectId: current.projectId,
+        taskId: current.taskId,
+        actorUserId: actor.userId,
+        kind: 'comment.visibility_changed',
+        data: { commentId, from, to: body.visibility },
+      });
+    }
+    const [view] = await this.views(organizationId, [
+      await this.requireOwn(organizationId, commentId),
+    ]);
+    return view!;
   }
 }

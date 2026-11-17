@@ -75,18 +75,30 @@ export class WorkTimesheetsService {
     const week = query.week ?? mondayOf(today);
     const sunday = addDays(week, 6);
     const userId = query.userId ?? actor.userId;
-    if (userId !== actor.userId) {
+    // ADR-0078 § 2.5 : la feuille d'un consultant se lit par son référent ou `work.manage`.
+    const consultant =
+      userId !== actor.userId ? await this.approvals.consultantOf(organizationId, userId) : null;
+    if (userId !== actor.userId && consultant === null) {
       // Membre de CETTE organisation, sinon 404.
       const role = await this.members.roleOf(organizationId, userId);
       if (role === undefined) memberNotFound();
     }
-    const context = await this.absences.timesheetContextOf(
+    const raw = await this.absences.timesheetContextOf(
       organizationId,
       actor.userId,
       userId,
       week,
       sunday,
     );
+    const context =
+      consultant === null
+        ? raw
+        : {
+            ...raw,
+            viewerIsManager: consultant.referentUserId === actor.userId,
+            employeeLinked: false,
+            absences: [],
+          };
     if (userId !== actor.userId && !actorCan(actor, 'work.manage') && !context.viewerIsManager) {
       memberNotFound();
     }

@@ -18,9 +18,11 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 
-import { fiscalPageUrl, invoicePageUrl, webUrl } from './mail.links.js';
+import { externalPortalUrl, fiscalPageUrl, invoicePageUrl, webUrl } from './mail.links.js';
 import {
   renderEmailVerification,
+  renderExternalAccessCode,
+  renderExternalInvitation,
   renderInvitation,
   renderMorningBrief,
   renderNormalizationAlert,
@@ -125,6 +127,23 @@ export interface WorkDigestMail extends WorkDigestMailContent {
   to: string;
 }
 
+/** ADR-0078 § 3 : code de connexion de l'espace externe. */
+export interface ExternalAccessCodeMail {
+  to: string;
+  code: string;
+  name?: string | null | undefined;
+  expiresInMinutes: number;
+}
+
+/** ADR-0078 : invitation d'un contact client ou d'un consultant sur un projet. */
+export interface ExternalInvitationMail {
+  to: string;
+  organizationName: string;
+  projectName: string;
+  kindLabel: string;
+  name?: string | null | undefined;
+}
+
 /**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
@@ -146,6 +165,8 @@ export abstract class MailService {
   abstract sendSalesDocument(input: SalesDocumentMail): Promise<MailDeliveryResult>;
   abstract sendWorkNotification(input: WorkNotificationMail): Promise<MailDeliveryResult>;
   abstract sendWorkDigest(input: WorkDigestMail): Promise<MailDeliveryResult>;
+  abstract sendExternalAccessCode(input: ExternalAccessCodeMail): Promise<MailDeliveryResult>;
+  abstract sendExternalInvitation(input: ExternalInvitationMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -259,6 +280,31 @@ export class TemplatedMailService extends MailService {
         `${webUrl()}/projets/mes-taches`,
         `${webUrl()}/projets/parametres`,
       ),
+    });
+  }
+
+  async sendExternalAccessCode(input: ExternalAccessCodeMail): Promise<MailDeliveryResult> {
+    return this.transport.send({
+      to: input.to,
+      ...renderExternalAccessCode({
+        url: externalPortalUrl(),
+        code: input.code,
+        name: input.name ?? null,
+        expiresInMinutes: input.expiresInMinutes,
+      }),
+    });
+  }
+
+  async sendExternalInvitation(input: ExternalInvitationMail): Promise<MailDeliveryResult> {
+    return this.transport.send({
+      to: input.to,
+      ...renderExternalInvitation({
+        url: externalPortalUrl(),
+        organizationName: input.organizationName,
+        projectName: input.projectName,
+        kindLabel: input.kindLabel,
+        name: input.name ?? null,
+      }),
     });
   }
 }

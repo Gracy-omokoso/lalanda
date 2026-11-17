@@ -28,8 +28,8 @@ import {
   type WorkTimesheetMyTaskItem,
 } from '@lalanda/shared/work';
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import type { ClientSession, Model } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
 import { isDuplicateKey } from '../../sales/sales.errors.js';
@@ -81,8 +81,43 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Optional() @Inject(WORK_ABSENCES_SOURCE) absences: WorkAbsencesSource | null = null,
+    // ADR-0078 § 2.5 : feuilles de temps des consultants (comptes externes), lecture seule.
+    @Optional() @InjectConnection() private readonly connection: Connection | null = null,
   ) {
     this.absences = absences ?? noWorkAbsences;
+  }
+
+  /**
+   * ADR-0078 § 2.5 : compte CONSULTANT actif de l'organisation (sa feuille est validée par
+   * son référent interne ou par `work.manage`), sinon `null`.
+   */
+  async consultantOf(
+    organizationId: string,
+    userId: string,
+  ): Promise<{ referentUserId: string | null } | null> {
+    if (!this.connection || !/^[0-9a-f]{24}$/i.test(userId)) return null;
+    const doc = await this.connection
+      .collection('work_external_accounts')
+      .findOne(
+        { _id: new Types.ObjectId(userId), organizationId, kind: 'consultant' },
+        { projection: { referentUserId: 1 } },
+      );
+    if (!doc) return null;
+    const referent = doc['referentUserId'];
+    return { referentUserId: typeof referent === 'string' ? referent : null };
+  }
+
+  /** Consultants de l'organisation dont l'appelant est le référent. */
+  private async consultantsReferredBy(organizationId: string, userId: string): Promise<string[]> {
+    if (!this.connection) return [];
+    const docs = await this.connection
+      .collection('work_external_accounts')
+      .find(
+        { organizationId, kind: 'consultant', referentUserId: userId },
+        { projection: { _id: 1 } },
+      )
+      .toArray();
+    return docs.map((d) => String(d['_id']));
   }
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -121,6 +156,9 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
   ): Promise<boolean> {
     if (userId === actor.userId) return false;
     if (actorCan(actor, 'work.manage')) return true;
+    // ADR-0078 § 2.5 : un consultant est validé par son référent interne.
+    const consultant = await this.consultantOf(organizationId, userId);
+    if (consultant) return consultant.referentUserId === actor.userId;
     const ctx = await this.absences.timesheetContextOf(
       organizationId,
       actor.userId,
@@ -219,6 +257,8 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
     body: SubmitTimesheetBody,
     actor: WorkActor,
     now = new Date(),
+    /** ADR-0078 : rôle inscrit à l'audit pour une soumission depuis l'espace externe. */
+    auditRole?: string,
   ): Promise<TimesheetApprovalView> {
     if (body.week > mondayOfDay(kinshasaDayOf(now))) {
       badRequest('WORK_TIMESHEET_WEEK', 'Une semaine à venir ne se soumet pas.');
@@ -270,7 +310,13 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
         .exec();
       if (!doc) staleRevision(current.revision + 1);
     }
-    await this.record(organizationId, actor, 'submitted', doc!, { minutes });
+    await this.record(
+      organizationId,
+      auditRole ? { ...actor, role: auditRole as WorkActor['role'] } : actor,
+      'submitted',
+      doc!,
+      { minutes },
+    );
     return this.approvalOf(organizationId, actor, userId, body.week, false, now);
   }
 
@@ -287,7 +333,12 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
         'Vous ne validez pas votre propre feuille de temps : votre manager ou un gestionnaire des projets le fait.',
       );
     }
-    if ((await this.members.roleOf(organizationId, body.userId)) === undefined) memberNotFound();
+    if (
+      (await this.members.roleOf(organizationId, body.userId)) === undefined &&
+      (await this.consultantOf(organizationId, body.userId)) === null
+    ) {
+      memberNotFound();
+    }
     if (!(await this.isValidator(organizationId, actor, body.userId, body.week))) memberNotFound();
     const current = await this.find(organizationId, body.userId, body.week);
     const status = current?.status ?? 'open';
@@ -418,8 +469,19 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
     const management = this.absences.managementOf
       ? await this.absences.managementOf(organizationId, actor.userId)
       : { teamUserIds: [], withManagerUserIds: [] };
-    const team = new Set(management.teamUserIds);
+    // ADR-0078 § 2.5 : les consultants dont l'appelant est le référent comptent comme son
+    // équipe ; un consultant a toujours un référent (il ne remonte pas aux gestionnaires
+    // dans « Mes tâches », mais reste dans la liste « à valider » d'un `work.manage`).
+    const referred = await this.consultantsReferredBy(organizationId, actor.userId);
+    const team = new Set([...management.teamUserIds, ...referred]);
     const withManager = new Set(management.withManagerUserIds);
+    if (this.connection) {
+      const consultants = await this.connection
+        .collection('work_external_accounts')
+        .find({ organizationId, kind: 'consultant' }, { projection: { _id: 1 } })
+        .toArray();
+      for (const c of consultants) withManager.add(String(c['_id']));
+    }
     const docs = rows.slice(0, MAX_PENDING_TIMESHEETS).filter((d) => {
       if (team.has(d.userId)) return true;
       if (!holdsManage) return false;

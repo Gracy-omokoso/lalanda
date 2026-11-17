@@ -109,12 +109,12 @@ function checkDay(value: unknown, what: string): WorkMarginDay {
  * Centimes × minutes → montant au centime : division par 60 arrondie au plus
  * proche, demi vers le haut (valeurs ≥ 0), puis passage en virgule fixe.
  */
-function minuteCentsToCents(value: bigint): Fixed {
+export function minuteCentsToCents(value: bigint): Fixed {
   return ((value + 30n) / 60n) * CENT;
 }
 
 /** Taux horaire en centimes entiers (deux décimales au plus, déjà vérifié). */
-function hourlyCents(value: string): bigint {
+export function hourlyCents(value: string): bigint {
   return trustedAmount(value, 'Taux horaire') / CENT;
 }
 
@@ -129,7 +129,9 @@ function paidOutsideCredit(payments: readonly WorkMarginPayment[], what: string)
 }
 
 /** Index des taux par membre, triés par date d'effet croissante. */
-function ratesByUser(rates: readonly WorkMarginRateInput[]): Map<string, WorkMarginRateInput[]> {
+export function ratesByUser(
+  rates: readonly WorkMarginRateInput[],
+): Map<string, WorkMarginRateInput[]> {
   const byUser = new Map<string, WorkMarginRateInput[]>();
   for (const rate of rates) {
     checkCurrency(rate.currency, 'Taux horaire');
@@ -151,7 +153,7 @@ function ratesByUser(rates: readonly WorkMarginRateInput[]): Map<string, WorkMar
 }
 
 /** Taux en vigueur au jour travaillé : le plus récent dont `effectiveFrom ≤ workedOn`. */
-function rateAt(
+export function rateAt(
   list: readonly WorkMarginRateInput[] | undefined,
   day: WorkMarginDay,
 ): WorkMarginRateInput | null {

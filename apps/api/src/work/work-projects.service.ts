@@ -19,7 +19,7 @@ import {
   type WorkProjectSummary,
   type WorkProjectView,
 } from '@lalanda/shared/work';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
@@ -48,6 +48,7 @@ import { WorkActivityService } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkSettingsService } from './work-settings.service.js';
+import { WorkExternalLifecycle } from './external/work-external-lifecycle.js';
 import {
   WorkAttachment,
   WorkComment,
@@ -102,6 +103,10 @@ export class WorkProjectsService {
     // ADR-0076 § 5 : dernier statut déclaré (Aperçu, portefeuille).
     @InjectModel(WorkProjectStatusUpdate.name)
     private readonly statuses: Model<WorkProjectStatusUpdateDocument>,
+    // ADR-0078 § 3.1 : fermeture des accès externes à l'archivage et à la suppression.
+    @Optional()
+    @Inject(WorkExternalLifecycle)
+    private readonly externals: WorkExternalLifecycle | null = null,
   ) {}
 
   /** ADR-0076 § 5 : vue d'un statut déclaré. */
@@ -703,6 +708,12 @@ export class WorkProjectsService {
       kind: 'project.archived',
       data: { from: current.status, to: 'archived' },
     });
+    // ADR-0078 § 3.1 : l'archivage ferme les accès externes du projet (sessions révoquées
+    // pour un compte sans autre accès). Une restauration ne les rouvre pas.
+    await this.externals?.closeProject(organizationId, projectId, {
+      userId: actor.userId,
+      role: actor.role ?? 'unknown',
+    });
     return this.get(organizationId, projectId, actor);
   }
 
@@ -796,6 +807,11 @@ export class WorkProjectsService {
       targetType: 'work_project',
       targetId: projectId,
       metadata: { name: current.name.slice(0, 120) },
+    });
+    // ADR-0078 § 3.1 : un projet supprimé ne laisse aucun accès externe ouvert.
+    await this.externals?.closeProject(organizationId, projectId, {
+      userId: actor.userId,
+      role: actor.role ?? 'unknown',
     });
   }
 

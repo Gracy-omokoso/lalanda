@@ -22,3 +22,12 @@ export {
   type TimeApprovalEntryInput,
   type TimeApprovalShare,
 } from './time-approval.js';
+// ADR-0078 § 2.4 : récapitulatif temps × taux d'achat d'un consultant.
+export {
+  CONSULTANT_RECAP_VERSION,
+  consultantTimeRecap,
+  type ConsultantRecapEntryInput,
+  type ConsultantRecapInput,
+  type ConsultantRecapLine,
+  type ConsultantRecapResult,
+} from './consultant-recap.js';

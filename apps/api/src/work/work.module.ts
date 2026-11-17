@@ -44,6 +44,18 @@ import {
   WorkTimesheetWeekSchema,
 } from './timesheets/work-timesheet-week.schema.js';
 import { WORK_ABSENCES_SOURCE } from './work-absences.port.js';
+// ADR-0078 : membres externes.
+import { WorkExternalLifecycle } from './external/work-external-lifecycle.js';
+import {
+  WorkExternalAccount,
+  WorkExternalAccountSchema,
+  WorkExternalChallenge,
+  WorkExternalChallengeSchema,
+  WorkExternalMembership,
+  WorkExternalMembershipSchema,
+  WorkExternalSession,
+  WorkExternalSessionSchema,
+} from './external/work-external.schemas.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
 import { WorkAttachmentsService } from './work-attachments.service.js';
@@ -159,6 +171,11 @@ import {
       { name: WorkProjectStatusUpdate.name, schema: WorkProjectStatusUpdateSchema },
       // ADR-0077 § 4
       { name: WorkTimesheetWeek.name, schema: WorkTimesheetWeekSchema },
+      // ADR-0078 : membres externes (comptes, accès, codes, sessions de l'espace externe).
+      { name: WorkExternalAccount.name, schema: WorkExternalAccountSchema },
+      { name: WorkExternalMembership.name, schema: WorkExternalMembershipSchema },
+      { name: WorkExternalChallenge.name, schema: WorkExternalChallengeSchema },
+      { name: WorkExternalSession.name, schema: WorkExternalSessionSchema },
     ]),
   ],
   controllers: [
@@ -232,8 +249,13 @@ import {
     WorkImportService,
     WorkAiPlanService,
     { provide: WORK_AI_CHAT_CLIENT, useExisting: OPENAI_CHAT_CLIENT },
+    // ADR-0078 § 3.1 : fermeture des accès externes (archivage, retrait, fiche désactivée).
+    WorkExternalLifecycle,
   ],
   exports: [
+    WorkExternalLifecycle,
+    WorkTimeService,
+    WorkCommentsService,
     MongooseModule,
     WorkMembersService,
     WorkActivityService,

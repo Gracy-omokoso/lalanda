@@ -67,6 +67,11 @@ export function fiscalPageUrl(): string {
   return `${webUrl()}/organisation/fiscalite`;
 }
 
+/** ADR-0078 : page de connexion de l'espace externe — aucun jeton dans l'URL. */
+export function externalPortalUrl(): string {
+  return `${webUrl()}/portail`;
+}
+
 function trimSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }

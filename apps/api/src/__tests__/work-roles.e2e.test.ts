@@ -189,6 +189,36 @@ e2eSuite('Projets : rôles dans le projet — ADR-0076 § 1', () => {
     ).toBe(201);
   });
 
+  it('ADR-0078 § 4 : un Lecteur ne modifie ni ne supprime ses saisies de temps existantes', async () => {
+    const t = await f.post('intern', `/work/projects/${projectId}/tasks`, { title: 'Relevé' });
+    expect(t.status, JSON.stringify(t.body)).toBe(201);
+    const saisie = await f.post('intern', `/work/tasks/${t.body.task.id}/time-entries`, {
+      workedOn: '2026-10-02',
+      minutes: 45,
+    });
+    expect(saisie.status, JSON.stringify(saisie.body)).toBe(201);
+    const roleDe = (role: 'viewer' | 'member') =>
+      f.put('employee', `/work/projects/${projectId}/members/users/${f.userId('intern')}/role`, {
+        role,
+      });
+    expect((await roleDe('viewer')).status).toBe(200);
+    const modif = await f.put('intern', `/work/time-entries/${saisie.body.id}`, {
+      expectedRevision: saisie.body.revision,
+      minutes: 60,
+    });
+    expect(modif.status).toBe(403);
+    expect(modif.body.code).toBe('WORK_TASK_CREATE_FORBIDDEN');
+    const suppr = await f.del('intern', `/work/time-entries/${saisie.body.id}`);
+    expect(suppr.status).toBe(403);
+    // Redevenu Membre : la saisie se modifie de nouveau.
+    expect((await roleDe('member')).status).toBe(200);
+    const ok = await f.put('intern', `/work/time-entries/${saisie.body.id}`, {
+      expectedRevision: saisie.body.revision,
+      minutes: 60,
+    });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+  });
+
   it('équipe Lecteur, historique du rôle, plafond du rôle d’organisation', async () => {
     const act = await f.get('owner', `/work/projects/${projectId}/activity`);
     const kinds = (act.body.items as { kind: string }[]).map((i) => i.kind);

@@ -9,10 +9,10 @@
 //   - pas membre de l'organisation (autre organisation, identifiant forgé) → 404 ;
 //   - membre, mais sans l'action → 400 avec le code métier de la règle.
 
-import { Inject, Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { WorkMemberRef, WorkProjectRole } from '@lalanda/shared/work';
-import type { Model } from 'mongoose';
+import { Types, type Connection, type Model } from 'mongoose';
 
 import {
   MEMBER_PERMISSIONS_PROJECTION,
@@ -53,6 +53,8 @@ export class WorkMembersService {
   constructor(
     @InjectModel(Membership.name) private readonly memberships: Model<MembershipDocument>,
     @Inject(MembersService) private readonly members: MembersService,
+    // ADR-0078 : noms des comptes externes (contact client, consultant), lecture seule.
+    @Optional() @InjectConnection() private readonly connection: Connection | null = null,
   ) {}
 
   /**
@@ -101,11 +103,35 @@ export class WorkMembersService {
     const ids = [...new Set(userIds.filter((u): u is string => typeof u === 'string'))];
     const identities = await this.members.identitiesOf(ids);
     const out = new Map<string, WorkMemberRef>();
+    const unknown: string[] = [];
     for (const id of ids) {
       const who = identities.get(id);
+      if (!who) unknown.push(id);
       out.set(id, { userId: id, name: who?.name ?? who?.email ?? FORMER_MEMBER });
     }
+    // ADR-0078 : un identifiant inconnu des comptes internes peut être un compte externe.
+    for (const [id, ext] of await this.externalNames(unknown)) out.set(id, ext);
     return out;
+  }
+
+  /** Noms des comptes externes (`work_external_accounts`) parmi ces identifiants. */
+  private async externalNames(ids: readonly string[]): Promise<Map<string, WorkMemberRef>> {
+    const valid = ids.filter((id) => /^[0-9a-f]{24}$/i.test(id));
+    if (valid.length === 0 || !this.connection) return new Map();
+    const docs = await this.connection
+      .collection('work_external_accounts')
+      .find(
+        { _id: { $in: valid.map((id) => new Types.ObjectId(id)) } },
+        { projection: { name: 1, kind: 1 } },
+      )
+      .toArray();
+    return new Map(
+      docs.map((d) => {
+        const id = String(d['_id']);
+        const kind = d['kind'] === 'consultant' ? 'consultant' : 'client';
+        return [id, { userId: id, name: String(d['name'] ?? FORMER_MEMBER), external: kind }];
+      }),
+    );
   }
 
   /** Référence d'un utilisateur (toujours définie). */

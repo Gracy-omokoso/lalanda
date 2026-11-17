@@ -134,6 +134,8 @@ export interface WorkPage<T> {
 export interface WorkMemberRef {
   userId: string;
   name: string;
+  /** ADR-0078 : compte externe (contact client ou consultant) ; absent pour un membre. */
+  external?: 'client' | 'consultant';
 }
 
 // ── Réglages ────────────────────────────────────────────────────────────────
@@ -293,6 +295,12 @@ export interface WorkTaskView {
   approval?: WorkTaskApprovalSummary | null;
   /** Créateur de la tâche (règle « modifier », ADR-0076 § 2). */
   createdBy?: string;
+  /** ADR-0078 § 1.3 : tâche visible dans l'espace du client. */
+  clientVisible?: boolean;
+  /** ADR-0078 § 1.5 : état de la validation par le client (`none` sans validation). */
+  clientApprovalState?: 'none' | 'pending' | 'approved' | 'changes_requested';
+  /** ADR-0078 § 2 : consultant responsable (compte externe), s'il y en a un. */
+  consultantAssigneeId?: string | null;
 }
 
 /** Période d'absence d'un membre (jours inclus), sans type ni motif (ADR-0045 § 6.2). */
@@ -430,6 +438,8 @@ export interface WorkCommentView {
   deletedAt: string | null;
   revision: number;
   createdAt: string;
+  /** ADR-0078 § 1.4 : `internal` (défaut, existants compris) ou `shared` (vu de l'espace externe). */
+  visibility?: 'internal' | 'shared';
 }
 
 // ── Temps ───────────────────────────────────────────────────────────────────

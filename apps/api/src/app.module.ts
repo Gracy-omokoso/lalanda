@@ -53,6 +53,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { TreasuryModule } from './treasury/treasury.module.js';
 import { WorkBillingModule } from './work/billing/work-billing.module.js';
 import { WorkModule } from './work/work.module.js';
+import { WorkExternalModule } from './work/external/work-external.module.js';
 import { SubscriptionInvoicesModule } from './subscription-invoices/subscription-invoices.module.js';
 
 @Module({
@@ -66,7 +67,9 @@ import { SubscriptionInvoicesModule } from './subscription-invoices/subscription
           ignore: (req) =>
             (req.url ?? '').startsWith('/public/lead-forms/') ||
             // ADR-0069 : le jeton de vérification d'une carte n'entre pas dans les journaux.
-            (req.url ?? '').startsWith('/public/cards/'),
+            (req.url ?? '').startsWith('/public/cards/') ||
+            // ADR-0078 : connexion de l'espace externe (adresse, code, jeton de session).
+            (req.url ?? '').startsWith('/portal/auth/'),
         },
         redact: {
           paths: ['req.headers.authorization', 'req.headers.cookie'],
@@ -165,6 +168,8 @@ import { SubscriptionInvoicesModule } from './subscription-invoices/subscription
     WorkModule,
     // ADR-0039 — lot L4a : devis → projet, jalon → brouillon, liens facture, marge.
     WorkBillingModule,
+    // ADR-0078 : membres externes (contact client, consultant) et espace externe `/portal`.
+    WorkExternalModule,
     // ADR-0047 : factures des abonnements Lalanda (organisation vendeuse, circuit des ventes).
     SubscriptionInvoicesModule,
   ],

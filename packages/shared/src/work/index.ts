@@ -29,3 +29,5 @@ export * from './slack.js';
 export * from './whatsapp.js';
 // ADR-0076 : rôles dans le projet, droits sur le projet et les tâches.
 export * from './roles.js';
+// ADR-0078 : membres externes (contact client, consultant), espace externe.
+export * from './external.js';

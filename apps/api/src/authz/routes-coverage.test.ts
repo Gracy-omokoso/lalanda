@@ -99,6 +99,10 @@ import { HrLeaveController } from '../hr/leave/hr-leave.controller.js';
 // ADR-0045 — H5
 import { HrReportsController } from '../hr/reports/hr-reports.controller.js';
 import { WorkTimesheetsController } from '../work/timesheets/work-timesheets.controller.js';
+// ADR-0078 : membres externes (ERP) et espace externe (session externe, publique bornée).
+import { WorkExternalController } from '../work/external/work-external.controller.js';
+import { PortalAuthController } from '../work/external/portal-auth.controller.js';
+import { PortalController } from '../work/external/portal.controller.js';
 // ADR-0045 — H4
 import { HrChecklistsController } from '../hr/checklists/hr-checklists.controller.js';
 import { HrDocumentsController } from '../hr/documents/hr-documents.controller.js';
@@ -318,6 +322,10 @@ const CONTROLEURS = [
   // ADR-0045 — H5 : rapports et registre ; feuille de temps en lecture.
   HrReportsController,
   WorkTimesheetsController,
+  // ADR-0078
+  WorkExternalController,
+  PortalAuthController,
+  PortalController,
   // ADR-0058 : accueil des projets (portefeuille).
   WorkPortfolioController,
   // ADR-0060 : membres d'un projet (utilisateurs, équipes) ; équipes RH.
@@ -385,6 +393,37 @@ const CONTROLEURS = [
  * liste doit être aussi visible en revue qu'ajouter une route.
  */
 const SANS_PERMISSION: Record<string, string> = {
+  // ── ADR-0078 — connexion à l'espace externe ─────────────────────────────
+  // Un contact client ou un consultant n'a AUCUNE session better-auth ni appartenance
+  // à l'organisation : exiger une permission d'organisation rendrait la connexion
+  // impossible. Débit par empreinte d'adresse et d'IP, réponse identique pour une
+  // adresse inconnue, code haché à usage unique (5 essais, 10 minutes).
+  'PortalAuthController.requestCode':
+    'Demande d’un code de connexion pour une adresse : même réponse qu’elle ait un compte ' +
+    'externe actif ou non ; envoi seulement à un compte actif ; débit borné (ADR-0078 § 3).',
+  'PortalAuthController.verify':
+    'Vérification du code à usage unique (haché, 5 essais, 10 minutes, temps constant) ; pose ' +
+    'le cookie de session EXTERNE, que `AuthGuard` ne reconnaît pas (ADR-0078 § 3).',
+  'PortalAuthController.logout': 'Révoque la session externe du cookie présenté, sans autre effet.',
+  // ── ADR-0078 — espace externe ───────────────────────────────────────────
+  // Gardé par `ExternalAuthGuard` (session externe, compte actif, fiche active, accès
+  // ouvert) ; chaque lecture part du compte de la session et de ses accès : projets de
+  // SA fiche, tâches visibles, commentaires partagés ; aucun montant (work-external.e2e).
+  'PortalController.me': 'Son propre compte externe (nom, genre, organisation).',
+  'PortalController.projects':
+    'Ses projets ouverts seulement (adhésion active, projet non archivé).',
+  'PortalController.project':
+    'Un de SES projets ; tâches visibles par le client, ou ses tâches (consultant).',
+  'PortalController.task':
+    'Une tâche visible pour lui ; commentaires partagés seulement ; aucun montant.',
+  'PortalController.comment': 'Commentaire toujours partagé sur une tâche visible pour lui.',
+  'PortalController.clientDecision':
+    'Contact client : approuver ou demander des modifications (motif) sur un livrable visible.',
+  'PortalController.createTime': 'Consultant : son temps sur SES tâches seulement.',
+  'PortalController.updateTime': 'Consultant : ses propres saisies seulement (verrou de semaine).',
+  'PortalController.removeTime': 'Consultant : ses propres saisies seulement (verrou de semaine).',
+  'PortalController.timesheet': 'Consultant : sa propre semaine (minutes, statut de validation).',
+  'PortalController.submitTimesheet': 'Consultant : soumet sa propre semaine à son référent.',
   'HealthController.check': 'Sonde publique — aucune authentification, aucune donnée.',
   // ADR-0064 § 2 et § 6 — appelées par Slack ou par le navigateur qui en revient.
   'SlackController.callback':

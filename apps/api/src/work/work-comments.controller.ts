@@ -4,6 +4,7 @@
 //   POST   /work/tasks/:taskId/comments   work.update
 //   PUT    /work/comments/:commentId      work.update (auteur seul, révision attendue)
 //   DELETE /work/comments/:commentId      work.update (auteur, ou détenteur de work.manage)
+//   PUT    /work/comments/:commentId/visibility  work.update (ADR-0078 : auteur ou gestion)
 
 import {
   Body,
@@ -20,6 +21,7 @@ import {
 } from '@nestjs/common';
 import {
   CreateWorkCommentBody,
+  PutCommentVisibilityBody,
   UpdateWorkCommentBody,
   WorkCursorQuery,
   type WorkCommentView,
@@ -98,5 +100,20 @@ export class WorkCommentsController {
     @Param('commentId', WorkIdPipe) commentId: string,
   ): Promise<void> {
     await this.comments.remove(orgId, commentId, workActorOf(user, perms));
+  }
+
+  /** ADR-0078 § 1.4 : interne ↔ partagé (auteur ou gestion du projet). */
+  @Put('comments/:commentId/visibility')
+  @RequirePermission('work.update')
+  async setVisibility(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Param('commentId', WorkIdPipe) commentId: string,
+    @Body() body: unknown,
+  ): Promise<WorkCommentView> {
+    const parsed = PutCommentVisibilityBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.comments.setVisibility(orgId, commentId, parsed.data, workActorOf(user, perms));
   }
 }
