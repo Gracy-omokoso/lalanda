@@ -12,13 +12,27 @@
 // seul), jamais remontées au geste de l'utilisateur. `flush()` attend les envois en
 // cours — pour les tests et l'arrêt propre.
 
+import type { NotificationKind } from '@lalanda/shared/notifications';
 import type { WorkNotificationEvent } from '@lalanda/shared/work';
-import { Inject, Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  type OnApplicationShutdown,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
 
+import {
+  NotificationDispatcher,
+  type PushChannelStatus,
+  type PushReport,
+  type RegisteredSender,
+} from '../notifications/notification-dispatcher.js';
 import { WhatsAppApi, WhatsAppApiError } from './whatsapp-api.js';
-import { workTemplateMessage } from './whatsapp-templates.js';
+import { isTemplateApproved, workTemplateMessage } from './whatsapp-templates.js';
 import { WhatsAppService, whatsappCodeOf } from './whatsapp.service.js';
 import {
   WhatsAppRecipient,
@@ -28,7 +42,13 @@ import {
 
 export interface WhatsAppWorkMessage {
   recipientUserId: string;
-  event: WorkNotificationEvent;
+  /** Événement ADR-0061 (modèles dédiés) ; absent pour un type du catalogue ADR-0079. */
+  event?: WorkNotificationEvent;
+  /** ADR-0079 § 7 : modèle du catalogue, prioritaire. */
+  template?: string;
+  kind?: NotificationKind;
+  /** Ligne du journal d'envoi (ADR-0079 § 6). */
+  deliveryId?: string | null;
   /** Libellé de l'événement (« Une tâche m’est assignée ») — modèle générique seulement. */
   eventLabel: string;
   title: string;
@@ -40,13 +60,21 @@ export interface WhatsAppWorkMessage {
 export const WHATSAPP_NOTIFIER = Symbol('WHATSAPP_NOTIFIER');
 
 export interface WhatsAppNotifierPort {
-  direct(organizationId: string, projectId: string, messages: WhatsAppWorkMessage[]): void;
+  /** `report` (ADR-0079 § 6) : sort de chaque message, pour le journal d'envoi. */
+  direct(
+    organizationId: string,
+    projectId: string,
+    messages: WhatsAppWorkMessage[],
+    report?: PushReport,
+  ): void;
   /** La personne a-t-elle un numéro vérifié dans cette organisation ? */
   isVerified(organizationId: string, userId: string): Promise<boolean>;
 }
 
 @Injectable()
-export class WhatsAppNotifier implements WhatsAppNotifierPort, OnApplicationShutdown {
+export class WhatsAppNotifier
+  implements WhatsAppNotifierPort, RegisteredSender, OnApplicationShutdown, OnModuleInit
+{
   private readonly logger = new Logger('WhatsAppNotifier');
   private readonly pending = new Set<Promise<void>>();
 
@@ -56,11 +84,37 @@ export class WhatsAppNotifier implements WhatsAppNotifierPort, OnApplicationShut
     @InjectModel(WhatsAppRecipient.name)
     private readonly recipients: Model<WhatsAppRecipientDocument>,
     @InjectConnection() private readonly db: Connection,
+    @Optional()
+    @Inject(NotificationDispatcher)
+    private readonly dispatcher: NotificationDispatcher | null = null,
   ) {}
 
-  direct(organizationId: string, projectId: string, messages: WhatsAppWorkMessage[]): void {
+  /** ADR-0079 : WhatsApp s'offre au répartiteur commun (notifications hors Projets). */
+  onModuleInit(): void {
+    this.dispatcher?.registerSender('whatsapp', this);
+  }
+
+  direct(
+    organizationId: string,
+    projectId: string,
+    messages: WhatsAppWorkMessage[],
+    report?: PushReport,
+  ): void {
     if (messages.length === 0) return;
-    this.track(this.send(organizationId, projectId, messages));
+    this.track(this.send(organizationId, projectId, messages, report));
+  }
+
+  /** ADR-0079 § 8 : état du canal pour l'écran « Mes notifications ». */
+  async channelStatus(organizationId: string, userId: string): Promise<PushChannelStatus> {
+    const v = await this.service.view(organizationId, userId);
+    if (!v.available) return { ready: false, reason: 'whatsapp_unavailable', detail: null };
+    if (v.number?.status !== 'verified') {
+      return { ready: false, reason: 'whatsapp_not_verified', detail: v.number?.phoneMasked ?? null };
+    }
+    if (v.quota.reached) {
+      return { ready: false, reason: 'monthly_quota', detail: v.number.phoneMasked };
+    }
+    return { ready: true, reason: null, detail: v.number.phoneMasked };
   }
 
   isVerified(organizationId: string, userId: string): Promise<boolean> {
@@ -88,9 +142,20 @@ export class WhatsAppNotifier implements WhatsAppNotifierPort, OnApplicationShut
     organizationId: string,
     projectId: string,
     messages: WhatsAppWorkMessage[],
+    report?: PushReport,
   ): Promise<void> {
+    const tell: PushReport = (m, o) => {
+      try {
+        report?.(m, o);
+      } catch {
+        /* le journal ne casse jamais un envoi */
+      }
+    };
     const state = await this.service.platform();
-    if (!state.platform) return;
+    if (!state.platform) {
+      for (const m of messages) tell(m, { status: 'skipped', reason: 'whatsapp_unavailable' });
+      return;
+    }
     const { creds, monthlyLimit } = state.platform;
     const docs = await this.recipients
       .find({
@@ -101,19 +166,27 @@ export class WhatsAppNotifier implements WhatsAppNotifierPort, OnApplicationShut
       })
       .lean<WhatsAppRecipientLean[]>()
       .exec();
-    if (docs.length === 0) return;
     const phoneOf = new Map(docs.map((d) => [d.userId, d.phone as string]));
     const context = await this.context(organizationId, projectId);
-    for (const m of messages) {
+    for (const [index, m] of messages.entries()) {
       const to = phoneOf.get(m.recipientUserId);
-      if (!to) continue;
+      if (!to) {
+        tell(m, { status: 'skipped', reason: 'whatsapp_not_verified' });
+        continue;
+      }
+      if (m.template && !isTemplateApproved(m.template)) {
+        tell(m, { status: 'skipped', reason: 'template_unavailable' });
+        continue;
+      }
       if (!(await this.service.reserve(organizationId, monthlyLimit))) {
         this.logger.warn(`Plafond mensuel WhatsApp atteint (organisation ${organizationId})`);
+        tell(m, { status: 'skipped', reason: 'monthly_quota' });
         continue;
       }
       const message = workTemplateMessage({
         to,
         event: m.event,
+        template: m.template,
         eventLabel: m.eventLabel,
         title: m.title,
         projectName: context.projectName,
@@ -123,11 +196,18 @@ export class WhatsAppNotifier implements WhatsAppNotifierPort, OnApplicationShut
       try {
         const wamid = await this.api.sendTemplate(creds, message);
         await this.service.recordMessage(organizationId, m.recipientUserId, wamid, message.name);
+        tell(m, { status: 'sent', reason: null });
       } catch (err) {
         await this.service.release(organizationId);
         await this.service.onSendError(organizationId, m.recipientUserId, err);
+        tell(m, { status: 'failed', reason: 'provider_error' });
         // Jeton refusé : inutile d'insister pour les destinataires suivants.
-        if (err instanceof WhatsAppApiError && err.kind === 'provider') return;
+        if (err instanceof WhatsAppApiError && err.kind === 'provider') {
+          for (const rest of messages.slice(index + 1)) {
+            tell(rest, { status: 'failed', reason: 'provider_error' });
+          }
+          return;
+        }
       }
     }
   }

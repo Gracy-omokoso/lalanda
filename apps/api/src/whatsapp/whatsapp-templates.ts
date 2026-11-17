@@ -115,6 +115,64 @@ export const WHATSAPP_TEMPLATES = {
 export type WhatsAppTemplateName = keyof typeof WHATSAPP_TEMPLATES;
 export const WHATSAPP_TEMPLATE_NAMES = Object.keys(WHATSAPP_TEMPLATES) as WhatsAppTemplateName[];
 
+/**
+ * ADR-0079 § 7 : modèles PROPOSÉS pour les notifications hors Projets, à soumettre à Meta.
+ * Tant qu'un modèle n'est pas déclaré approuvé (`WHATSAPP_APPROVED_TEMPLATES`, liste
+ * séparée par des virgules), le canal WhatsApp est « indisponible pour cet événement »
+ * (journalisé `template_unavailable`) : rien ne part, rien ne casse. Texte EXACT recopié
+ * dans `docs/integrations/whatsapp.md` (vérifié par le test unitaire).
+ */
+export const WHATSAPP_PENDING_TEMPLATES = {
+  lalanda_notification_generale: {
+    name: 'lalanda_notification_generale',
+    category: 'UTILITY',
+    body:
+      'Bonjour, vous avez une nouvelle notification dans Lalanda.\n\n' +
+      'Événement : {{1}}\nDétail : {{2}}\nOrganisation : {{3}}\n\n' +
+      'Ouvrez Lalanda pour en savoir plus.',
+    params: ['événement', 'détail', 'nom de l’organisation'],
+    examples: [
+      'Une relance m’est assignée',
+      'Appeler la société Kin Services — relance assignée par Gracy',
+      'Go freelance',
+    ],
+    footer: STOP,
+    button: { ...OUVRIR, example: 'crm/agenda' },
+  },
+  lalanda_validation_attendue: {
+    name: 'lalanda_validation_attendue',
+    category: 'UTILITY',
+    body:
+      'Bonjour, une demande attend votre validation dans Lalanda.\n\n' +
+      'Demande : {{1}}\nDétail : {{2}}\nOrganisation : {{3}}\n\n' +
+      'Ouvrez Lalanda pour la traiter.',
+    params: ['nature de la demande', 'détail', 'nom de l’organisation'],
+    examples: [
+      'Une demande d’achat attend mon approbation',
+      'DA-0042 — demandée par Gracy',
+      'Go freelance',
+    ],
+    footer: STOP,
+    button: { ...OUVRIR, example: 'achats/demandes' },
+  },
+} as const satisfies Record<string, WhatsAppTemplateSpec>;
+
+export type WhatsAppPendingTemplateName = keyof typeof WHATSAPP_PENDING_TEMPLATES;
+
+/**
+ * Modèle utilisable pour l'envoi ? Les modèles d'ADR-0065 le sont (déclarés à la
+ * soumission, comportement inchangé) ; un modèle proposé l'est une fois inscrit dans
+ * `WHATSAPP_APPROVED_TEMPLATES` après l'approbation de Meta.
+ */
+export function isTemplateApproved(name: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if ((WHATSAPP_TEMPLATE_NAMES as readonly string[]).includes(name)) return true;
+  if (!(name in WHATSAPP_PENDING_TEMPLATES)) return false;
+  return (env['WHATSAPP_APPROVED_TEMPLATES'] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .includes(name);
+}
+
 /** Modèle d'un événement des Projets : trois dédiés, un générique pour les autres. */
 export function templateForEvent(event: WorkNotificationEvent): WhatsAppTemplateName {
   switch (event) {
@@ -155,7 +213,10 @@ function text(t: string): { type: 'text'; text: string } {
 
 export interface WorkTemplateInput {
   to: string;
-  event: WorkNotificationEvent;
+  /** Événement ADR-0061 ; absent pour un événement du catalogue ADR-0079. */
+  event?: WorkNotificationEvent | undefined;
+  /** ADR-0079 § 7 : modèle choisi par le catalogue ; prioritaire sur `event`. */
+  template?: string | undefined;
   eventLabel: string;
   title: string;
   projectName: string | null;
@@ -165,12 +226,24 @@ export interface WorkTemplateInput {
 
 /** Message d'une notification des Projets, prêt pour `WhatsAppApi.sendTemplate`. */
 export function workTemplateMessage(input: WorkTemplateInput): WhatsAppTemplateMessage {
-  const name = templateForEvent(input.event);
+  const name: string =
+    input.template &&
+    (input.template in WHATSAPP_TEMPLATES || input.template in WHATSAPP_PENDING_TEMPLATES)
+      ? input.template
+      : input.event
+        ? templateForEvent(input.event)
+        : 'lalanda_notification_projet';
   const tail = [templateParam(input.projectName, 150), templateParam(input.organizationName, 150)];
   const params =
     name === 'lalanda_notification_projet'
       ? [templateParam(input.eventLabel, 150), templateParam(input.title), ...tail]
-      : [templateParam(input.title), ...tail];
+      : name in WHATSAPP_PENDING_TEMPLATES
+        ? [
+            templateParam(input.eventLabel, 150),
+            templateParam(input.title),
+            templateParam(input.organizationName, 150),
+          ]
+        : [templateParam(input.title), ...tail];
   const components: WhatsAppTemplateComponent[] = [
     { type: 'body', parameters: params.map(text) },
     { type: 'button', sub_type: 'url', index: '0', parameters: [text(linkSuffix(input.href))] },

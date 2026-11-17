@@ -14,7 +14,7 @@
 import { createHash } from 'node:crypto';
 
 import { WORK_LIMITS, type WorkAttachmentView } from '@lalanda/shared/work';
-import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -39,6 +39,7 @@ import {
   workAttachmentObjectKey,
 } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
+import { WorkNotifier } from './work-notifier.js';
 import { WorkTasksService } from './work-tasks.service.js';
 import {
   WorkAttachment,
@@ -142,6 +143,8 @@ export class WorkAttachmentsService {
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
+    // ADR-0079 § 3 : « pièce jointe ajoutée » (facultatif : rien ne casse sans notifier).
+    @Optional() @Inject(WorkNotifier) private readonly notifier: WorkNotifier | null = null,
   ) {}
 
   private async requireOwn(
@@ -229,7 +232,26 @@ export class WorkAttachmentsService {
       },
     });
     const doc = await this.requireOwn(organizationId, String(created._id));
-    return attachmentViewOf(doc, await this.members.refs([actor.userId]));
+    const refs = await this.members.refs([actor.userId]);
+    // ADR-0079 § 3 : responsable, collaborateurs, abonnés, chef et adjoint (rafales
+    // regroupées : « 3 nouvelles pièces jointes — … »).
+    if (this.notifier) {
+      await this.notifier.taskEvent({
+        organizationId,
+        recipients: [
+          task.assigneeUserId,
+          ...(task.collaboratorUserIds ?? []),
+          ...(task.followerUserIds ?? []),
+          ...(await this.notifier.leads(organizationId, task.projectId)),
+        ],
+        kind: 'work.attachment_added',
+        projectId: task.projectId,
+        taskId: String(task._id),
+        title: `${WorkMembersService.refOf(refs, actor.userId).name} a joint « ${fileName} » à #${task.number} ${task.title}`,
+        actorUserId: actor.userId,
+      });
+    }
+    return attachmentViewOf(doc, refs);
   }
 
   /** Octets et métadonnées ; `null` si l'objet a disparu du stockage. */

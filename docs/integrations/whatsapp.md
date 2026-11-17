@@ -153,6 +153,63 @@ Exemples : `{{1}}` = `Commentaire sur une tâche que je suis` · `{{2}}` =
 
 Pied de page et bouton : identiques à `lalanda_tache_assignee`.
 
+Depuis ADR-0079, ce modèle sert aussi aux nouveaux événements des Projets (tâche créée, terminée,
+rouverte, échéance modifiée, pièce jointe, jalon et brouillon de facture, feuilles de temps…) et au
+bouton « M'envoyer un test » : **aucun nouveau modèle n'est nécessaire pour les Projets**.
+
+### Modèles à soumettre pour les autres modules (ADR-0079 § 7)
+
+Tant qu'ils ne sont pas approuvés par Meta **et** déclarés dans la variable
+`WHATSAPP_APPROVED_TEMPLATES` du serveur (noms séparés par des virgules), WhatsApp est
+« indisponible pour cet événement » : rien ne part, le journal d'envoi l'indique
+(`template_unavailable`) et l'écran « Mes notifications » le dit. Les RH ne partent jamais sur
+WhatsApp (confidentialité), avec ou sans modèle.
+
+#### `lalanda_notification_generale` — catégorie **Utilitaire**
+
+Pour les notifications du CRM, des achats, des stocks, des équipements, des documents, des ventes et
+de l'organisation.
+
+Corps :
+
+```text
+Bonjour, vous avez une nouvelle notification dans Lalanda.
+
+Événement : {{1}}
+Détail : {{2}}
+Organisation : {{3}}
+
+Ouvrez Lalanda pour en savoir plus.
+```
+
+Exemples : `{{1}}` = `Une relance m’est assignée` · `{{2}}` =
+`Appeler la société Kin Services — relance assignée par Gracy` · `{{3}}` = `Go freelance`.
+
+Pied de page et bouton : identiques à `lalanda_tache_assignee` (exemple de suffixe : `crm/agenda`).
+
+#### `lalanda_validation_attendue` — catégorie **Utilitaire**
+
+Pour les demandes qui attendent une validation hors Projets (demande d'achat, contrat client,
+inventaire).
+
+Corps :
+
+```text
+Bonjour, une demande attend votre validation dans Lalanda.
+
+Demande : {{1}}
+Détail : {{2}}
+Organisation : {{3}}
+
+Ouvrez Lalanda pour la traiter.
+```
+
+Exemples : `{{1}}` = `Une demande d’achat attend mon approbation` · `{{2}}` =
+`DA-0042 — demandée par Gracy` · `{{3}}` = `Go freelance`.
+
+Pied de page et bouton : identiques à `lalanda_tache_assignee` (exemple de suffixe :
+`achats/demandes`).
+
 ### `lalanda_code_verification` — catégorie **Authentification**
 
 Meta impose le texte des modèles d'authentification ; vous ne choisissez que les options. Cochez :

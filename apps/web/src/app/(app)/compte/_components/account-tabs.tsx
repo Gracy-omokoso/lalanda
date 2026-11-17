@@ -22,6 +22,8 @@ export const ACCOUNT_TABS: AccountTab[] = [
   { segment: '', label: 'Profil' },
   { segment: 'securite', label: 'Sécurité' },
   { segment: 'preferences', label: 'Préférences' },
+  // ADR-0079 § 8 : écran unique « Mes notifications » (tout Lalanda).
+  { segment: 'notifications', label: 'Notifications' },
 ];
 
 const BASE = '/compte';

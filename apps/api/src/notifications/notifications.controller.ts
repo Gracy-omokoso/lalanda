@@ -2,6 +2,7 @@
 //
 //   GET  /notifications                    les siennes (curseur, unreadOnly)   analytics.read
 //   GET  /notifications/unread-count       compteur de non lues                analytics.read
+//   GET  /notifications/unread-elsewhere   non lues des AUTRES organisations   analytics.read (ADR-0079 § 1)
 //   POST /notifications/:notificationId/read                                  analytics.read
 //   POST /notifications/read-all                                              analytics.read
 //   GET  /notifications/preferences        types coupés                        analytics.read
@@ -32,6 +33,7 @@ import {
   type NotificationPreferencesView,
   type NotificationView,
   type UnreadCountView,
+  type UnreadElsewhereView,
 } from '@lalanda/shared/notifications';
 
 import { AuthGuard } from '../auth/auth.guard.js';
@@ -67,6 +69,15 @@ export class NotificationsController {
     @CurrentUser() user: User,
   ): Promise<UnreadCountView> {
     return this.service.unreadCount(orgId, user.id);
+  }
+
+  @Get('unread-elsewhere')
+  @RequirePermission('analytics.read')
+  async unreadElsewhere(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+  ): Promise<UnreadElsewhereView> {
+    return this.service.unreadElsewhere(orgId, user.id);
   }
 
   @Post('read-all')

@@ -15,7 +15,8 @@ describe('notifications — contrats partagés', () => {
     // ADR-0061 § 2 : trois types work de plus (statut changé, ajout à un projet, projet à risque).
     // ADR-0076 § 6 : quatre types work de plus (collaborateur, validation demandée et décidée,
     // statut du projet).
-    expect(NOTIFICATION_KINDS).toHaveLength(65);
+    // ADR-0079 § 3 : seize types work de plus et le test de la cloche (organisation).
+    expect(NOTIFICATION_KINDS).toHaveLength(82);
     for (const kind of NOTIFICATION_KINDS) {
       if (kind === 'platform.announcement') continue;
       const module = kind.split('.')[0]!;
@@ -53,10 +54,12 @@ describe('notifications — contrats partagés', () => {
       'goal',
       'attendance_correction',
       'sales_contract',
+      'timesheet',
     ]);
     // ADR-0041 — A4.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
       'organization.permissions_changed',
+      'organization.notification_test',
     ]);
     // ADR-0044 — P0 (§ 6.5) : sept types, un module, trois natures d'entité.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('purchases.'))).toEqual([

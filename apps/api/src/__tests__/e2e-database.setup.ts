@@ -92,6 +92,10 @@ const uri = process.env['MONGODB_URI'];
 if (isE2E && uri) {
   const dbName = suiteDbName(testPath);
   process.env['MONGODB_DB'] = dbName;
+  // ADR-0079 § 5 : sans réglage, les heures calmes (21 h – 7 h, Kinshasa) couperaient
+  // Slack et WhatsApp selon l'heure à laquelle la suite tourne. Les suites e2e partent
+  // donc sans heures calmes par défaut ; celles qui les testent les règlent elles-mêmes.
+  process.env['NOTIFICATIONS_QUIET_HOURS_DEFAULT'] ??= 'off';
 
   vi.setConfig({ testTimeout: E2E_TEST_TIMEOUT_MS, hookTimeout: E2E_HOOK_TIMEOUT_MS });
 

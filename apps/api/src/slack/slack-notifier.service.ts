@@ -18,11 +18,24 @@
 // introuvable). Introuvable : rien ne part, rien n'est signalé à l'utilisateur, le
 // compteur `unmatched` de la connexion augmente.
 
-import { Inject, Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  type OnApplicationShutdown,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Types, type Connection } from 'mongoose';
 
 import { webUrl } from '../mail/mail.links.js';
+import {
+  NotificationDispatcher,
+  type PushChannelStatus,
+  type PushReport,
+  type RegisteredSender,
+} from '../notifications/notification-dispatcher.js';
 import { MembersService } from '../organizations/members.service.js';
 import { SlackApi, SlackApiError } from './slack-api.js';
 import {
@@ -44,6 +57,8 @@ export interface SlackDirectMessage {
   title: string;
   /** Chemin RELATIF dans l'application. */
   href: string;
+  /** Ligne du journal d'envoi (ADR-0079 § 6). */
+  deliveryId?: string | null;
 }
 
 export interface SlackChannelEvent {
@@ -59,12 +74,20 @@ export interface SlackChannelEvent {
 export const SLACK_NOTIFIER = Symbol('SLACK_NOTIFIER');
 
 export interface SlackNotifierPort {
-  direct(organizationId: string, projectId: string, messages: SlackDirectMessage[]): void;
+  /** `report` (ADR-0079 § 6) : sort de chaque message, pour le journal d'envoi. */
+  direct(
+    organizationId: string,
+    projectId: string,
+    messages: SlackDirectMessage[],
+    report?: PushReport,
+  ): void;
   channel(event: SlackChannelEvent): void;
 }
 
 @Injectable()
-export class SlackNotifier implements SlackNotifierPort, OnApplicationShutdown {
+export class SlackNotifier
+  implements SlackNotifierPort, RegisteredSender, OnApplicationShutdown, OnModuleInit
+{
   private readonly logger = new Logger('SlackNotifier');
   private readonly pending = new Set<Promise<void>>();
 
@@ -73,11 +96,34 @@ export class SlackNotifier implements SlackNotifierPort, OnApplicationShutdown {
     @Inject(SlackApi) private readonly api: SlackApi,
     @Inject(MembersService) private readonly members: MembersService,
     @InjectConnection() private readonly db: Connection,
+    @Optional()
+    @Inject(NotificationDispatcher)
+    private readonly dispatcher: NotificationDispatcher | null = null,
   ) {}
 
-  direct(organizationId: string, projectId: string, messages: SlackDirectMessage[]): void {
+  /** ADR-0079 : Slack s'offre au répartiteur commun (notifications hors Projets). */
+  onModuleInit(): void {
+    this.dispatcher?.registerSender('slack', this);
+  }
+
+  direct(
+    organizationId: string,
+    projectId: string,
+    messages: SlackDirectMessage[],
+    report?: PushReport,
+  ): void {
     if (messages.length === 0) return;
-    this.track(this.sendDirect(organizationId, projectId, messages));
+    this.track(this.sendDirect(organizationId, projectId, messages, report));
+  }
+
+  /** ADR-0079 § 8 : état du canal pour l'écran « Mes notifications ». */
+  async channelStatus(organizationId: string, _userId: string): Promise<PushChannelStatus> {
+    const view = await this.connections.view(organizationId, false);
+    if (!view.available) return { ready: false, reason: 'slack_unavailable', detail: null };
+    if (!view.connected || view.status !== 'active') {
+      return { ready: false, reason: 'slack_not_connected', detail: view.teamName };
+    }
+    return { ready: true, reason: null, detail: view.teamName };
   }
 
   channel(event: SlackChannelEvent): void {
@@ -107,19 +153,31 @@ export class SlackNotifier implements SlackNotifierPort, OnApplicationShutdown {
     organizationId: string,
     projectId: string,
     messages: SlackDirectMessage[],
+    report?: PushReport,
   ): Promise<void> {
+    const tell: PushReport = (m, o) => {
+      try {
+        report?.(m, o);
+      } catch {
+        /* le journal ne casse jamais un envoi */
+      }
+    };
     const active = await this.connections.active(organizationId);
-    if (!active) return;
+    if (!active) {
+      for (const m of messages) tell(m, { status: 'skipped', reason: 'slack_not_connected' });
+      return;
+    }
     const [context, who] = await Promise.all([
       this.context(organizationId, projectId),
       this.members.identitiesOf(messages.map((m) => m.recipientUserId)),
     ]);
-    for (const m of messages) {
+    for (const [index, m] of messages.entries()) {
       const email = who.get(m.recipientUserId)?.email ?? null;
       try {
         const slackUserId = email ? await this.slackUserOf(active, m.recipientUserId, email) : null;
         if (!slackUserId) {
           await this.connections.count(organizationId, 'unmatched');
+          tell(m, { status: 'skipped', reason: 'slack_unmatched' });
           continue;
         }
         const channel = await this.api.openDirectMessage(active.token, slackUserId);
@@ -134,10 +192,17 @@ export class SlackNotifier implements SlackNotifierPort, OnApplicationShutdown {
           }),
         });
         await this.connections.count(organizationId, 'sent');
+        tell(m, { status: 'sent', reason: null });
       } catch (err) {
         await this.connections.onError(organizationId, err);
+        tell(m, { status: 'failed', reason: 'provider_error' });
         // Jeton mort : inutile d'insister pour les destinataires suivants.
-        if (err instanceof SlackApiError && err.deadToken) return;
+        if (err instanceof SlackApiError && err.deadToken) {
+          for (const rest of messages.slice(index + 1)) {
+            tell(rest, { status: 'failed', reason: 'provider_error' });
+          }
+          return;
+        }
       }
     }
   }

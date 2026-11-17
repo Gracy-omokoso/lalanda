@@ -159,6 +159,22 @@ export class WorkDueRemindersJob implements OnModuleInit {
           actorUserId: null,
           dedupeKey: `${kind}:${taskId}:${task.dueDate}`,
         });
+        // ADR-0079 § 3 : le chef et l'adjoint voient les retards de leur projet (une fois
+        // par tâche et par échéance), sauf s'ils sont eux-mêmes le responsable.
+        if (kind === 'work.task_overdue') {
+          await this.notifier.taskEvent({
+            organizationId,
+            recipients: (await this.notifier.leads(organizationId, task.projectId)).filter(
+              (u) => u !== task.assigneeUserId,
+            ),
+            kind: 'work.project_task_overdue',
+            projectId: task.projectId,
+            taskId,
+            title: `En retard : #${task.number} ${task.title} (échéance ${task.dueDate})`,
+            actorUserId: null,
+            dedupeKey: `work.project_task_overdue:${taskId}:${task.dueDate}`,
+          });
+        }
         report.notified += 1;
       }
     }

@@ -1312,7 +1312,8 @@ export class WorkTasksService {
       title: `#${task.number} ${task.title} — assignée par ${await this.actorName(actor)}`,
       href: taskHref(task.projectId, task.id),
     });
-    if (assigneeUserId === actor.userId) return;
+    // ADR-0079 § 1 : l'auto-assignation n'est notifiée que si la personne l'a demandé
+    // (« Me notifier aussi de mes propres actions ») — le notifier en décide.
     await this.notifier.taskEvent({
       organizationId,
       recipients: [assigneeUserId],
@@ -1581,6 +1582,20 @@ export class WorkTasksService {
       collaboratorUserIds,
       actor,
     );
+    // ADR-0079 § 3 : le chef et l'adjoint voient naître les tâches de leur projet (un
+    // geste de masse — import, IA — s'annonce par ses assignations groupées).
+    if (!opts.assignments) {
+      await this.notifier.taskEvent({
+        organizationId,
+        recipients: await this.notifier.leads(organizationId, projectId),
+        kind: 'work.task_created',
+        projectId,
+        taskId: id,
+        title: `${await this.actorName(actor)} a créé #${number} ${body.title}`,
+        actorUserId: actor.userId,
+        audience: 'project_lead',
+      });
+    }
     return this.result(organizationId, id);
   }
 
@@ -1849,6 +1864,27 @@ export class WorkTasksService {
         actor,
       );
     }
+    // ADR-0079 § 3 : « l'échéance d'une de mes tâches change » — responsable (s'il n'est pas
+    // celui qu'on vient d'assigner), collaborateurs, chef et adjoint.
+    if (body.dueDate !== undefined && body.dueDate !== (current.dueDate ?? null)) {
+      const assignee = assigneeChanged ? null : (current.assigneeUserId ?? null);
+      const label = `#${current.number} ${body.title ?? current.title}`;
+      await this.notifier.taskEvent({
+        organizationId,
+        recipients: [
+          assignee,
+          ...(current.collaboratorUserIds ?? []).filter((u) => !collabAdded.includes(u)),
+          ...(await this.notifier.leads(organizationId, current.projectId)),
+        ],
+        kind: 'work.task_due_date_changed',
+        projectId: current.projectId,
+        taskId,
+        title: body.dueDate
+          ? `${await this.actorName(actor)} a fixé l’échéance de ${label} au ${body.dueDate}`
+          : `${await this.actorName(actor)} a retiré l’échéance de ${label}`,
+        actorUserId: actor.userId,
+      });
+    }
     return this.result(organizationId, taskId);
   }
 
@@ -1997,6 +2033,27 @@ export class WorkTasksService {
         projectId: current.projectId,
         taskId,
         title: `${await this.actorName(actor)} a déplacé #${current.number} ${current.title} vers « ${column.label} »`,
+        actorUserId: actor.userId,
+      });
+    }
+    // ADR-0079 § 3 : terminée ou rouverte — le chef, l'adjoint et les abonnés (le
+    // responsable et les collaborateurs ont déjà « statut changé »).
+    if (nowDone !== current.done) {
+      const concerned = new Set(
+        [current.assigneeUserId, ...(current.collaboratorUserIds ?? [])].filter(Boolean),
+      );
+      const leads = await this.notifier.leads(organizationId, current.projectId);
+      await this.notifier.taskEvent({
+        organizationId,
+        recipients: [...leads, ...(nowDone ? (current.followerUserIds ?? []) : [])].filter(
+          (u) => !concerned.has(u),
+        ),
+        kind: nowDone ? 'work.task_completed' : 'work.task_reopened',
+        projectId: current.projectId,
+        taskId,
+        title: nowDone
+          ? `${await this.actorName(actor)} a terminé #${current.number} ${current.title}`
+          : `${await this.actorName(actor)} a rouvert #${current.number} ${current.title}`,
         actorUserId: actor.userId,
       });
     }

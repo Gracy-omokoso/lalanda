@@ -4,11 +4,20 @@
 // des contrats partagés `@lalanda/shared/notifications`, jamais recopiées.
 
 import type {
+  NotificationChannel,
+  NotificationChannelsView,
+  NotificationDeliveriesPageView,
   NotificationKind,
+  NotificationOrgSettingsView,
   NotificationPageView,
   NotificationPreferencesView,
+  NotificationSettingsView,
+  NotificationTestView,
   NotificationView,
+  PutNotificationOrgSettingsBody,
+  PutNotificationSettingsBody,
   UnreadCountView,
+  UnreadElsewhereView,
 } from '@lalanda/shared/notifications';
 
 import { jsonRequest } from './api';
@@ -46,4 +55,29 @@ export const notificationsApi = {
       method: 'PUT',
       body: { mutedKinds },
     }),
+  // ADR-0079 : non lues des autres organisations, réglages, canaux, tests, journal.
+  unreadElsewhere: () =>
+    jsonRequest<UnreadElsewhereView>('/notifications/unread-elsewhere', { method: 'GET' }),
+  settings: () => jsonRequest<NotificationSettingsView>('/notifications/settings', { method: 'GET' }),
+  putSettings: (body: PutNotificationSettingsBody) =>
+    jsonRequest<NotificationSettingsView>('/notifications/settings', { method: 'PUT', body }),
+  orgSettings: () =>
+    jsonRequest<NotificationOrgSettingsView>('/notifications/organization-settings', {
+      method: 'GET',
+    }),
+  putOrgSettings: (body: PutNotificationOrgSettingsBody) =>
+    jsonRequest<NotificationOrgSettingsView>('/notifications/organization-settings', {
+      method: 'PUT',
+      body,
+    }),
+  channels: () => jsonRequest<NotificationChannelsView>('/notifications/channels', { method: 'GET' }),
+  test: (channel: NotificationChannel) =>
+    jsonRequest<NotificationTestView>('/notifications/test', { method: 'POST', body: { channel } }),
+  deliveries: (params: { cursor?: string | null; organization?: boolean } = {}) =>
+    jsonRequest<NotificationDeliveriesPageView>(
+      `/notifications/deliveries${params.organization ? '/organization' : ''}${
+        params.cursor ? `?cursor=${encodeURIComponent(params.cursor)}` : ''
+      }`,
+      { method: 'GET' },
+    ),
 };

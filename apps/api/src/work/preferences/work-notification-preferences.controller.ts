@@ -2,12 +2,17 @@
 //
 //   GET /work/notification-preferences   work.read   (préférences de l'APPELANT)
 //   PUT /work/notification-preferences   work.read   (révision attendue ; 0 = premier enregistrement)
+//   PUT /work/notification-preferences/digest   work.read   (résumé quotidien seul, ADR-0079 § 8)
+//
+// ADR-0079 § 4.4 : route de COMPATIBILITÉ. Les canaux vivent dans `/notifications/settings`
+// (modes, surcharges par mode) ; cette route les présente et les écrit dans l'ancienne forme.
 //
 // Donnée personnelle : chacun ne lit et n'écrit que les siennes, dans l'organisation
 // active. `work.read` suffit : quiconque reçoit des notifications des Projets les règle.
 
 import { Body, Controller, Get, Inject, Put, UseGuards } from '@nestjs/common';
 import {
+  PutWorkDigestBody,
   PutWorkNotificationPreferencesBody,
   type WorkNotificationPreferencesView,
 } from '@lalanda/shared/work';
@@ -48,5 +53,17 @@ export class WorkNotificationPreferencesController {
     const parsed = PutWorkNotificationPreferencesBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.prefs.put(orgId, user.id, parsed.data);
+  }
+
+  @Put('digest')
+  @RequirePermission('work.read')
+  async putDigest(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @Body() body: unknown,
+  ): Promise<WorkNotificationPreferencesView> {
+    const parsed = PutWorkDigestBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.prefs.putDigest(orgId, user.id, parsed.data);
   }
 }

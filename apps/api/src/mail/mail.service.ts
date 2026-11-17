@@ -121,6 +121,11 @@ export interface SalesDocumentMail extends SalesDocumentMailContent {
 export interface WorkNotificationMail extends WorkNotificationMailContent {
   to: string;
   href: string;
+  /**
+   * ADR-0079 § 8 : chemin RELATIF de l'écran « Mes notifications » cité en pied d'e-mail ;
+   * défaut : `/projets/parametres` (ADR-0061). Toute notification de Lalanda l'utilise.
+   */
+  preferencesPath?: string;
 }
 
 /** Résumé quotidien des Projets (ADR-0061 § 2), au plus un par jour. */
@@ -273,12 +278,14 @@ export class TemplatedMailService extends MailService {
   }
 
   async sendWorkNotification(input: WorkNotificationMail): Promise<MailDeliveryResult> {
-    const { to, href, ...content } = input;
+    const { to, href, preferencesPath, ...content } = input;
     // Chemin relatif seulement : une URL absolue fournie par un appelant n'est jamais suivie.
     const path = /^\/[^/]/.test(href) ? href : '/projets';
+    const prefs =
+      preferencesPath && /^\/[^/\\\s][^\s\\]*$/.test(preferencesPath) ? preferencesPath : '/projets/parametres';
     return this.transport.send({
       to,
-      ...renderWorkNotification(content, `${webUrl()}${path}`, `${webUrl()}/projets/parametres`),
+      ...renderWorkNotification(content, `${webUrl()}${path}`, `${webUrl()}${prefs}`),
     });
   }
 

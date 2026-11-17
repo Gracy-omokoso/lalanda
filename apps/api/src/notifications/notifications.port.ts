@@ -25,6 +25,9 @@
 //   (`recipientUserId === actorUserId` → ignoré) ;
 // - un type coupé par le destinataire (`notification_preferences.mutedKinds`)
 //   n'est pas enregistré ;
+// - ADR-0079 : `notify` applique le mode et les réglages de la personne sur les quatre
+//   canaux (cloche, e-mail, Slack, WhatsApp) ; l'auteur n'est notifié que s'il a coché
+//   « Me notifier aussi de mes propres actions » ;
 // - `dedupeKey` est unique par (organisation, destinataire) : réémettre la même
 //   clé ne crée pas de doublon (rappels d'échéance rejoués) ;
 // - le destinataire doit être membre de l'organisation et détenir
@@ -38,6 +41,14 @@ import type { NotificationEmission } from '@lalanda/shared/notifications';
 import type { Action } from '../authz/permissions.js';
 
 export const NOTIFICATIONS_PORT = Symbol('NOTIFICATIONS_PORT');
+
+/**
+ * ADR-0079 § 4 : port de la CLOCHE seule. `NOTIFICATIONS_PORT.notify` répartit sur les
+ * quatre canaux selon les réglages du destinataire (cloche, e-mail, Slack, WhatsApp) ;
+ * un producteur qui répartit lui-même (les Projets, contexte de projet) passe par le
+ * répartiteur et n'utilise que ce port pour la cloche — sinon l'e-mail partirait deux fois.
+ */
+export const NOTIFICATIONS_BELL_PORT = Symbol('NOTIFICATIONS_BELL_PORT');
 
 /** Une notification à émettre ; `requiredAction` est une action RBAC réelle. */
 export type NotificationInput = NotificationEmission<Action>;

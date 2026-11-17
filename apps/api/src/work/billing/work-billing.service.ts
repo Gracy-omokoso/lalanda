@@ -30,7 +30,7 @@ import {
   type WorkProjectWarning,
   type WorkTaskView,
 } from '@lalanda/shared/work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
@@ -55,6 +55,8 @@ import {
   type WorkActor,
 } from '../work.common.js';
 import { WorkActivityService, type ActivityInput } from '../work-activity.service.js';
+import { WorkMembersService } from '../work-members.service.js';
+import { WorkNotifier } from '../work-notifier.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import { WorkSettingsService } from '../work-settings.service.js';
 import { WorkTasksService } from '../work-tasks.service.js';
@@ -209,7 +211,16 @@ export class WorkBillingService {
     @Inject(WorkSettingsService) private readonly settings: WorkSettingsService,
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(InvoiceDraftsService) private readonly drafts: InvoiceDraftsService,
+    // ADR-0079 § 3 : projet créé depuis un devis, une opportunité ou un contrat ; brouillon
+    // de facture d'un jalon. Facultatif : sans notifier, rien ne part et rien ne casse.
+    @Optional() @Inject(WorkNotifier) private readonly notifier: WorkNotifier | null = null,
+    @Optional() @Inject(WorkMembersService) private readonly members: WorkMembersService | null = null,
   ) {}
+
+  private async actorName(actor: WorkActor): Promise<string> {
+    if (!this.members) return 'Un membre';
+    return WorkMembersService.refOf(await this.members.refs([actor.userId]), actor.userId).name;
+  }
 
   // ── Lectures d'autres modules ────────────────────────────────────────────
 
@@ -672,6 +683,28 @@ export class WorkBillingService {
       await this.projectModel.deleteOne({ _id: created._id, organizationId }).exec();
       throw err;
     }
+    // ADR-0079 § 3 : sans chef désigné, les gestionnaires des projets (`work.manage`)
+    // apprennent qu'un projet est né d'un devis, d'une opportunité ou d'un contrat.
+    if (this.notifier) {
+      const a = input.activity;
+      const origin =
+        typeof a['contractNumber'] === 'string'
+          ? `du contrat ${a['contractNumber']}`
+          : typeof a['quoteNumber'] === 'string'
+            ? `du devis ${a['quoteNumber']}`
+            : input.source?.['kind'] === 'opportunity'
+              ? 'd’une opportunité gagnée'
+              : 'd’un document commercial';
+      await this.notifier.projectEvent({
+        organizationId,
+        recipients: await this.notifier.holdersOf(organizationId, 'work.manage'),
+        kind: 'work.project_created',
+        projectId,
+        title: `${await this.actorName(actor)} a créé le projet ${name} à partir ${origin}`,
+        actorUserId: actor.userId,
+        audience: 'permission_holders',
+      });
+    }
     return this.projects.get(organizationId, projectId);
   }
 
@@ -1000,6 +1033,19 @@ export class WorkBillingService {
       data: { invoiceId, source: body.source, lineCount: lines.length },
     });
     await this.projects.touch(organizationId, task.projectId);
+    // ADR-0079 § 3 : le chef et l'adjoint savent qu'un brouillon attend (jamais un montant).
+    if (this.notifier) {
+      await this.notifier.taskEvent({
+        organizationId,
+        recipients: await this.notifier.leads(organizationId, task.projectId),
+        kind: 'work.invoice_draft_prepared',
+        projectId: task.projectId,
+        taskId,
+        title: `${await this.actorName(actor)} a préparé un brouillon de facture pour le jalon #${task.number} ${task.title}`,
+        actorUserId: actor.userId,
+        audience: 'project_lead',
+      });
+    }
     const invoice = (await this.invoicesOf(organizationId, [invoiceId])).get(invoiceId)!;
     return {
       invoiceId,

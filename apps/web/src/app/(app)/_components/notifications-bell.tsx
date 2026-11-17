@@ -15,10 +15,11 @@
 // n'invente pas d'état. Rien ici n'autorise quoi que ce soit — l'API ne sert
 // que les notifications de l'appelant dans l'organisation active.
 
-import type { NotificationView } from '@lalanda/shared/notifications';
+import type { NotificationView, UnreadElsewhereView } from '@lalanda/shared/notifications';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { basculerOrganisation } from '@/lib/bascule-organisation';
 import { notificationsApi } from '@/lib/notifications-api';
 
 import {
@@ -46,6 +47,8 @@ export function NotificationsBell(): React.ReactElement {
   const [nonLues, setNonLues] = useState(0);
   const [etat, setEtat] = useState<EtatPanneau>('ferme');
   const [items, setItems] = useState<NotificationView[]>([]);
+  // ADR-0079 § 1 : non lues des AUTRES organisations (la cloche ne montre que l'active).
+  const [ailleurs, setAilleurs] = useState<UnreadElsewhereView['organizations']>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const ouvert = etat !== 'ferme';
@@ -116,6 +119,10 @@ export function NotificationsBell(): React.ReactElement {
       setItems(page.items);
       setNonLues(compteur.unread);
       setEtat('pret');
+      notificationsApi
+        .unreadElsewhere()
+        .then((v) => setAilleurs(v.organizations))
+        .catch(() => setAilleurs([]));
     } catch {
       setEtat('erreur');
     }
@@ -210,6 +217,26 @@ export function NotificationsBell(): React.ReactElement {
             aria-live="polite"
             aria-busy={etat === 'chargement'}
           >
+            {ailleurs.length > 0 ? (
+              <ul className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                {ailleurs.map((o) => (
+                  <li key={o.organizationId} className="px-3 py-2 text-xs">
+                    <span>
+                      {o.unread} non lue{o.unread > 1 ? 's' : ''} dans <strong>{o.name}</strong>.{' '}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        basculerOrganisation({ id: o.organizationId, name: o.name }, '/notifications')
+                      }
+                      className="text-[var(--accent)] underline-offset-2 hover:underline"
+                    >
+                      Basculer et les voir
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {/* ADR-0053 — P6 : annonces de la plateforme, avant celles de l'organisation. */}
             <SectionAnnoncesCloche annonces={annonces.annonces} onLire={annonces.lire} />
             {etat === 'chargement' ? (
@@ -257,13 +284,23 @@ export function NotificationsBell(): React.ReactElement {
             )}
           </div>
 
-          <Link
-            href={NOTIFICATIONS_HREF}
-            onClick={() => setEtat('ferme')}
-            className="shrink-0 border-t border-[var(--border)] px-3 py-2 text-center text-sm text-[var(--accent)] transition hover:bg-[var(--surface-muted)]"
-          >
-            Voir toutes les notifications
-          </Link>
+          <div className="flex shrink-0 border-t border-[var(--border)] text-sm">
+            <Link
+              href={NOTIFICATIONS_HREF}
+              onClick={() => setEtat('ferme')}
+              className="flex-1 px-3 py-2 text-center text-[var(--accent)] transition hover:bg-[var(--surface-muted)]"
+            >
+              Voir toutes les notifications
+            </Link>
+            {/* ADR-0079 § 8 : l'écran unique des réglages. */}
+            <Link
+              href="/compte/notifications"
+              onClick={() => setEtat('ferme')}
+              className="border-l border-[var(--border)] px-3 py-2 text-center text-[var(--accent)] transition hover:bg-[var(--surface-muted)]"
+            >
+              Réglages
+            </Link>
+          </div>
         </div>
       ) : null}
     </div>

@@ -73,6 +73,10 @@ export class Notification {
   @Prop({ type: Date, default: null })
   readAt!: Date | null;
 
+  /** ADR-0079 § 5 : événements regroupés dans cette ligne (rafale). Absent : 1. */
+  @Prop({ type: Number, required: false })
+  groupCount?: number;
+
   /**
    * Expiration : `createdAt` + `NOTIFICATIONS_RETENTION_DAYS` (180 jours par
    * défaut). L'index TTL porte sur ce champ, et non sur `createdAt` avec un

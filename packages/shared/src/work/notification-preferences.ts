@@ -1,5 +1,9 @@
 // Mes notifications des Projets — préférences PAR UTILISATEUR (ADR-0061 § 2).
 //
+// ADR-0079 § 4.4 : FORME DE COMPATIBILITÉ. Les canaux vivent désormais dans les réglages
+// communs (`@lalanda/shared/notifications` : modes, surcharges par mode). Les défauts
+// ci-dessous ne servent plus qu'à relire un ancien enregistrement (conversion sans perte).
+//
 // Pour chaque événement : cloche (boîte in-app) oui/non, e-mail oui/non, Slack oui/non
 // (ADR-0064 : message privé du bot, seulement si l'organisation a connecté son espace
 // Slack), WhatsApp oui/non (ADR-0065 : message par modèle Meta, seulement si la
@@ -180,6 +184,26 @@ export function resolveWorkNotificationPreferences(
   return base;
 }
 
+const Digest = z
+  .object({
+    enabled: z.boolean({ error: 'Vrai ou faux attendu.' }),
+    hour: z.number({ error: 'Heure attendue (0 à 23).' }).int().min(0).max(23),
+    workingDaysOnly: z.boolean({ error: 'Vrai ou faux attendu.' }),
+  })
+  .strict();
+
+/**
+ * ADR-0079 § 8 : `PUT /work/notification-preferences/digest` — le résumé quotidien seul
+ * (écran unique « Mes notifications ») ; les canaux vivent dans `/notifications/settings`.
+ */
+export const PutWorkDigestBody = z
+  .object({
+    expectedRevision: z.number({ error: 'Révision attendue : un entier.' }).int().min(0),
+    digest: Digest,
+  })
+  .strict();
+export type PutWorkDigestBody = z.output<typeof PutWorkDigestBody>;
+
 const Channels = z
   .object({
     bell: z.boolean({ error: 'Vrai ou faux attendu.' }),
@@ -206,13 +230,7 @@ export const PutWorkNotificationPreferencesBody = z
         ) as Record<WorkNotificationEvent, typeof Channels>,
       )
       .strict(),
-    digest: z
-      .object({
-        enabled: z.boolean({ error: 'Vrai ou faux attendu.' }),
-        hour: z.number({ error: 'Heure attendue (0 à 23).' }).int().min(0).max(23),
-        workingDaysOnly: z.boolean({ error: 'Vrai ou faux attendu.' }),
-      })
-      .strict(),
+    digest: Digest,
   })
   .strict();
 export type PutWorkNotificationPreferencesBody = z.output<

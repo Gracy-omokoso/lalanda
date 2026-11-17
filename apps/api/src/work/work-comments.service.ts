@@ -302,6 +302,21 @@ export class WorkCommentsService {
       title: `${who.name} a commenté ${label}`,
       actorUserId: actor.userId,
     });
+    // ADR-0079 § 3 : le chef et l'adjoint suivent les échanges de leur projet — s'ils ne
+    // les reçoivent pas déjà comme abonnés ou mentionnés.
+    const followers = new Set(task.followerUserIds ?? []);
+    await this.notifier.taskEvent({
+      organizationId,
+      recipients: (await this.notifier.leads(organizationId, task.projectId)).filter(
+        (u) => !followers.has(u) && !mentioned.has(u),
+      ),
+      kind: 'work.comment_added',
+      projectId: task.projectId,
+      taskId,
+      title: `${who.name} a commenté ${label}`,
+      actorUserId: actor.userId,
+      audience: 'project_lead',
+    });
   }
 
   async update(

@@ -22,12 +22,16 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 
 import {
+  NOTIFICATION_SETTINGS_LIMITS,
+  burstTitle,
+  notificationSpecOf,
   type ListNotificationsQuery,
   type NotificationKind,
   type NotificationPageView,
   type NotificationPreferencesView,
   type NotificationView,
   type UnreadCountView,
+  type UnreadElsewhereView,
 } from '@lalanda/shared/notifications';
 
 import {
@@ -45,6 +49,8 @@ import {
   type NotificationDocument,
   type NotificationPreferencesDocument,
 } from './notification.schemas.js';
+import { NotificationDispatcher } from './notification-dispatcher.js';
+import { NotificationSettingsService } from './notification-settings.service.js';
 import type { NotificationInput, NotificationsPort } from './notifications.port.js';
 import { heldActions, knownKinds, rejectEmission, retentionDays } from './notifications.rules.js';
 
@@ -64,7 +70,14 @@ export type NotificationsClock = () => Date;
 
 /** Résultat d'une émission — utile aux tests, ignoré par les producteurs. */
 export type NotifyOutcome =
-  'created' | 'duplicate' | 'muted' | 'not_member' | 'not_allowed' | 'rejected' | 'error';
+  | 'created'
+  | 'grouped'
+  | 'duplicate'
+  | 'muted'
+  | 'not_member'
+  | 'not_allowed'
+  | 'rejected'
+  | 'error';
 
 const DAY_MS = 86_400_000;
 
@@ -94,6 +107,7 @@ function toView(doc: Notification & { _id: Types.ObjectId }): NotificationView {
     actorUserId: doc.actorUserId ?? null,
     readAt: doc.readAt ? doc.readAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
+    ...(doc.groupCount && doc.groupCount > 1 ? { count: doc.groupCount } : {}),
   };
 }
 
@@ -107,20 +121,35 @@ export class NotificationsService implements NotificationsPort {
     private readonly preferencesModel: Model<NotificationPreferencesDocument>,
     @InjectModel(Membership.name) private readonly memberships: Model<MembershipDocument>,
     @Inject(NOTIFICATIONS_CLOCK) private readonly clock: NotificationsClock,
+    @Inject(NotificationDispatcher) private readonly dispatcher: NotificationDispatcher,
+    @Inject(NotificationSettingsService) private readonly settings: NotificationSettingsService,
   ) {}
 
   // ── Port ─────────────────────────────────────────────────────────────────
 
+  /**
+   * ADR-0079 § 4 : répartit l'émission sur les canaux choisis par le destinataire (mode,
+   * surcharges, obligations) — la cloche par `emit`, l'e-mail, Slack et WhatsApp par le
+   * répartiteur, journal compris. Ne lève jamais.
+   */
   async notify(input: NotificationInput): Promise<void> {
-    await this.emit(input);
+    await this.dispatcher.dispatch([input], { bell: (i) => this.emit(i) });
   }
 
-  /** Comme `notify`, en rendant le sort de l'émission. Ne lève jamais. */
+  /**
+   * CLOCHE seule, en rendant le sort de l'émission. Ne lève jamais. Respecte les types
+   * coupés ; regroupe les rafales (§ 5) ; l'auteur n'est enregistré que s'il a demandé à
+   * être notifié de ses propres actions (§ 1).
+   */
   async emit(input: NotificationInput): Promise<NotifyOutcome> {
     try {
       const rejection = rejectEmission(input);
-      if (rejection === 'self_notification') return 'rejected';
-      if (rejection !== null) {
+      if (rejection === 'self_notification') {
+        const allowed = await this.settings
+          .notifyOwnActions(input.organizationId, input.recipientUserId)
+          .catch(() => false);
+        if (!allowed) return 'rejected';
+      } else if (rejection !== null) {
         this.logger.warn(`émission ignorée (${rejection}) : type ${String(input.kind)}`);
         return 'rejected';
       }
@@ -136,6 +165,7 @@ export class NotificationsService implements NotificationsPort {
       if (knownKinds(prefs?.mutedKinds).includes(input.kind)) return 'muted';
 
       const now = this.clock();
+      if ((await this.groupBurst(input, now)) === 'grouped') return 'grouped';
       try {
         await this.notifications.create({
           organizationId,
@@ -171,7 +201,74 @@ export class NotificationsService implements NotificationsPort {
     }
   }
 
+  /**
+   * ADR-0079 § 5 : rafale — une notification NON LUE du même type, sur le même objet,
+   * créée il y a moins de 10 minutes absorbe la nouvelle (« 3 nouveaux commentaires —
+   * … ») et garde une seule ligne (sa place dans la liste ne bouge pas). Seulement pour les types du
+   * catalogue qui le prévoient, et jamais pour un rappel (`dedupeKey`).
+   */
+  private async groupBurst(input: NotificationInput, now: Date): Promise<'grouped' | null> {
+    const spec = notificationSpecOf(input.kind);
+    if (!spec?.burst || input.dedupeKey !== undefined) return null;
+    const since = new Date(
+      now.getTime() - NOTIFICATION_SETTINGS_LIMITS.burstWindowMinutes * 60_000,
+    );
+    const existing = await this.notifications
+      .findOne({
+        organizationId: input.organizationId,
+        recipientUserId: input.recipientUserId,
+        kind: input.kind,
+        'source.entityId': input.source.entityId,
+        readAt: null,
+        createdAt: { $gte: since },
+      })
+      .sort({ createdAt: -1 })
+      .lean<Notification & { _id: Types.ObjectId }>();
+    if (!existing) return null;
+    const count = (existing.groupCount ?? 1) + 1;
+    await this.notifications.updateOne(
+      { _id: existing._id, readAt: null },
+      {
+        $set: {
+          title: burstTitle(count, spec.burst.noun, input.title),
+          href: input.href,
+          actorUserId: input.actorUserId,
+          groupCount: count,
+          updatedAt: now,
+        },
+      },
+    );
+    return 'grouped';
+  }
+
   // ── Lecture par le destinataire ──────────────────────────────────────────
+
+  /**
+   * ADR-0079 § 1 : notifications non lues des AUTRES organisations de l'appelant. La
+   * cloche ne montre que l'organisation active : sans ce signal, un salarié qui a aussi
+   * son organisation personnelle ne voit jamais rien venir de son équipe.
+   */
+  async unreadElsewhere(activeOrgId: string, userId: string): Promise<UnreadElsewhereView> {
+    const memberships = await this.memberships
+      .find({ userId, organizationId: { $ne: activeOrgId } }, { organizationId: 1 })
+      .limit(20)
+      .lean();
+    const out: UnreadElsewhereView['organizations'] = [];
+    for (const m of memberships) {
+      const organizationId = String(m.organizationId);
+      const base = await this.visibleFilter(organizationId, userId);
+      if (!base) continue;
+      const unread = await this.notifications.countDocuments({ ...base, readAt: null });
+      if (unread > 0) {
+        out.push({
+          organizationId,
+          name: await this.dispatcher.organizationName(organizationId),
+          unread,
+        });
+      }
+    }
+    return { organizations: out };
+  }
 
   async list(
     organizationId: string,

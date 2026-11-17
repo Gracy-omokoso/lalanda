@@ -47,6 +47,7 @@ import { WorkAccessService } from './work-access.service.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
+import { WorkNotifier } from './work-notifier.js';
 import { WorkSettingsService } from './work-settings.service.js';
 import { WorkExternalLifecycle } from './external/work-external-lifecycle.js';
 import {
@@ -107,7 +108,31 @@ export class WorkProjectsService {
     @Optional()
     @Inject(WorkExternalLifecycle)
     private readonly externals: WorkExternalLifecycle | null = null,
+    // ADR-0079 § 3 : projet archivé ou restauré. Facultatif : rien ne casse sans notifier.
+    @Optional() @Inject(WorkNotifier) private readonly notifier: WorkNotifier | null = null,
   ) {}
+
+  /** ADR-0079 § 3 : archivé ou restauré — chef, adjoint et membres directs du projet. */
+  private async notifyLifecycle(
+    organizationId: string,
+    project: WorkProjectLean,
+    kind: 'work.project_archived' | 'work.project_restored',
+    actor: WorkActor,
+  ): Promise<void> {
+    if (!this.notifier) return;
+    const who = WorkMembersService.refOf(await this.members.refs([actor.userId]), actor.userId);
+    await this.notifier.projectEvent({
+      organizationId,
+      recipients: [project.ownerUserId, project.deputyUserId, ...(project.memberUserIds ?? [])],
+      kind,
+      projectId: String(project._id),
+      title:
+        kind === 'work.project_archived'
+          ? `${who.name} a archivé le projet ${project.name}`
+          : `${who.name} a restauré le projet ${project.name}`,
+      actorUserId: actor.userId,
+    });
+  }
 
   /** ADR-0076 § 5 : vue d'un statut déclaré. */
   static statusViewOf(
@@ -714,6 +739,7 @@ export class WorkProjectsService {
       userId: actor.userId,
       role: actor.role ?? 'unknown',
     });
+    await this.notifyLifecycle(organizationId, current, 'work.project_archived', actor);
     return this.get(organizationId, projectId, actor);
   }
 
@@ -741,6 +767,7 @@ export class WorkProjectsService {
       kind: 'project.restored',
       data: { from: 'archived', to },
     });
+    await this.notifyLifecycle(organizationId, current, 'work.project_restored', actor);
     return this.get(organizationId, projectId, actor);
   }
 

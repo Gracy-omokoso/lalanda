@@ -32,7 +32,9 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
+import { can } from '../../authz/permissions.js';
 import { isDuplicateKey } from '../../sales/sales.errors.js';
+import { WorkNotifier } from '../work-notifier.js';
 import type { TimesheetAgendaPage, TimesheetAgendaReader } from '../my-tasks.ports.js';
 import {
   WORK_ABSENCES_SOURCE,
@@ -83,6 +85,8 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
     @Optional() @Inject(WORK_ABSENCES_SOURCE) absences: WorkAbsencesSource | null = null,
     // ADR-0078 § 2.5 : feuilles de temps des consultants (comptes externes), lecture seule.
     @Optional() @InjectConnection() private readonly connection: Connection | null = null,
+    // ADR-0079 § 3 : soumise, validée, renvoyée, rouverte (ADR-0077 n'émettait rien).
+    @Optional() @Inject(WorkNotifier) private readonly notifier: WorkNotifier | null = null,
   ) {
     this.absences = absences ?? noWorkAbsences;
   }
@@ -118,6 +122,85 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
       )
       .toArray();
     return docs.map((d) => String(d['_id']));
+  }
+
+  /**
+   * ADR-0079 § 3 : qui valide la semaine de `userId` — son manager (direct ou indirect)
+   * s'il en a un relié à un compte, sinon les détenteurs de `work.manage` (ADR-0077 § 4.6).
+   * Au plus 200 membres examinés.
+   */
+  private async validatorsOf(
+    organizationId: string,
+    userId: string,
+    week: string,
+  ): Promise<string[]> {
+    // ADR-0078 § 2.5 : la semaine d'un consultant va à son référent interne, sinon à
+    // `work.manage`.
+    const consultant = await this.consultantOf(organizationId, userId);
+    const perms = await this.members.permissions(organizationId);
+    if (consultant) {
+      if (consultant.referentUserId && perms.has(consultant.referentUserId)) {
+        return [consultant.referentUserId];
+      }
+      return [...perms.entries()]
+        .filter(([u, m]) => u !== userId && can(m.role, 'work.manage', m.context))
+        .map(([u]) => u);
+    }
+    const candidates = [...perms.entries()]
+      .filter(([u, m]) => u !== userId && can(m.role, 'work.read', m.context))
+      .slice(0, 200);
+    const managers: string[] = [];
+    for (const [u] of candidates) {
+      const ctx = await this.absences.timesheetContextOf(
+        organizationId,
+        u,
+        userId,
+        week,
+        addDays(week, 6),
+      );
+      if (ctx.viewerIsManager) managers.push(u);
+    }
+    if (managers.length > 0) return managers;
+    return candidates.filter(([, m]) => can(m.role, 'work.manage', m.context)).map(([u]) => u);
+  }
+
+  private async notifyWeek(
+    organizationId: string,
+    kind:
+      | 'work.timesheet_submitted'
+      | 'work.timesheet_approved'
+      | 'work.timesheet_returned'
+      | 'work.timesheet_reopened',
+    doc: WorkTimesheetWeekLean,
+    actor: WorkActor,
+  ): Promise<void> {
+    if (!this.notifier) return;
+    try {
+      const refs = await this.members.refs([actor.userId], organizationId);
+      const who = WorkMembersService.refOf(refs, actor.userId).name;
+      const recipients =
+        kind === 'work.timesheet_submitted'
+          ? await this.validatorsOf(organizationId, doc.userId, doc.week)
+          : [doc.userId];
+      const title = {
+        'work.timesheet_submitted': `${who} a soumis sa feuille de temps de la semaine du ${doc.week}`,
+        'work.timesheet_approved': `${who} a validé votre feuille de temps de la semaine du ${doc.week}`,
+        'work.timesheet_returned': `${who} vous a renvoyé votre feuille de temps de la semaine du ${doc.week}`,
+        'work.timesheet_reopened': `${who} a rouvert votre feuille de temps de la semaine du ${doc.week}`,
+      }[kind];
+      await this.notifier.memberEvent({
+        organizationId,
+        recipients,
+        kind,
+        entity: { type: 'timesheet', id: String(doc._id) },
+        title,
+        href: timesheetHref(doc.userId, doc.week),
+        actorUserId: actor.userId,
+        audience: kind === 'work.timesheet_submitted' ? 'manager' : 'requester',
+      });
+    } catch {
+      /* une notification perdue ne défait jamais une décision */
+    }
   }
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -317,6 +400,7 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
       doc!,
       { minutes },
     );
+    await this.notifyWeek(organizationId, 'work.timesheet_submitted', doc!, actor);
     return this.approvalOf(organizationId, actor, userId, body.week, false, now);
   }
 
@@ -402,6 +486,7 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
       minutes,
     );
     await this.record(organizationId, actor, 'approved', doc, { minutes });
+    await this.notifyWeek(organizationId, 'work.timesheet_approved', doc, actor);
     return this.approvalOf(organizationId, actor, body.userId, body.week, true);
   }
 
@@ -421,6 +506,7 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
       null,
     );
     await this.record(organizationId, actor, 'returned', doc, { reason: body.reason });
+    await this.notifyWeek(organizationId, 'work.timesheet_returned', doc, actor);
     return this.approvalOf(organizationId, actor, body.userId, body.week, true);
   }
 
@@ -443,6 +529,7 @@ export class WorkTimesheetApprovalsService implements TimesheetAgendaReader {
       reason: body.reason,
       approvedMinutes: current.approvedMinutes ?? null,
     });
+    await this.notifyWeek(organizationId, 'work.timesheet_reopened', doc, actor);
     return this.approvalOf(organizationId, actor, body.userId, body.week, true);
   }
 

@@ -9,6 +9,8 @@
 
 import { z } from 'zod';
 
+import type { NotificationAudience } from './catalog.js';
+
 /** Types de notification (union fermée). */
 export const NOTIFICATION_KINDS = [
   'work.task_assigned',
@@ -27,6 +29,28 @@ export const NOTIFICATION_KINDS = [
   'work.task_approval_requested',
   'work.task_approval_decided',
   'work.project_status_posted',
+  // ADR-0079 § 3 : événements des Projets ajoutés pour l'équipe, le chef et l'adjoint —
+  // tâche créée, échéance modifiée, terminée, rouverte ; tâche en retard (vue du chef) ;
+  // commentaire et pièce jointe ; brouillon de facture d'un jalon ; membre ajouté ;
+  // projet archivé, restauré, créé depuis un devis, une opportunité ou un contrat ;
+  // feuilles de temps (ADR-0077 n'émettait rien). Refiltrés à la lecture par `work.read`
+  // ET par la visibilité du projet (ADR-0060).
+  'work.task_created',
+  'work.task_due_date_changed',
+  'work.task_completed',
+  'work.task_reopened',
+  'work.project_task_overdue',
+  'work.comment_added',
+  'work.attachment_added',
+  'work.invoice_draft_prepared',
+  'work.project_member_added',
+  'work.project_archived',
+  'work.project_restored',
+  'work.project_created',
+  'work.timesheet_submitted',
+  'work.timesheet_approved',
+  'work.timesheet_returned',
+  'work.timesheet_reopened',
   // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM. `crm.opportunity_won`
   // est déclaré ici et émis par le lot C7 (opportunité gagnée → projet).
   'crm.activity_assigned',
@@ -102,6 +126,8 @@ export const NOTIFICATION_KINDS = [
   'sales.contract_notice_due',
   'sales.contract_term_ending',
   'sales.subscription_drafts_ready',
+  // ADR-0079 § 6 : « M'envoyer un test » (cloche), émis pour soi-même seulement.
+  'organization.notification_test',
   'platform.announcement', // ADR-0053 — P6 : annonce de la plateforme (`/me/announcements`, hors boîte d'organisation).
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -156,6 +182,8 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'attendance_correction',
   // ADR-0050 — V6 : contrat client (ses avenants et ses échéances y renvoient).
   'sales_contract',
+  // ADR-0079 § 3 : semaine de feuille de temps (ADR-0077 § 4).
+  'timesheet',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 
@@ -216,6 +244,11 @@ export interface NotificationEmission<A extends string = string> {
   actorUserId: string | null;
   /** Ex. `work.task_due_soon:<taskId>:<dueDate>` : une seule notification par clé. */
   dedupeKey?: string;
+  /**
+   * ADR-0079 § 4 : relation du destinataire avec l'objet (`project_lead` = chef ou adjoint
+   * du projet). Sert au mode par défaut (chef → Atténué) et au journal. Facultatif.
+   */
+  audience?: NotificationAudience;
 }
 
 /** Notification servie au destinataire. */
@@ -228,6 +261,8 @@ export interface NotificationView {
   actorUserId: string | null;
   readAt: string | null;
   createdAt: string;
+  /** ADR-0079 § 5 : nombre d'événements regroupés dans cette ligne (rafale) ; 1 sinon. */
+  count?: number;
 }
 
 export interface NotificationPageView {
@@ -279,3 +314,7 @@ export const PutNotificationPreferencesBody = z
   })
   .strict();
 export type PutNotificationPreferencesBody = z.output<typeof PutNotificationPreferencesBody>;
+
+// ADR-0079 : catalogue des événements, modes, canaux, réglages et journal d'envoi.
+export * from './catalog.js';
+export * from './settings.js';

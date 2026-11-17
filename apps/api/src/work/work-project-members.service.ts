@@ -277,6 +277,28 @@ export class WorkProjectMembersService {
         title: `Vous avez été ajouté au projet ${project.name}`,
         actorUserId: actor.userId,
       });
+      // ADR-0079 § 3 : le chef et l'adjoint voient qui rejoint leur projet.
+      const added = new Set([...newUsers, ...newTeams.flatMap(teamMemberIds)]);
+      const names = WorkMembersService.refOf;
+      const refs = await this.members.refs(newUsers.slice(0, 3));
+      const who =
+        newUsers.length > 0
+          ? newUsers
+              .slice(0, 3)
+              .map((u) => names(refs, u).name)
+              .join(', ') + (newUsers.length > 3 ? ` et ${newUsers.length - 3} autre(s)` : '')
+          : `${newTeams.length} équipe(s)`;
+      await this.notifier.projectEvent({
+        organizationId,
+        recipients: [project.ownerUserId, project.deputyUserId].filter(
+          (u): u is string => !!u && !added.has(u),
+        ),
+        kind: 'work.project_member_added',
+        projectId,
+        title: `${who} rejoint le projet ${project.name}`,
+        actorUserId: actor.userId,
+        audience: 'project_lead',
+      });
     }
     return this.get(organizationId, projectId, actor);
   }

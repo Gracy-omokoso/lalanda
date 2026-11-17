@@ -10,6 +10,7 @@ import {
   NOTIFICATION_KINDS,
   NOTIFICATION_LIMITS,
   isNotificationHref,
+  notificationSpecOf,
   type NotificationKind,
   type NotificationView,
 } from '@lalanda/shared/notifications';
@@ -22,8 +23,8 @@ export const TAILLE_PANNEAU = NOTIFICATION_LIMITS.bellPanelSize;
 /** Intervalle d'interrogation du compteur quand l'onglet est visible (60 s). */
 export const INTERVALLE_COMPTEUR_MS = NOTIFICATION_LIMITS.unreadPollMs;
 
-/** Libellé et explication de chaque type (préférences, page). */
-export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: string }> = {
+/** Libellés rédigés à la main (antérieurs au catalogue ADR-0079). */
+const LIBELLES_EXPLICITES: Partial<Record<NotificationKind, { label: string; aide: string }>> = {
   // ADR-0076 § 6
   'work.task_collaborator_added': {
     label: 'Collaborateur d’une tâche',
@@ -297,7 +298,30 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Annonce de Lalanda',
     aide: 'Un message de l’équipe Lalanda à ses utilisateurs.',
   },
+  // ADR-0079 § 6 : « M'envoyer un test ».
+  'organization.notification_test': {
+    label: 'Notification de test',
+    aide: 'Envoyée à votre demande depuis « Mes notifications ».',
+  },
 };
+
+/**
+ * Libellé et explication de chaque type (préférences, page). ADR-0079 : les types sans
+ * libellé rédigé prennent celui du catalogue partagé (événement et destinataires).
+ */
+export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: string }> =
+  Object.fromEntries(
+    NOTIFICATION_KINDS.map((k) => {
+      const spec = notificationSpecOf(k);
+      return [
+        k,
+        LIBELLES_EXPLICITES[k] ?? {
+          label: spec?.label ?? k,
+          aide: spec ? `Reçu par : ${spec.recipients.toLowerCase()}.` : '',
+        },
+      ];
+    }),
+  ) as Record<NotificationKind, { label: string; aide: string }>;
 
 /**
  * Types dans l'ordre d'affichage des préférences. ADR-0053 — P6 : les annonces de la

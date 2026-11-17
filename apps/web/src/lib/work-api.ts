@@ -38,6 +38,7 @@ import type {
   WorkTaskWriteResult,
   // ADR-0060 et ADR-0061 : membres, équipes, préférences de notification.
   AddProjectMembersBody,
+  PutWorkDigestBody,
   PutWorkNotificationPreferencesBody,
   WorkNotificationPreferencesView,
   WorkProjectMembersView,
@@ -423,6 +424,12 @@ export const workApi = {
     }),
   putNotificationPreferences: (body: PutWorkNotificationPreferencesBody) =>
     jsonRequest<WorkNotificationPreferencesView>('/work/notification-preferences', {
+      method: 'PUT',
+      body,
+    }),
+  /** ADR-0079 § 8 : le résumé quotidien seul (écran unique « Mes notifications »). */
+  putDigest: (body: PutWorkDigestBody) =>
+    jsonRequest<WorkNotificationPreferencesView>('/work/notification-preferences/digest', {
       method: 'PUT',
       body,
     }),

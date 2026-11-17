@@ -9,30 +9,30 @@
 // journalisées et avalées. L'auteur d'un geste n'est jamais notifié de son
 // propre geste (vérifié ici, et de nouveau par le port).
 
-import { NOTIFICATION_LIMITS, type NotificationKind } from '@lalanda/shared/notifications';
-import { WORK_NOTIFICATION_EVENT_LABELS, workEventOf } from '@lalanda/shared/work';
+import {
+  NOTIFICATION_LIMITS,
+  type NotificationAudience,
+  type NotificationKind,
+} from '@lalanda/shared/notifications';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Types, type Connection } from 'mongoose';
 
+import { can, type Action } from '../authz/permissions.js';
 import { MailService } from '../mail/mail.service.js';
-import { MembersService } from '../organizations/members.service.js';
+import { NotificationDispatcher } from '../notifications/notification-dispatcher.js';
+import { NotificationSettingsService } from '../notifications/notification-settings.service.js';
 import type { NotificationInput } from '../notifications/notifications.port.js';
-import { WorkNotificationPreferencesService } from './preferences/work-notification-preferences.service.js';
 import {
+  NOTIFICATIONS_BELL_PORT,
   NOTIFICATIONS_PORT,
   noNotifications,
   type NotificationsPort,
 } from '../notifications/notifications.port.js';
-import {
-  SLACK_NOTIFIER,
-  type SlackDirectMessage,
-  type SlackNotifierPort,
-} from '../slack/slack-notifier.service.js';
+import { SLACK_NOTIFIER, type SlackNotifierPort } from '../slack/slack-notifier.service.js';
 import {
   WHATSAPP_NOTIFIER,
   type WhatsAppNotifierPort,
-  type WhatsAppWorkMessage,
 } from '../whatsapp/whatsapp-notifier.service.js';
 import { taskHref } from './work.common.js';
 import { WorkAccessService } from './work-access.service.js';
@@ -48,6 +48,8 @@ export interface TaskNotification {
   actorUserId: string | null;
   /** Clé de déduplication (rappels) ; facultative pour les gestes. */
   dedupeKey?: string;
+  /** ADR-0079 : relation des destinataires (le chef et l'adjoint sont reconnus seuls). */
+  audience?: NotificationAudience;
 }
 
 /** Tâche assignée, retenue par un lot (import, création par l'IA). */
@@ -104,15 +106,20 @@ export class WorkNotifier {
     @Optional() @Inject(NOTIFICATIONS_PORT) port: NotificationsPort | null,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
-    @Inject(WorkNotificationPreferencesService)
-    private readonly prefs: WorkNotificationPreferencesService,
-    @Inject(MembersService) private readonly identities: MembersService,
     @InjectConnection() private readonly connection: Connection,
     @Optional() @Inject(MailService) mail: MailService | null = null,
     @Optional() @Inject(SLACK_NOTIFIER) slack: SlackNotifierPort | null = null,
     @Optional() @Inject(WHATSAPP_NOTIFIER) whatsapp: WhatsAppNotifierPort | null = null,
+    // ADR-0079 : cloche seule (le répartiteur s'occupe des autres canaux).
+    @Optional() @Inject(NOTIFICATIONS_BELL_PORT) bell: NotificationsPort | null = null,
+    @Optional()
+    @Inject(NotificationDispatcher)
+    private readonly dispatcher: NotificationDispatcher | null = null,
+    @Optional()
+    @Inject(NotificationSettingsService)
+    private readonly settings: NotificationSettingsService | null = null,
   ) {
-    this.port = port ?? noNotifications;
+    this.port = bell ?? port ?? noNotifications;
     this.mail = mail;
     this.slack = slack;
     this.whatsapp = whatsapp;
@@ -134,95 +141,59 @@ export class WorkNotifier {
   mail: MailService | null;
 
   /**
-   * ADR-0061 § 2 : remet une notification selon les préférences du destinataire —
-   * cloche (boîte commune, par le port) et/ou e-mail (service mail). Un type hors des
-   * huit événements réglables part dans la cloche, comme avant.
+   * ADR-0079 § 4 : remet les notifications par le répartiteur commun — mode et réglages de
+   * chaque destinataire, obligations de l'organisation, garde-fous, journal d'envoi. La
+   * cloche passe par `this.port` (enveloppé par les tests) ; l'e-mail, Slack et WhatsApp
+   * par les champs ci-dessus (remplaçables par les tests). Le chef et l'adjoint du projet
+   * sont reconnus (`audience: project_lead`) : leur mode par défaut est celui du chef.
    */
   private async deliver(inputs: NotificationInput[]): Promise<void> {
     if (inputs.length === 0) return;
-    const organizationId = inputs[0]!.organizationId;
-    const prefs = await this.prefs.many(
-      organizationId,
-      inputs.map((i) => i.recipientUserId),
-    );
-    const emailTo: NotificationInput[] = [];
-    const slackTo: SlackDirectMessage[] = [];
-    const whatsappTo: WhatsAppWorkMessage[] = [];
-    for (const input of inputs) {
-      const event = workEventOf(input.kind);
-      const channels = event ? prefs.get(input.recipientUserId)?.events[event] : undefined;
-      if (!channels || channels.bell) {
-        try {
-          await this.port.notify(input);
-        } catch (err) {
-          this.warn(input, err);
-        }
-      }
-      if (event && channels?.email) emailTo.push(input);
-      // ADR-0064 § 4 : message privé Slack, mêmes destinataires filtrés que l'e-mail.
-      if (event && channels?.slack) {
-        slackTo.push({
-          recipientUserId: input.recipientUserId,
-          eventLabel: WORK_NOTIFICATION_EVENT_LABELS[event],
-          title: input.title,
-          href: input.href,
-        });
-      }
-      // ADR-0065 § 4 : modèle WhatsApp, mêmes destinataires filtrés que l'e-mail ; le
-      // module WhatsApp n'envoie qu'aux numéros vérifiés.
-      if (event && channels?.whatsapp) {
-        whatsappTo.push({
-          recipientUserId: input.recipientUserId,
-          event,
-          eventLabel: WORK_NOTIFICATION_EVENT_LABELS[event],
-          title: input.title,
-          href: input.href,
-        });
-      }
-    }
-    if (whatsappTo.length > 0 && this.whatsapp) {
-      try {
-        this.whatsapp.direct(organizationId, inputs[0]!.source.projectId ?? '', whatsappTo);
-      } catch (err) {
-        this.warn(inputs[0]!, err);
-      }
-    }
-    if (slackTo.length > 0 && this.slack) {
-      try {
-        this.slack.direct(organizationId, inputs[0]!.source.projectId ?? '', slackTo);
-      } catch (err) {
-        this.warn(inputs[0]!, err);
-      }
-    }
-    if (emailTo.length === 0 || !this.mail) return;
     try {
-      const [who, orgName] = await Promise.all([
-        this.identities.identitiesOf(emailTo.map((i) => i.recipientUserId)),
-        this.organizationName(organizationId),
-      ]);
-      for (const input of emailTo) {
-        const to = who.get(input.recipientUserId)?.email;
-        const event = workEventOf(input.kind);
-        if (!to || !event) continue;
-        await this.mail.sendWorkNotification({
-          to,
-          href: input.href,
-          organizationName: orgName,
-          title: input.title,
-          eventLabel: WORK_NOTIFICATION_EVENT_LABELS[event],
-        });
+      const leads = new Map<string, string[]>();
+      for (const i of inputs) {
+        const p = i.source.projectId;
+        if (p && !leads.has(p)) leads.set(p, await this.leads(i.organizationId, p));
       }
+      const marked = inputs.map((i) =>
+        i.source.projectId && leads.get(i.source.projectId)?.includes(i.recipientUserId)
+          ? { ...i, audience: 'project_lead' as const }
+          : i,
+      );
+      if (!this.dispatcher) {
+        for (const i of marked) await this.port.notify(i);
+        return;
+      }
+      await this.dispatcher.dispatch(marked, {
+        bell: (i) => this.port.notify(i),
+        mail: this.mail,
+        slack: this.slack,
+        whatsapp: this.whatsapp,
+      });
     } catch (err) {
-      this.warn(emailTo[0]!, err);
+      this.warn(inputs[0]!, err);
     }
   }
 
-  private async organizationName(organizationId: string): Promise<string> {
-    if (!Types.ObjectId.isValid(organizationId)) return 'Lalanda';
+  /** ADR-0076 : chef et adjoint d'un projet (lecture seule, scopée). */
+  async leads(organizationId: string, projectId: string): Promise<string[]> {
+    if (!Types.ObjectId.isValid(projectId)) return [];
     const doc = await this.connection
-      .collection('organizations')
-      .findOne({ _id: new Types.ObjectId(organizationId) }, { projection: { name: 1 } });
-    return doc ? String(doc['name'] ?? 'Lalanda') : 'Lalanda';
+      .collection('work_projects')
+      .findOne(
+        { _id: new Types.ObjectId(projectId), organizationId },
+        { projection: { ownerUserId: 1, deputyUserId: 1 } },
+      );
+    if (!doc) return [];
+    return [doc['ownerUserId'], doc['deputyUserId']].filter(
+      (u): u is string => typeof u === 'string' && u !== '',
+    );
+  }
+
+  /** Membres qui détiennent EFFECTIVEMENT une action (rôle, ajouts, retraits). */
+  async holdersOf(organizationId: string, action: Action): Promise<string[]> {
+    const perms = await this.members.permissions(organizationId);
+    return [...perms.entries()].filter(([, m]) => can(m.role, action, m.context)).map(([u]) => u);
   }
 
   private warn(input: NotificationInput, err: unknown): void {
@@ -243,7 +214,17 @@ export class WorkNotifier {
     recipients: readonly (string | null | undefined)[],
     actorUserId: string | null,
   ): Promise<string[]> {
-    const ids = [...new Set(recipients.filter((r): r is string => !!r && r !== actorUserId))];
+    // ADR-0079 § 1 : l'auteur reste destinataire s'il a demandé à être notifié de ses
+    // propres actions (désactivé par défaut).
+    const keepActor =
+      actorUserId !== null &&
+      recipients.includes(actorUserId) &&
+      !!(await this.settings?.notifyOwnActions(organizationId, actorUserId).catch(() => false));
+    const ids = [
+      ...new Set(
+        recipients.filter((r): r is string => !!r && (r !== actorUserId || keepActor)),
+      ),
+    ];
     if (ids.length === 0) return [];
     const perms = await this.members.permissions(organizationId, ids);
     const out: string[] = [];
@@ -280,6 +261,7 @@ export class WorkNotifier {
         href: taskHref(n.projectId, n.taskId),
         actorUserId: n.actorUserId,
         ...(n.dedupeKey ? { dedupeKey: n.dedupeKey } : {}),
+        ...(n.audience ? { audience: n.audience } : {}),
       })),
     );
   }
@@ -363,6 +345,46 @@ export class WorkNotifier {
     }
   }
 
+  /**
+   * ADR-0079 § 3 : événement d'un membre hors projet (feuilles de temps). Destinataires :
+   * membres qui détiennent `work.read` ; jamais l'auteur, sauf s'il l'a demandé.
+   */
+  async memberEvent(n: MemberNotification): Promise<void> {
+    try {
+      const keepActor =
+        n.actorUserId !== null &&
+        !!(await this.settings?.notifyOwnActions(n.organizationId, n.actorUserId).catch(() => false));
+      const ids = [
+        ...new Set(
+          n.recipients.filter((r): r is string => !!r && (r !== n.actorUserId || keepActor)),
+        ),
+      ];
+      if (ids.length === 0) return;
+      const perms = await this.members.permissions(n.organizationId, ids);
+      const recipients = ids.filter((id) => {
+        const m = perms.get(id);
+        return !!m && can(m.role, 'work.read', m.context);
+      });
+      await this.deliver(
+        recipients.map((recipient) => ({
+          organizationId: n.organizationId,
+          recipientUserId: recipient,
+          kind: n.kind,
+          requiredAction: 'work.read' as const,
+          source: { module: 'work' as const, entityType: n.entity.type, entityId: n.entity.id },
+          title: boundedTitle(n.title),
+          href: n.href,
+          actorUserId: n.actorUserId,
+          ...(n.audience ? { audience: n.audience } : {}),
+        })),
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Notification ${n.kind} non remise : ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   /** ADR-0061 § 2 : événement de projet (ajouté au projet, projet à risque). */
   async projectEvent(n: ProjectNotification): Promise<void> {
     const recipients = await this.visibleRecipients(
@@ -387,6 +409,7 @@ export class WorkNotifier {
         href: n.href ?? `/projets/${n.projectId}`,
         actorUserId: n.actorUserId,
         ...(n.dedupeKey ? { dedupeKey: n.dedupeKey } : {}),
+        ...(n.audience ? { audience: n.audience } : {}),
       })),
     );
   }
@@ -402,4 +425,18 @@ export interface ProjectNotification {
   dedupeKey?: string;
   /** Lien relatif de l'application ; défaut : la page du projet. */
   href?: string;
+  /** ADR-0079 : relation des destinataires. */
+  audience?: NotificationAudience;
+}
+
+/** ADR-0079 § 3 : événement hors projet (feuille de temps), entre membres de l'organisation. */
+export interface MemberNotification {
+  organizationId: string;
+  recipients: readonly (string | null | undefined)[];
+  kind: NotificationKind;
+  entity: { type: 'timesheet'; id: string };
+  title: string;
+  href: string;
+  actorUserId: string | null;
+  audience?: NotificationAudience;
 }

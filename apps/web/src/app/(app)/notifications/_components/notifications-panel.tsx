@@ -250,8 +250,13 @@ function Preferences({ organizationId }: { organizationId: string | null }): Rea
     <fieldset className="flex flex-col gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
       <legend className="px-1 text-sm font-semibold">Préférences</legend>
       <p className="text-xs text-[var(--foreground-muted)]">
-        Décochez un type pour ne plus le recevoir dans cette organisation. Pas d’e-mail : les
-        notifications restent dans l’application.
+        Décochez un type pour ne plus le recevoir dans la cloche de cette organisation. Le mode
+        (Perroquet, Atténué, Essentiel), l’e-mail, Slack, WhatsApp, les tests et le journal
+        d’envoi se règlent dans{' '}
+        <Link href="/compte/notifications" className="text-[var(--accent)] underline-offset-2 hover:underline">
+          Mes notifications
+        </Link>
+        .
       </p>
       {coupes === null && !erreur ? (
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
