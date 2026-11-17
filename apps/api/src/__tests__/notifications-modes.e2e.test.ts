@@ -29,6 +29,7 @@ import {
   type PushMessage,
 } from '../notifications/notification-dispatcher.js';
 import { SlackNotifier } from '../slack/slack-notifier.service.js';
+import { WhatsAppNotifier } from '../whatsapp/whatsapp-notifier.service.js';
 import { NOTIFICATIONS_PORT, type NotificationsPort } from '../notifications/notifications.port.js';
 import { e2eSuite } from './e2e-utils.js';
 import { useWorkFixture } from './work-e2e-fixtures.js';
@@ -51,7 +52,16 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
     });
   });
 
-  const flush = () => f.app().get(NotificationDispatcher).flush();
+  /**
+   * Envois en tâche de fond terminés : Slack et WhatsApp (leur sort revient par `report`),
+   * puis les mises à jour du journal. La CLOCHE et l'e-mail, eux, sont écrits AVANT la
+   * réponse du geste (chaîne entièrement attendue) : aucune attente n'est nécessaire.
+   */
+  const flush = async () => {
+    await f.app().get(SlackNotifier).flush();
+    await f.app().get(WhatsAppNotifier).flush();
+    await f.app().get(NotificationDispatcher).flush();
+  };
   async function bell(who: Parameters<typeof f.get>[0]) {
     const res = await f.get(who, '/notifications?limit=50');
     expect(res.status).toBe(200);
@@ -101,11 +111,17 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
 
   describe('§ 1 diagnostic de la cloche — A agit, B reçoit', () => {
     it('B reçoit, compte, lit ; A (l’auteur) ne reçoit rien', async () => {
+      // État de départ ÉTABLI ici (aucune dépendance aux tests précédents) : tout lu.
+      expect((await f.post('analyst', '/notifications/read-all')).status).toBe(200);
       const before = (await f.get('analyst', '/notifications/unread-count')).body.unread as number;
+      expect(before).toBe(0);
       const t = await task({ title: 'Poser le carrelage', assigneeUserId: f.userId('analyst') });
       const count = await f.get('analyst', '/notifications/unread-count');
       expect(count.status).toBe(200);
-      expect(count.body.unread).toBe(before + 1);
+      // En cas d'écart, le message montre ce que la cloche contient (diagnostic).
+      if (count.body.unread !== 1) {
+        expect(count.body.unread, JSON.stringify(await bell('analyst'))).toBe(1);
+      }
       const items = await bell('analyst');
       const mine = items.find(
         (n) => n.kind === 'work.task_assigned' && n.title.includes(`#${t.number}`),
@@ -150,9 +166,15 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
         .get('/notifications/unread-elsewhere')
         .set('Cookie', cookies);
       expect(res.status).toBe(200);
-      const elsewhere = res.body.organizations as { organizationId: string; unread: number }[];
-      // Une tâche de plus pour B : il y a au moins une non lue dans l'organisation de l'équipe.
+      // État de départ ÉTABLI ici : B a tout lu dans l'organisation de l'équipe (ce test ne
+      // dépend pas de ce que le précédent a lu ou non).
+      expect((await f.post('analyst', '/notifications/read-all')).status).toBe(200);
+      const vide = await request(f.app().getHttpServer())
+        .get('/notifications/unread-elsewhere')
+        .set('Cookie', cookies);
+      const elsewhere = vide.body.organizations as { organizationId: string; unread: number }[];
       expect(elsewhere.find((o) => o.organizationId === f.orgId())).toBeUndefined();
+      // Une tâche de plus pour B : une non lue dans l'organisation de l'équipe.
       await task({ title: 'Pour l’autre organisation', assigneeUserId: f.userId('analyst') });
       const again = await request(f.app().getHttpServer())
         .get('/notifications/unread-elsewhere')
@@ -161,7 +183,7 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
         (again.body.organizations as { organizationId: string; unread: number }[]).find(
           (o) => o.organizationId === f.orgId(),
         )?.unread,
-      ).toBeGreaterThan(0);
+      ).toBe(1);
     });
   });
 
