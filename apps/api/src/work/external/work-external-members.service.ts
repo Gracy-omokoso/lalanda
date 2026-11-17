@@ -208,6 +208,10 @@ export class WorkExternalMembersService {
         referent: d.referentUserId ? WorkMembersService.refOf(refs, d.referentUserId) : null,
         projectCount: counts.get(id) ?? 0,
         lastLoginAt: d.lastLoginAt ? new Date(d.lastLoginAt).toISOString() : null,
+        pausedUntil:
+          d.pausedUntil && new Date(d.pausedUntil).getTime() > Date.now()
+            ? new Date(d.pausedUntil).toISOString()
+            : null,
         revision: d.revision,
         createdAt: new Date(d.createdAt).toISOString(),
       };
@@ -799,6 +803,54 @@ export class WorkExternalMembersService {
     if (account.status === 'active') {
       await this.lifecycle.closeAccount(account, 'manual', auditActor(actor));
     }
+    return (
+      await this.accountViews(organizationId, [
+        await this.requireAccount(organizationId, accountId),
+      ])
+    )[0]!;
+  }
+
+  /**
+   * `POST /work/external-accounts/:accountId/unlock` (`work.manage`) — remet à zéro les
+   * compteurs du jour (codes faux, demandes), la pause et son palier ; audité.
+   */
+  async unlock(
+    organizationId: string,
+    accountId: string,
+    actor: WorkActor,
+  ): Promise<WorkExternalAccountView> {
+    const account = await this.requireAccount(organizationId, accountId);
+    await this.accounts
+      .updateOne(
+        { _id: account._id, organizationId },
+        {
+          $set: {
+            authFailureDay: null,
+            authFailureCount: 0,
+            pausedUntil: null,
+            pauseDay: null,
+            pauseLevel: 0,
+            codeRequestDay: null,
+            codeRequestCount: 0,
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+      )
+      .exec();
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role ?? 'unknown',
+      action: 'work.external.unlocked',
+      targetType: 'work_external_account',
+      targetId: accountId,
+      metadata: {
+        failures: account.authFailureCount ?? 0,
+        pauseLevel: account.pauseLevel ?? 0,
+        codeRequests: account.codeRequestCount ?? 0,
+      },
+    });
     return (
       await this.accountViews(organizationId, [
         await this.requireAccount(organizationId, accountId),

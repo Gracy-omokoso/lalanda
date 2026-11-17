@@ -646,25 +646,36 @@ export function renderExternalInvitation(input: {
   };
 }
 
+/** Durée lisible d'une pause : « 15 minutes », « 1 heure », « 4 heures ». */
+function dureePause(minutes: number): string {
+  if (minutes < 60) return `${minutes} minutes`;
+  const h = Math.round(minutes / 60);
+  return h === 1 ? '1 heure' : `${h} heures`;
+}
+
 /**
- * ADR-0078 (revue de sécurité B2) : l'accès à l'espace externe est suspendu après trop de
- * codes faux dans la journée. Le message ne dit ni d'où viennent les essais, ni le code.
+ * ADR-0078 (revue de sécurité B2, révisée) : les demandes de code de l'espace externe sont
+ * mises en PAUSE après trop de codes faux. Le message ne dit ni d'où viennent les essais, ni
+ * le code ; il donne la durée de la pause et le recours (l'interlocuteur dans l'organisation).
  */
 export function renderExternalLockWarning(input: {
   url: string;
   name?: string | null;
-  lockedUntil: Date;
+  pausedUntil: Date;
+  minutes: number;
 }): RenderedMail {
   const rendered = layout({
-    heading: 'Connexion suspendue',
+    heading: 'Connexion mise en pause',
     paragraphs: [
       greeting(input.name),
-      `Trop de codes erronés ont été saisis pour votre espace ${PRODUCT} aujourd'hui. Par précaution, la connexion est suspendue jusqu'au ${formatDateFr(input.lockedUntil)}.`,
-      "Si ces essais ne viennent pas de vous, quelqu'un connaît peut-être votre adresse : aucun accès n'a été ouvert sans code valable. Prévenez votre interlocuteur dans l'organisation.",
+      `Trop de codes erronés ont été saisis pour votre espace ${PRODUCT}. Par précaution, les codes en cours ne sont plus valables et vous pourrez en demander un nouveau dans ${dureePause(input.minutes)}.`,
+      "Si ces essais ne viennent pas de vous, quelqu'un connaît peut-être votre adresse : aucun accès n'a été ouvert sans code valable. Votre interlocuteur dans l'organisation peut lever la pause.",
     ],
     ctaLabel: 'Ouvrir la page de connexion',
     ctaUrl: input.url,
-    footnotes: ['Vous pourrez demander un nouveau code après cette date.'],
+    footnotes: [
+      'Si cela recommence aujourd’hui, la pause suivante sera plus longue (4 heures au plus).',
+    ],
   });
-  return { ...rendered, subject: `${PRODUCT} — connexion à votre espace suspendue` };
+  return { ...rendered, subject: `${PRODUCT} — connexion à votre espace mise en pause` };
 }

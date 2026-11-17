@@ -140,7 +140,9 @@ export interface ExternalAccessCodeMail {
 export interface ExternalLockWarningMail {
   to: string;
   name?: string | null | undefined;
-  lockedUntil: Date;
+  pausedUntil: Date;
+  /** Durée de la pause, en minutes. */
+  minutes: number;
 }
 
 /** ADR-0078 : invitation d'un contact client ou d'un consultant sur un projet. */
@@ -330,7 +332,8 @@ export class TemplatedMailService extends MailService {
       ...renderExternalLockWarning({
         url: externalPortalUrl(),
         name: input.name ?? null,
-        lockedUntil: input.lockedUntil,
+        pausedUntil: input.pausedUntil,
+        minutes: input.minutes,
       }),
     });
   }

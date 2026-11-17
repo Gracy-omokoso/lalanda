@@ -255,7 +255,7 @@ d'organisation** : la matrice et ses actions sont inchangées.
 - **Qui gère** (routes `/work/...`) : inviter, régler « peut ouvrir le projet », retirer, régler
   les tâches (visible par le client, validation client, consultants) et remettre une validation
   client en attente : **gestion du projet** (chef, adjoint d'ADR-0076, `work.manage`) sous
-  `work.update` ; comptes, fermeture, conversion d'un Invité : `work.manage` ; taux d'achat d'un
+  `work.update` ; comptes, fermeture, déblocage de la connexion (pause après codes faux), conversion d'un Invité : `work.manage` ; taux d'achat d'un
   consultant : `work.manage` + `purchase.manage` (lecture et récapitulatif : `work.read` +
   `purchase.read`) ; consultants d'une fiche fournisseur : `work.read` + `purchase.read`.
 - **Visibilité d'un commentaire** : auteur ou gestion du projet ; celui d'un externe reste partagé.

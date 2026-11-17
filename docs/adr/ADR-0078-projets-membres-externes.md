@@ -210,16 +210,24 @@ suivantes, toutes testées (`work-external.e2e.test.ts`, `work-external-throttle
    Une nouvelle demande **ne remplace plus** le code vivant : délai minimal de **60 s** entre deux
    codes d'une adresse (dans ce délai, rien n'est créé ni envoyé, même réponse), **deux codes
    vivants** au plus (le précédent reste valable), un code juste consomme son jumeau. Plafond
-   **par compte**, tenu en base : **30 demandes par jour** (au-delà, aucun envoi, audit
+   **par compte**, tenu en base : **60 demandes par jour** (au-delà, aucun envoi, audit
    `work.external.code_requests_capped`).
 3. **B1 — durée de réponse égale.** `request-code` répond **avant** tout accès à la base ; la
    recherche des comptes, le défi, l'e-mail et l'audit se font ensuite, en arrière-plan.
-4. **B2 — verrouillage.** **20 codes faux** dans la journée (Kinshasa) verrouillent le compte
-   **24 h** (`lockedUntil`) : codes vivants invalidés, audit `work.external.locked`, e-mail
-   d'avertissement au titulaire (`renderExternalLockWarning`) ; pendant le verrou, aucun code ne
-   part et même un bon code est refusé (message unique). Une connexion réussie remet le compteur
-   à zéro. *À revoir avec l'expert sécurité* : le verrou peut être déclenché par un tiers qui
-   connaît l'adresse (compromis assumé contre la devinette du code).
+4. **B2 — pauses croissantes, pas de verrou long** (révisé le 17 nov. 2026 à la demande du
+   coordinateur : un verrou de 24 h déclenché par un tiers qui connaît l'adresse recréait le déni
+   de service de M2, un client bloqué une journée avant une échéance). La devinette est déjà
+   bornée (60 s entre deux codes, deux codes vivants, 5 essais par code, plafond de demandes :
+   au plus environ 150 essais par jour, une chance infime sur un million de codes). Désormais,
+   **tous les 20 codes faux** du jour (compteur en base, jour de Kinshasa) : codes vivants
+   invalidés et **pause** des demandes de code, **croissante le même jour** — 15 min, puis 1 h,
+   puis 4 h au plus (`pausedUntil`, `pauseLevel`) ; audit `work.external.paused` ; e-mail
+   d'avertissement au titulaire **une fois par palier** (`renderExternalLockWarning`, masqué des
+   journaux). Pendant la pause, aucun code ne part et un code d'avant ne vaut plus rien (message
+   unique). **Déblocage** : `POST /work/external-accounts/:accountId/unlock` (`work.manage`,
+   audité `work.external.unlocked`, bouton « Débloquer la connexion » de `/projets/externes`)
+   remet à zéro les codes faux, la pause et son palier, et le plafond quotidien de demandes. Une
+   connexion réussie remet le compteur de codes faux à zéro.
 5. **B3** — la vérification ne lit que les défis dont les essais restent (`attempts < 5`).
 6. **B4** — retirer la validation client d'un **jalon** en attente ou « modifications
    demandées » exige un **motif** (`400 WORK_CLIENT_APPROVAL_REASON_REQUIRED`) ; ajouter ou retirer
@@ -311,7 +319,8 @@ projet (`403 WORK_TASK_CREATE_FORBIDDEN`, comme la création) : `PUT` et `DELETE
    `purchase.read` (prix d'achat, pas donnée salariale ; les taux des membres restent sous
    `treasury.manage`). *À revoir avec Gracy.*
 6. **Durées et bornes** : code 10 min, 5 essais, session 12 h, débits ci-dessus, 60 s entre deux
-   codes, 30 demandes et 20 échecs par jour et par compte, verrou de 24 h. *Usage courant ; à
+   codes, 60 demandes par jour et par compte, pause tous les 20 codes faux (15 min, 1 h, 4 h).
+   *Usage courant ; à
    revoir avec l'expert sécurité.*
 7. **Fiscalité du récapitulatif** : montants **HT** au taux d'achat, sans TVA ni retenue à la
    source (IBP/IRL sur prestations de non-salariés, à confirmer selon le statut du consultant en

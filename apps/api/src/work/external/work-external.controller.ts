@@ -7,6 +7,7 @@
 //   GET    /work/external-accounts                                 work.manage
 //   PUT    /work/external-accounts/:accountId                      work.manage
 //   POST   /work/external-accounts/:accountId/close                work.manage
+//   POST   /work/external-accounts/:accountId/unlock               work.manage
 //   GET    /work/external-accounts/:accountId/rates                work.read + purchase.read
 //   POST   /work/external-accounts/:accountId/rates                work.manage + purchase.manage
 //   DELETE /work/external-accounts/:accountId/rates/:rateId        work.manage + purchase.manage
@@ -171,6 +172,19 @@ export class WorkExternalController {
     const parsed = CloseExternalAccountBody.safeParse(body ?? {});
     if (!parsed.success) invalidRequest(parsed.error);
     return this.externals.closeAccount(orgId, accountId, workActorOf(user, perms));
+  }
+
+  /** Revue B2 : lève la pause et remet à zéro les compteurs du jour (audité). */
+  @Post('external-accounts/:accountId/unlock')
+  @HttpCode(200)
+  @RequirePermission('work.manage')
+  async unlock(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: Perms,
+    @Param('accountId', WorkIdPipe) accountId: string,
+  ): Promise<WorkExternalAccountView> {
+    return this.externals.unlock(orgId, accountId, workActorOf(user, perms));
   }
 
   // ── Taux d'achat et récapitulatif d'un consultant ────────────────────────

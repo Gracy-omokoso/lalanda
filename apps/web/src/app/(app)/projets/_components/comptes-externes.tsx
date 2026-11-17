@@ -333,6 +333,15 @@ export function ComptesExternes(): React.ReactElement {
     }
   }, [organizationId, version]);
 
+  async function debloquer(c: WorkExternalAccountView): Promise<void> {
+    try {
+      await workExternalApi.unlockAccount(c.id);
+      recharger();
+    } catch (err) {
+      setErreur(message(err, 'Le compte n’a pas pu être débloqué.'));
+    }
+  }
+
   async function fermer(c: WorkExternalAccountView): Promise<void> {
     if (!window.confirm(`Fermer l’accès de ${c.name} à tous ses projets ?`)) return;
     try {
@@ -375,6 +384,21 @@ export function ComptesExternes(): React.ReactElement {
                   ? `${c.projectCount} projet${c.projectCount > 1 ? 's' : ''} ouvert${c.projectCount > 1 ? 's' : ''}`
                   : libelleFermeture(c.closedReason)}
               </StatusPill>
+              {c.pausedUntil ? (
+                <StatusPill tone="late">
+                  {`Connexion en pause jusqu’à ${new Date(c.pausedUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                </StatusPill>
+              ) : null}
+              {c.status === 'active' ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void debloquer(c)}
+                  title="Lève la pause et remet à zéro les compteurs du jour (codes faux, demandes)."
+                >
+                  Débloquer la connexion
+                </Button>
+              ) : null}
               {c.status === 'active' ? (
                 <Button size="sm" variant="secondary" onClick={() => void fermer(c)}>
                   Fermer l’accès

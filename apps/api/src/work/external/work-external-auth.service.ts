@@ -106,14 +106,14 @@ export class WorkExternalAuthService {
     await Promise.allSettled([...this.background]);
   }
 
-  /** Compte verrouillé (trop d'échecs du jour, B2) ? */
-  private locked(account: WorkExternalAccountLean, now: Date): boolean {
-    return !!account.lockedUntil && new Date(account.lockedUntil).getTime() > now.getTime();
+  /** Compte en pause (trop de codes faux, B2) ? */
+  private paused(account: WorkExternalAccountLean, now: Date): boolean {
+    return !!account.pausedUntil && new Date(account.pausedUntil).getTime() > now.getTime();
   }
 
   /**
-   * Comptes UTILISABLES de l'adresse : actifs, fiche active, au moins un projet ouvert, non
-   * verrouillés.
+   * Comptes UTILISABLES de l'adresse : actifs, fiche active, au moins un projet ouvert, hors
+   * pause.
    */
   private async usableAccounts(
     email: string,
@@ -126,7 +126,7 @@ export class WorkExternalAuthService {
       .exec();
     const out: WorkExternalAccountLean[] = [];
     for (const d of docs) {
-      if (this.locked(d, now)) continue;
+      if (this.paused(d, now)) continue;
       if (!(await this.lifecycle.ensureUsable(d))) continue;
       if ((await this.lifecycle.openProjectsOf(d.organizationId, String(d._id))).length === 0) {
         continue;
@@ -244,8 +244,11 @@ export class WorkExternalAuthService {
   }
 
   /**
-   * B2 : un échec de code compte pour chaque compte du défi ; au-delà de 20 par jour, le
-   * compte est verrouillé 24 h (audit, e-mail d'avertissement au titulaire).
+   * B2 (révisé) : un échec de code compte pour chaque compte du défi. Tous les 20 codes faux
+   * du jour : codes vivants invalidés et PAUSE des demandes, croissante le même jour (15 min,
+   * 1 h, puis 4 h au plus) ; audit, et e-mail d'avertissement une fois par palier. Aucun
+   * verrou long : un tiers qui connaît l'adresse ne bloque pas le titulaire une journée, et
+   * `work.manage` lève tout par `POST /work/external-accounts/:id/unlock`.
    */
   private async recordFailure(challenge: WorkExternalChallengeLean, now: Date): Promise<void> {
     const ids = challenge.accountIds.filter((i) => /^[0-9a-f]{24}$/i.test(i));
@@ -257,8 +260,11 @@ export class WorkExternalAuthService {
       .exec();
     for (const a of accounts) {
       const count = (a.authFailureDay === day ? (a.authFailureCount ?? 0) : 0) + 1;
-      const lock = count >= WORK_EXTERNAL_AUTH.failuresPerDayMax && !this.locked(a, now);
-      const lockedUntil = new Date(now.getTime() + WORK_EXTERNAL_AUTH.lockHours * 3_600_000);
+      const pause = count % WORK_EXTERNAL_AUTH.failuresPerPause === 0;
+      const paliers = WORK_EXTERNAL_AUTH.pauseMinutes;
+      const level = pause ? (a.pauseDay === day ? (a.pauseLevel ?? 0) : 0) + 1 : 0;
+      const minutes = paliers[Math.min(level, paliers.length) - 1] ?? 0;
+      const pausedUntil = new Date(now.getTime() + minutes * 60_000);
       await this.accounts
         .updateOne(
           { _id: a._id },
@@ -266,27 +272,35 @@ export class WorkExternalAuthService {
             $set: {
               authFailureDay: day,
               authFailureCount: count,
-              ...(lock ? { lockedUntil } : {}),
+              ...(pause ? { pausedUntil, pauseDay: day, pauseLevel: level } : {}),
             },
           },
           { timestamps: false },
         )
         .exec();
-      if (!lock) continue;
+      if (!pause) continue;
       await this.audit.record({
         organizationId: a.organizationId,
         actorUserId: String(a._id),
         actorRole: externalAuditRole(a.kind),
-        action: 'work.external.locked',
+        action: 'work.external.paused',
         targetType: 'work_external_account',
         targetId: String(a._id),
-        metadata: { failures: count, lockedUntil: lockedUntil.toISOString() },
+        metadata: { failures: count, level, minutes, pausedUntil: pausedUntil.toISOString() },
       });
-      // Les codes encore vivants de l'adresse tombent avec le verrou.
+      // Les codes encore vivants de l'adresse tombent avec la pause.
       await this.challenges
         .updateMany({ email: challenge.email, consumedAt: null }, { $set: { consumedAt: now } })
         .exec();
-      await this.mail.sendExternalLockWarning({ to: a.email, name: a.name, lockedUntil });
+      // Un avertissement par palier (15 min, 1 h, 4 h), pas à chaque pause de 4 h suivante.
+      if (level <= paliers.length) {
+        await this.mail.sendExternalLockWarning({
+          to: a.email,
+          name: a.name,
+          pausedUntil,
+          minutes,
+        });
+      }
     }
   }
 

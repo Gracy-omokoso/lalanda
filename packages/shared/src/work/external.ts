@@ -53,12 +53,12 @@ export const WORK_EXTERNAL_AUTH = {
   minRequestIntervalSeconds: 60,
   /** Codes vivants au plus par adresse (le précédent reste valable). */
   liveChallengesMax: 2,
-  /** Demandes de code par compte et par jour (plafond en base, au-dessus des seaux). */
-  codeRequestsPerDayMax: 30,
-  /** Échecs de code par compte et par jour avant verrouillage. */
-  failuresPerDayMax: 20,
-  /** Durée du verrouillage. */
-  lockHours: 24,
+  /** Demandes de code par compte et par jour (plafond en base, levé par le déblocage). */
+  codeRequestsPerDayMax: 60,
+  /** Codes faux par compte avant chaque pause (compteur du jour, en base). */
+  failuresPerPause: 20,
+  /** Pauses croissantes du même jour, en minutes : 15 min, 1 h, puis 4 h au plus. */
+  pauseMinutes: [15, 60, 240],
 } as const;
 
 /** Bornes des données (ADR-0078). */
@@ -411,6 +411,8 @@ export interface WorkExternalAccountView {
   /** Projets ouverts (accès actif). */
   projectCount: number;
   lastLoginAt: string | null;
+  /** Demandes de code suspendues jusqu'à cette date (trop de codes faux), ou `null`. */
+  pausedUntil: string | null;
   revision: number;
   createdAt: string;
 }

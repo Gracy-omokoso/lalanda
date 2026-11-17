@@ -62,6 +62,12 @@ export const workExternalApi = {
       method: 'PUT',
       body,
     }),
+  /** Revue B2 : lève la pause et remet à zéro les compteurs du jour (`work.manage`). */
+  unlockAccount: (accountId: string) =>
+    jsonRequest<WorkExternalAccountView>(`/work/external-accounts/${e(accountId)}/unlock`, {
+      method: 'POST',
+      body: {},
+    }),
   closeAccount: (accountId: string) =>
     jsonRequest<WorkExternalAccountView>(`/work/external-accounts/${e(accountId)}/close`, {
       method: 'POST',

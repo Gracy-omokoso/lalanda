@@ -1318,6 +1318,7 @@ réponse de l'espace externe ne porte de montant, de marge, de coût ni de temps
 | `GET /work/external-accounts` | `work.manage` | `{ items: WorkExternalAccountView[] }` (500 au plus) |
 | `PUT /work/external-accounts/:accountId` | `work.manage` | `{ name?, referentUserId? }` |
 | `POST /work/external-accounts/:accountId/close` | `work.manage` | accès et sessions fermés, `closedReason: manual` |
+| `POST /work/external-accounts/:accountId/unlock` | `work.manage` | `200` ; remet à zéro codes faux, pause et palier, plafond quotidien de demandes ; audit `work.external.unlocked` ; la vue du compte porte `pausedUntil` |
 | `GET` · `POST /work/external-accounts/:accountId/rates` · `DELETE …/rates/:rateId` | lecture `work.read` + `purchase.read` ; écriture `work.manage` + `purchase.manage` | `{ currency, hourlyRate, effectiveFrom }` (chaîne décimale) ; `409 WORK_RATE_DUPLICATE` ; rangé dans `work_member_rates` |
 | `GET /work/external-accounts/:accountId/time-recap(.csv)` | `work.read` + `purchase.read` | `?from&to` ; lignes mois × projet × devise des projets VISIBLES de l'appelant, totaux, `minutesWithoutRate`, `hiddenMinutes`, `version` (moteur) ; CSV « ; », UTF-8 avec BOM, cellules neutralisées |
 | `GET /work/suppliers/:supplierId/consultants` | `work.read` + `purchase.read` | consultants de la fiche, projets, récapitulatif |
@@ -1334,8 +1335,8 @@ réponse de l'espace externe ne porte de montant, de marge, de coût ni de temps
 
 | Route | Règle et réponse |
 |---|---|
-| `POST /portal/auth/request-code` | `{ email }` → `202 { sent: true }` dans tous les cas ; réponse rendue avant le travail ; code à six chiffres, 10 min, envoyé à un compte actif non verrouillé seulement, pas plus d'un code par minute, deux codes vivants au plus, 30 par jour et par compte ; `429 EXTERNAL_RATE_LIMITED` (5 par adresse + IP, 20 par IP, par 15 min) |
-| `POST /portal/auth/verify` | `{ email, code, organizationId? }` → `200 { me }` + cookie `lalanda_ext_session` (`httpOnly`, 12 h) ; `400 EXTERNAL_CODE_INVALID` (inconnu, faux, expiré, épuisé — 5 essais, usage unique, verrouillé) ; 20 échecs par jour verrouillent le compte 24 h (audit, e-mail d'avertissement) ; `409 EXTERNAL_ORGANIZATION_REQUIRED` (`details.organizations`) ; `429` (10 par adresse + IP, 30 par IP) |
+| `POST /portal/auth/request-code` | `{ email }` → `202 { sent: true }` dans tous les cas ; réponse rendue avant le travail ; code à six chiffres, 10 min, envoyé à un compte actif non verrouillé seulement, pas plus d'un code par minute, deux codes vivants au plus, 60 par jour et par compte, aucun pendant une pause ; `429 EXTERNAL_RATE_LIMITED` (5 par adresse + IP, 20 par IP, par 15 min) |
+| `POST /portal/auth/verify` | `{ email, code, organizationId? }` → `200 { me }` + cookie `lalanda_ext_session` (`httpOnly`, 12 h) ; `400 EXTERNAL_CODE_INVALID` (inconnu, faux, expiré, épuisé — 5 essais, usage unique) ; tous les 20 codes faux du jour : codes en cours invalidés et pause des demandes de 15 min, puis 1 h, puis 4 h au plus (audit, e-mail d'avertissement une fois par palier) ; `409 EXTERNAL_ORGANIZATION_REQUIRED` (`details.organizations`) ; `429` (10 par adresse + IP, 30 par IP) |
 | `POST /portal/auth/logout` | `204`, session révoquée, cookie effacé |
 
 **Espace externe** (cookie de session externe seulement ; `401 EXTERNAL_SESSION_REQUIRED` sinon ;

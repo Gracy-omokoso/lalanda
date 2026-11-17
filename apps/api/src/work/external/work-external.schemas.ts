@@ -90,9 +90,16 @@ export class WorkExternalAccount {
   @Prop({ type: Number, default: 0 })
   authFailureCount?: number;
 
-  /** Connexion suspendue jusqu'à cette date (trop d'échecs du jour). */
+  /** Demandes de code suspendues jusqu'à cette date (pause après trop de codes faux). */
   @Prop({ type: Date, default: null })
-  lockedUntil?: Date | null;
+  pausedUntil?: Date | null;
+
+  /** Jour (Kinshasa) et rang de la dernière pause (15 min, 1 h, 4 h). */
+  @Prop({ type: String, default: null })
+  pauseDay?: string | null;
+
+  @Prop({ type: Number, default: 0 })
+  pauseLevel?: number;
 
   /** Jour (Kinshasa) des demandes de code comptées. */
   @Prop({ type: String, default: null })

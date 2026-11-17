@@ -13,6 +13,7 @@ import 'reflect-metadata';
 
 import type { Db } from 'mongodb';
 import { ObjectId } from 'mongodb';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
 import { beforeAll, expect, it, vi } from 'vitest';
 
@@ -78,6 +79,16 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
   });
   // B1 : le code part APRÈS la réponse ; on attend la fin du travail en arrière-plan.
   const settle = () => f.app().get(WorkExternalAuthService).settled();
+  /** Vide les seaux de débit en cours de test (motif du `beforeEach` de la fixture). */
+  const viderDebit = () => {
+    const store = f.app().get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const ids of store.timeoutIds.values()) ids.forEach(clearTimeout);
+    store.timeoutIds.clear();
+    store.storage.clear();
+  };
   const lastCodeFor = async (email: string): Promise<string> => {
     await settle();
     const mail = [...sent].reverse().find((m) => m.to === email && /code/i.test(m.subject));
@@ -855,7 +866,7 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
       .slice(COOKIE.length + 1);
   });
 
-  it('B2 et B3 : verrou après 20 échecs du jour (audit, avertissement), essais épuisés refusés', async () => {
+  it('B2 et B3 : pauses croissantes après 20 codes faux, déblocage par work.manage, essais épuisés refusés', async () => {
     // B3 : un défi aux essais épuisés ne s'ouvre plus, même avec le bon code.
     await db
       .collection('work_external_challenges')
@@ -870,7 +881,119 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
         .status,
     ).toBe(400);
 
-    // B2 : 19 échecs déjà comptés aujourd'hui ; le 20ᵉ verrouille le compte.
+    // B2 (révisé) : tous les 20 codes faux du jour, pause croissante (15 min, 1 h, 4 h).
+    const compte = () =>
+      db.collection('work_external_accounts').findOne({ _id: new ObjectId(consultantId) });
+    const echecApres = async (dejaComptes: number): Promise<string> => {
+      viderDebit();
+      await db
+        .collection('work_external_challenges')
+        .updateMany({ email: CONSULTANT }, { $set: { consumedAt: new Date() } });
+      await db.collection('work_external_accounts').updateOne(
+        { _id: new ObjectId(consultantId) },
+        {
+          $set: {
+            authFailureDay: kinshasaDayOf(new Date()),
+            authFailureCount: dejaComptes,
+            pausedUntil: null,
+          },
+        },
+      );
+      await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+      const bon = await lastCodeFor(CONSULTANT);
+      const faux = bon === '000000' ? '111111' : '000000';
+      const r = await request(server())
+        .post('/portal/auth/verify')
+        .send({ email: CONSULTANT, code: faux });
+      expect(r.status).toBe(400);
+      return bon;
+    };
+    const minutesDePause = async (): Promise<number> => {
+      const a = await compte();
+      return Math.round((new Date(a?.['pausedUntil'] as Date).getTime() - Date.now()) / 60_000);
+    };
+    const avertissements = () =>
+      sent.filter((m) => m.to === CONSULTANT && /mise en pause/.test(m.subject));
+
+    sent.length = 0;
+    const bon = await echecApres(19);
+    expect(await minutesDePause()).toBe(15);
+    expect((await compte())?.['pauseLevel']).toBe(1);
+    expect(avertissements()).toHaveLength(1);
+    expect(avertissements()[0]!.redactInLogs).toBe(true);
+    expect(
+      await db
+        .collection('audit_events')
+        .findOne({ action: 'work.external.paused', targetId: consultantId }),
+    ).not.toBeNull();
+    // En pause : les codes en cours ne valent plus rien, aucun nouveau code ne part.
+    expect(
+      (await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code: bon }))
+        .status,
+    ).toBe(400);
+    const avant = sent.length;
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    await settle();
+    expect(sent).toHaveLength(avant);
+
+    // Le même jour, la pause s'allonge : 1 h, puis 4 h au plus ; un avertissement par palier.
+    await echecApres(39);
+    expect(await minutesDePause()).toBe(60);
+    await echecApres(59);
+    expect(await minutesDePause()).toBe(240);
+    await echecApres(79);
+    expect(await minutesDePause()).toBe(240);
+    expect((await compte())?.['pauseLevel']).toBe(4);
+    expect(avertissements()).toHaveLength(3);
+
+    // Déblocage : `work.manage` seulement ; compteurs, pause et plafond remis à zéro.
+    const refus = await f.post('analyst', `/work/external-accounts/${consultantId}/unlock`, {});
+    expect(refus.status).toBe(403);
+    const vue = await f.get('owner', '/work/external-accounts');
+    expect(
+      (vue.body.items as { id: string; pausedUntil: string | null }[]).find(
+        (a) => a.id === consultantId,
+      )?.pausedUntil,
+    ).not.toBeNull();
+    await db
+      .collection('work_external_accounts')
+      .updateOne(
+        { _id: new ObjectId(consultantId) },
+        { $set: { codeRequestDay: kinshasaDayOf(new Date()), codeRequestCount: 60 } },
+      );
+    const leve = await f.post('owner', `/work/external-accounts/${consultantId}/unlock`, {});
+    expect(leve.status, JSON.stringify(leve.body)).toBe(200);
+    expect(leve.body.pausedUntil).toBeNull();
+    const apres = await compte();
+    expect(apres).toMatchObject({
+      authFailureCount: 0,
+      pauseLevel: 0,
+      pausedUntil: null,
+      codeRequestCount: 0,
+    });
+    expect(
+      await db
+        .collection('audit_events')
+        .findOne({ action: 'work.external.unlocked', targetId: consultantId }),
+    ).not.toBeNull();
+    sent.length = 0;
+    viderDebit();
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    const nouveau = await lastCodeFor(CONSULTANT);
+    const ok = await request(server())
+      .post('/portal/auth/verify')
+      .send({ email: CONSULTANT, code: nouveau });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    // Une connexion réussie remet le compteur d'échecs à zéro.
+    expect((await compte())?.['authFailureCount']).toBe(0);
+    const raw = ([] as string[]).concat(ok.headers['set-cookie'] ?? []);
+    consultantCookie = raw
+      .find((c) => c.startsWith(`${COOKIE}=`))!
+      .split(';')[0]!
+      .slice(COOKIE.length + 1);
+  });
+
+  it('B2 : plafond de 60 demandes de code par jour et par compte, levé par le déblocage', async () => {
     await db
       .collection('work_external_challenges')
       .updateMany({ email: CONSULTANT }, { $set: { consumedAt: new Date() } });
@@ -878,43 +1001,26 @@ e2eSuite('Projets : membres externes et espace externe — ADR-0078', () => {
       .collection('work_external_accounts')
       .updateOne(
         { _id: new ObjectId(consultantId) },
-        { $set: { authFailureDay: kinshasaDayOf(new Date()), authFailureCount: 19 } },
+        { $set: { codeRequestDay: kinshasaDayOf(new Date()), codeRequestCount: 60 } },
       );
-    sent.length = 0;
-    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
-    const bon = await lastCodeFor(CONSULTANT);
-    const faux = bon === '000000' ? '111111' : '000000';
-    expect(
-      (await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code: faux }))
-        .status,
-    ).toBe(400);
-    const verrou = await db
-      .collection('work_external_accounts')
-      .findOne({ _id: new ObjectId(consultantId) });
-    expect(verrou?.['lockedUntil']).toBeInstanceOf(Date);
-    expect(
-      sent.some((m) => m.to === CONSULTANT && /suspendue/.test(m.subject) && m.redactInLogs),
-    ).toBe(true);
-    expect(
-      await db
-        .collection('audit_events')
-        .findOne({ action: 'work.external.locked', targetId: consultantId }),
-    ).not.toBeNull();
-    // Verrouillé : même le bon code est refusé, et aucun nouveau code ne part.
-    expect(
-      (await request(server()).post('/portal/auth/verify').send({ email: CONSULTANT, code: bon }))
-        .status,
-    ).toBe(400);
     sent.length = 0;
     await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
     await settle();
     expect(sent).toHaveLength(0);
+    expect(
+      await db
+        .collection('audit_events')
+        .findOne({ action: 'work.external.code_requests_capped', targetId: consultantId }),
+    ).not.toBeNull();
+    expect(
+      (await f.post('owner', `/work/external-accounts/${consultantId}/unlock`, {})).status,
+    ).toBe(200);
+    await request(server()).post('/portal/auth/request-code').send({ email: CONSULTANT });
+    await settle();
+    expect(sent.filter((m) => m.to === CONSULTANT)).toHaveLength(1);
     await db
-      .collection('work_external_accounts')
-      .updateOne(
-        { _id: new ObjectId(consultantId) },
-        { $set: { lockedUntil: null, authFailureCount: 0 } },
-      );
+      .collection('work_external_challenges')
+      .updateMany({ email: CONSULTANT }, { $set: { consumedAt: new Date() } });
   });
 
   it('B4 : retirer une validation client en attente d’un jalon exige un motif, tracé à l’audit', async () => {
