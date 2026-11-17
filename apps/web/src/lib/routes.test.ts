@@ -349,3 +349,13 @@ describe('ADR-0069 : vérification publique d’une carte de service', () => {
     expect(isPublicFormPath('/v')).toBe(false);
   });
 });
+
+describe('espace externe (ADR-0078)', () => {
+  it('n’exige pas la session better-auth et ne renvoie pas un membre connecté vers l’accueil', () => {
+    for (const path of ['/portail', '/portail/projets', '/portail/projets/abc', '/portail/temps']) {
+      expect(isProtectedPath(path), path).toBe(false);
+      expect(isMarketingPath(path), path).toBe(false);
+      expect(isAuthPath(path), path).toBe(false);
+    }
+  });
+});

@@ -394,6 +394,14 @@ const LIBELLES_ACTIVITE: Record<WorkActivityKind, string> = {
   'task.approval_approved': 'a validé la tâche',
   'task.approval_changes_requested': 'a demandé des modifications',
   'task.approval_rejected': 'a refusé la tâche',
+  // ADR-0078 : membres externes, validation par le client, visibilité des commentaires.
+  'project.external_member_added': 'a invité un membre externe',
+  'project.external_member_removed': 'a retiré un membre externe',
+  'task.external_settings_changed': 'a changé les réglages de l’espace externe',
+  'task.client_approval_approved': 'a approuvé le livrable (client)',
+  'task.client_approval_changes_requested': 'a demandé des modifications (client)',
+  'task.client_approval_reset': 'a soumis de nouveau le livrable au client',
+  'comment.visibility_changed': 'a changé la visibilité d’un commentaire',
 };
 
 /** « Kevin a déplacé la tâche (À faire → En cours) ». */

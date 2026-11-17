@@ -25,6 +25,7 @@ import {
   DatePicker,
   Field,
   FormGrid,
+  Switch,
   TextArea,
   TextInput,
   buttonClasses,
@@ -32,6 +33,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
+import { workExternalApi } from '@/lib/work-external-api';
 
 import { useProfil } from '../../_components/profile-context';
 
@@ -251,6 +253,8 @@ function Fil({
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [edition, setEdition] = useState<string | null>(null);
+  // ADR-0078 § 1.4 : un nouveau commentaire est interne, sauf choix contraire.
+  const [partager, setPartager] = useState(false);
 
   const charger = useCallback(() => {
     workApi
@@ -334,8 +338,16 @@ function Fil({
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <p className="text-xs text-[var(--foreground-muted)]">
                     <span className="font-semibold text-[var(--foreground)]">{c.author.name}</span>{' '}
+                    {c.author.external ? (
+                      <span className="mr-1 rounded-[var(--radius-sm)] bg-[var(--accent-soft)] px-1 text-[var(--accent)]">
+                        {c.author.external === 'client' ? 'client' : 'consultant'}
+                      </span>
+                    ) : null}
                     <time dateTime={c.createdAt}>{formatInstant(c.createdAt)}</time>
                     {c.editedAt && !c.deletedAt ? ' · modifié' : ''}
+                    {c.visibility === 'shared' && !c.deletedAt ? (
+                      <span className="ml-1 font-medium text-[var(--accent)]">· partagé</span>
+                    ) : null}
                   </p>
                   {c.deletedAt ? (
                     <p className="italic text-[var(--foreground-muted)]">Commentaire supprimé</p>
@@ -402,6 +414,26 @@ function Fil({
                       >
                         Supprimer
                       </button>
+                      {!c.author.external ? (
+                        <button
+                          type="button"
+                          className="text-[var(--foreground-muted)] underline-offset-2 hover:underline"
+                          disabled={envoi}
+                          onClick={() =>
+                            void geste(
+                              () =>
+                                workExternalApi.setCommentVisibility(
+                                  c.id,
+                                  c.visibility === 'shared' ? 'internal' : 'shared',
+                                  c.revision,
+                                ),
+                              'La visibilité n’a pas pu être changée.',
+                            )
+                          }
+                        >
+                          {c.visibility === 'shared' ? 'Rendre interne' : 'Partager avec l’externe'}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -425,11 +457,23 @@ function Fil({
                 libelleEnvoi="Commenter"
                 onEnvoyer={(corps) =>
                   geste(
-                    () => workApi.createComment(detail.id, corps),
+                    () =>
+                      workApi.createComment(detail.id, {
+                        ...corps,
+                        visibility: partager ? 'shared' : 'internal',
+                      }),
                     'Envoi du commentaire impossible.',
                   )
                 }
               />
+              <div className="mt-2">
+                <Switch
+                  checked={partager}
+                  onChange={setPartager}
+                  label="Partager avec l’espace externe"
+                  description="Visible du contact client (tâche visible par le client) et des consultants du projet. Sinon : interne."
+                />
+              </div>
             </div>
           </div>
         </div>

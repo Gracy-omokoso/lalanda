@@ -56,6 +56,7 @@ import { Collaboration } from './tache-collab';
 // ADR-0076 : collaborateurs, abonnés, liste de contrôle, validation.
 import { droitsTache } from './collab-model';
 import { ListeControle, ParticipantsTache, ValidationTache } from './tache-participants';
+import { TacheExterne } from './tache-externe';
 
 import {
   candidatsDependance,
@@ -789,6 +790,9 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
           ) : null}
         </section>
       ) : null}
+
+      {/* ─── ADR-0078 : visible par le client, validation client, consultants ── */}
+      <TacheExterne detail={d} onChange={charger} />
 
       <Collaboration detail={d} onChange={charger} />
 

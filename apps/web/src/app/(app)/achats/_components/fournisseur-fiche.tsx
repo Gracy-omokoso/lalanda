@@ -39,6 +39,7 @@ import {
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
+import { ConsultantsFournisseur } from './consultants-fournisseur';
 import { useAccesAchats } from './achats-access';
 import {
   ACHATS_BASE,
@@ -466,6 +467,9 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
           vide="Aucun équipement acquis chez ce fournisseur."
         />
       </div>
+
+      {/* ADR-0078 § 2.4 : consultants du fournisseur, projets et temps valorisé. */}
+      <ConsultantsFournisseur supplierId={s.id} />
 
       {o ? (
         <SectionsFiche sections={o.sections} supplierId={supplierId} />

@@ -223,6 +223,7 @@ export class WorkExternalMembersService {
         account: views.get(r.accountId)!,
         projectId: r.projectId,
         status: r.status,
+        closedReason: (r.closedReason ?? null) as WorkExternalCloseReason | null,
         canOpenProject: r.canOpenProject,
         invitedAt: new Date(r.invitedAt).toISOString(),
         invitedBy: WorkMembersService.refOf(refs, r.invitedBy),

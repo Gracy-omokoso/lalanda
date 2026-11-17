@@ -404,6 +404,7 @@ export interface WorkExternalMemberView {
   account: WorkExternalAccountView;
   projectId: string;
   status: 'active' | 'closed';
+  closedReason: WorkExternalCloseReason | null;
   canOpenProject: boolean;
   invitedAt: string;
   invitedBy: WorkMemberRef;
