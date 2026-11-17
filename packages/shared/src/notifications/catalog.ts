@@ -442,6 +442,41 @@ const SPECS: Record<
     tier: 'essentiel',
     importance: 'important',
   }),
+  // ── Projets · Membres externes (ADR-0078) ─────────────────────────────────
+  'work.client_approved': work({
+    family: 'work.approvals',
+    label: 'Le client valide un livrable',
+    recipients: 'Le responsable, les collaborateurs, le chef et l’adjoint',
+    audience: ['assignee', 'collaborators', 'project_lead'],
+    tier: 'essentiel',
+    importance: 'important',
+  }),
+  'work.client_changes_requested': work({
+    family: 'work.approvals',
+    label: 'Le client demande des modifications',
+    recipients: 'Le responsable, les collaborateurs, le chef et l’adjoint (motif dans Lalanda)',
+    audience: ['assignee', 'collaborators', 'project_lead'],
+    tier: 'essentiel',
+    importance: 'urgent',
+  }),
+  'work.external_comment': work({
+    family: 'work.exchanges',
+    label: 'Un client ou un consultant commente',
+    recipients: 'Le responsable, les collaborateurs, les abonnés, le chef et l’adjoint',
+    audience: ['assignee', 'collaborators', 'followers', 'project_lead'],
+    tier: 'essentiel',
+    importance: 'important',
+    burst: { noun: 'nouveaux commentaires externes' },
+  }),
+  'work.consultant_time_logged': work({
+    family: 'work.time',
+    label: 'Un consultant que je suis saisit du temps',
+    recipients: 'Le référent interne du consultant',
+    audience: ['manager'],
+    tier: 'essentiel',
+    importance: 'info',
+    burst: { noun: 'saisies de temps' },
+  }),
   // ── CRM (ADR-0040) ────────────────────────────────────────────────────────
   'crm.activity_assigned': mod('crm', {
     family: 'crm.activities',

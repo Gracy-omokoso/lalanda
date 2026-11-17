@@ -209,9 +209,11 @@ export function libelleSort(
   const base = {
     sent: 'Envoyée',
     queued: 'En cours d’envoi',
+    deferred: 'Différée (heures calmes)',
     skipped: 'Ignorée',
     failed: 'Échec',
   }[status];
+  if (status === 'deferred') return base;
   if (!raison || raison === 'grouped') return raison === 'grouped' ? `${base} (regroupée)` : base;
   return `${base} — ${NOTIFICATION_SKIP_REASON_LABELS[raison]}`;
 }

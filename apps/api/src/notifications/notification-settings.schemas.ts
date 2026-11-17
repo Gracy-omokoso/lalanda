@@ -169,3 +169,75 @@ NotificationDeliverySchema.index({
 });
 /** Conservation bornée (90 jours). */
 NotificationDeliverySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+/**
+ * ADR-0079 § 5 : file des heures calmes (Slack, WhatsApp). Un message par ligne, au plus
+ * `deferredPerUserMax` par personne et par canal ; au-delà, une ligne `overflow` compte le
+ * reste. Libérée à la fin des heures calmes, puis gardée 7 jours (trace), jamais renvoyée.
+ */
+@Schema({ collection: 'notification_deferred', timestamps: false, strict: true, minimize: false })
+export class NotificationDeferredDoc {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true })
+  userId!: string;
+
+  @Prop({ type: String, required: true })
+  channel!: string;
+
+  @Prop({ type: Boolean, default: false })
+  overflow!: boolean;
+
+  /** Messages comptés par la ligne `overflow`, et leurs lignes de journal (500 au plus). */
+  @Prop({ type: Number, default: 0 })
+  overflowCount!: number;
+
+  @Prop({ type: [String], default: [] })
+  overflowDeliveryIds!: string[];
+
+  @Prop({ type: String, default: null })
+  kind!: string | null;
+
+  @Prop({ type: String, default: '' })
+  projectId!: string;
+
+  @Prop({ type: String, default: '' })
+  eventLabel!: string;
+
+  @Prop({ type: String, default: '' })
+  title!: string;
+
+  @Prop({ type: String, default: '/notifications' })
+  href!: string;
+
+  @Prop({ type: String, default: null })
+  template!: string | null;
+
+  @Prop({ type: String, default: null })
+  deliveryId!: string | null;
+
+  @Prop({ type: Date, required: true })
+  releaseAt!: Date;
+
+  @Prop({ type: String, default: null })
+  claimedBy!: string | null;
+
+  @Prop({ type: Date, default: null })
+  releasedAt!: Date | null;
+
+  @Prop({ type: Date, default: null })
+  expiresAt!: Date | null;
+
+  @Prop({ type: Date, required: true })
+  createdAt!: Date;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+}
+export type NotificationDeferredDocument = HydratedDocument<NotificationDeferredDoc>;
+export type NotificationDeferredLean = NotificationDeferredDoc & { _id: Types.ObjectId };
+export const NotificationDeferredSchema = SchemaFactory.createForClass(NotificationDeferredDoc);
+NotificationDeferredSchema.index({ releasedAt: 1, releaseAt: 1 });
+NotificationDeferredSchema.index({ organizationId: 1, userId: 1, channel: 1, releasedAt: 1 });
+NotificationDeferredSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

@@ -72,3 +72,28 @@ export function ipBucket(ip: string | null | undefined): string {
     .digest('hex')
     .slice(0, 32);
 }
+
+/**
+ * ADR-0079 § 9 : jeton du lien de désinscription d'un compte externe — organisation,
+ * compte et HMAC-SHA256 (clé HKDF distincte). Ne donne accès qu'au réglage des e-mails du
+ * compte, jamais à l'espace externe ; sans expiration (un lien de pied de page doit
+ * rester valable).
+ */
+export function externalPreferenceToken(organizationId: string, accountId: string): string {
+  const sig = createHmac('sha256', key('lalanda/external-notification-preferences'))
+    .update(`${organizationId}:${accountId}`)
+    .digest('base64url');
+  return `${organizationId}.${accountId}.${sig}`;
+}
+
+/** Jeton → (organisation, compte), ou `null` s'il est faux. Comparaison à temps constant. */
+export function readExternalPreferenceToken(
+  token: string,
+): { organizationId: string; accountId: string } | null {
+  const m = /^([0-9a-f]{24})\.([0-9a-f]{24})\.([A-Za-z0-9_-]{43})$/.exec(token);
+  if (!m) return null;
+  const expected = Buffer.from(externalPreferenceToken(m[1]!, m[2]!));
+  const given = Buffer.from(token);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  return { organizationId: m[1]!, accountId: m[2]! };
+}

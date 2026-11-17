@@ -159,7 +159,7 @@ export class NotificationDeliveriesService {
         kind,
         entityId,
         createdAt: { $gte: since },
-        [`channels.${channel}.status`]: { $in: ['sent', 'queued'] },
+        [`channels.${channel}.status`]: { $in: ['sent', 'queued', 'deferred'] },
       })
       .exec();
     return hit !== null;
@@ -172,7 +172,7 @@ export class NotificationDeliveriesService {
         organizationId,
         userId,
         createdAt: { $gte: kinshasaDayStart(now) },
-        'channels.whatsapp.status': { $in: ['sent', 'queued'] },
+        'channels.whatsapp.status': { $in: ['sent', 'queued', 'deferred'] },
       })
       .exec();
   }

@@ -103,6 +103,7 @@ import { WorkTimesheetsController } from '../work/timesheets/work-timesheets.con
 import { WorkExternalController } from '../work/external/work-external.controller.js';
 import { PortalAuthController } from '../work/external/portal-auth.controller.js';
 import { PortalController } from '../work/external/portal.controller.js';
+import { PortalNotificationsController } from '../work/external/portal-notifications.controller.js';
 // ADR-0045 — H4
 import { HrChecklistsController } from '../hr/checklists/hr-checklists.controller.js';
 import { HrDocumentsController } from '../hr/documents/hr-documents.controller.js';
@@ -330,6 +331,7 @@ const CONTROLEURS = [
   WorkExternalController,
   PortalAuthController,
   PortalController,
+  PortalNotificationsController,
   // ADR-0058 : accueil des projets (portefeuille).
   WorkPortfolioController,
   // ADR-0060 : membres d'un projet (utilisateurs, équipes) ; équipes RH.
@@ -428,6 +430,13 @@ const SANS_PERMISSION: Record<string, string> = {
   'PortalController.removeTime': 'Consultant : ses propres saisies seulement (verrou de semaine).',
   'PortalController.timesheet': 'Consultant : sa propre semaine (minutes, statut de validation).',
   'PortalController.submitTimesheet': 'Consultant : soumet sa propre semaine à son référent.',
+  // ADR-0079 § 9 : e-mails de l'espace externe.
+  'PortalController.myNotifications': 'Sa propre préférence d’e-mails (tout, validations, rien).',
+  'PortalController.putMyNotifications': 'Règle sa propre préférence d’e-mails.',
+  'PortalNotificationsController.get':
+    'Lien de désinscription signé : préférence du seul compte du jeton, rien d’autre.',
+  'PortalNotificationsController.put':
+    'Lien de désinscription signé : règle les e-mails du seul compte du jeton.',
   'HealthController.check': 'Sonde publique — aucune authentification, aucune donnée.',
   // ADR-0064 § 2 et § 6 — appelées par Slack ou par le navigateur qui en revient.
   'SlackController.callback':

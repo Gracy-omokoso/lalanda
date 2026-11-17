@@ -646,6 +646,35 @@ export function renderExternalInvitation(input: {
   };
 }
 
+/**
+ * ADR-0079 § 9 : notification d'un compte externe (livrable à valider, commentaire partagé,
+ * nouvel accès). Titre de tâche et nom de projet seulement : jamais de montant, de temps
+ * ni de nom interne autre que ce que l'espace externe montre déjà.
+ */
+export function renderExternalNotification(input: {
+  url: string;
+  preferencesUrl: string;
+  name?: string | null;
+  organizationName: string;
+  projectName: string;
+  eventLabel: string;
+  detail: string;
+}): RenderedMail {
+  const rendered = layout({
+    heading: input.eventLabel,
+    paragraphs: [
+      greeting(input.name),
+      `${input.organizationName} — projet « ${input.projectName} » : ${input.detail}`,
+    ],
+    ctaLabel: 'Ouvrir mon espace',
+    ctaUrl: input.url,
+    footnotes: [
+      `Vous recevez cet e-mail parce que vous avez accès à ce projet. Choisir ce que vous recevez (tout, les validations seulement, rien) : ${input.preferencesUrl}`,
+    ],
+  });
+  return { ...rendered, subject: `${PRODUCT} — ${input.eventLabel} (${input.projectName})` };
+}
+
 /** Durée lisible d'une pause : « 15 minutes », « 1 heure », « 4 heures ». */
 function dureePause(minutes: number): string {
   if (minutes < 60) return `${minutes} minutes`;

@@ -5,6 +5,8 @@
 // ne transite par ces routes.
 
 import type {
+  ExternalNotificationPreferenceValue,
+  PortalNotificationPreferenceView,
   PortalClientDecisionBody,
   PortalCommentView,
   PortalMeView,
@@ -92,5 +94,23 @@ export const portalApi = {
     jsonRequest<PortalTimesheetView>('/portal/timesheet/submit', {
       method: 'POST',
       body: { week, expectedRevision },
+    }),
+  // ADR-0079 § 9 : e-mails de l'espace externe — par la session, ou par le lien signé.
+  myNotifications: () =>
+    jsonRequest<PortalNotificationPreferenceView>('/portal/me/notifications', { method: 'GET' }),
+  putMyNotifications: (preference: ExternalNotificationPreferenceValue) =>
+    jsonRequest<PortalNotificationPreferenceView>('/portal/me/notifications', {
+      method: 'PUT',
+      body: { preference },
+    }),
+  preferenceByToken: (jeton: string) =>
+    jsonRequest<PortalNotificationPreferenceView>(
+      `/portal/notifications/preference?jeton=${e(jeton)}`,
+      { method: 'GET' },
+    ),
+  putPreferenceByToken: (jeton: string, preference: ExternalNotificationPreferenceValue) =>
+    jsonRequest<PortalNotificationPreferenceView>('/portal/notifications/preference', {
+      method: 'PUT',
+      body: { jeton, preference },
     }),
 };

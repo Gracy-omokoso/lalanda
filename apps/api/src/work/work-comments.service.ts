@@ -20,7 +20,7 @@ import {
   type WorkCommentView,
   type WorkPage,
 } from '@lalanda/shared/work';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -43,6 +43,7 @@ import {
 } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
+import { WorkExternalNotifier } from './external/work-external-notifier.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
 import { WorkSettingsService } from './work-settings.service.js';
@@ -88,7 +89,31 @@ export class WorkCommentsService {
     @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     @Inject(WorkSettingsService) private readonly settings: WorkSettingsService,
+    // ADR-0079 § 9 : commentaire PARTAGÉ → e-mail aux externes qui voient la tâche.
+    @Optional()
+    @Inject(WorkExternalNotifier)
+    private readonly externals: WorkExternalNotifier | null = null,
   ) {}
+
+  private async notifyExternals(
+    organizationId: string,
+    task: WorkTaskLean,
+    authorId: string,
+  ): Promise<void> {
+    await this.externals?.sharedComment(
+      organizationId,
+      {
+        id: String(task._id),
+        projectId: task.projectId,
+        number: task.number,
+        title: task.title,
+        clientVisible: task.clientVisible ?? false,
+        consultantAssigneeId: task.consultantAssigneeId ?? null,
+        consultantCollaboratorIds: task.consultantCollaboratorIds ?? [],
+      },
+      authorId,
+    );
+  }
 
   /**
    * ADR-0061 § 3 : un gestionnaire (`work.manage`) modère-t-il les commentaires des
@@ -263,6 +288,8 @@ export class WorkCommentsService {
       },
     });
     await this.notify(organizationId, task, mentions, actor, true);
+    if (body.visibility === 'shared')
+      await this.notifyExternals(organizationId, task, actor.userId);
     const [view] = await this.views(organizationId, [
       await this.requireOwn(organizationId, commentId),
     ]);
@@ -476,6 +503,11 @@ export class WorkCommentsService {
         kind: 'comment.visibility_changed',
         data: { commentId, from, to: body.visibility },
       });
+      // ADR-0079 § 9 : rendu partagé → les externes qui voient la tâche l'apprennent.
+      if (body.visibility === 'shared') {
+        const t = await this.tasks.requireOwn(organizationId, current.taskId);
+        await this.notifyExternals(organizationId, t, current.authorUserId);
+      }
     }
     const [view] = await this.views(organizationId, [
       await this.requireOwn(organizationId, commentId),

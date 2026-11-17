@@ -16,7 +16,8 @@ describe('notifications — contrats partagés', () => {
     // ADR-0076 § 6 : quatre types work de plus (collaborateur, validation demandée et décidée,
     // statut du projet).
     // ADR-0079 § 3 : seize types work de plus et le test de la cloche (organisation).
-    expect(NOTIFICATION_KINDS).toHaveLength(82);
+    // ADR-0079 § 3 bis : quatre types des membres externes.
+    expect(NOTIFICATION_KINDS).toHaveLength(86);
     for (const kind of NOTIFICATION_KINDS) {
       if (kind === 'platform.announcement') continue;
       const module = kind.split('.')[0]!;

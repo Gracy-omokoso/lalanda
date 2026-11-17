@@ -39,6 +39,8 @@ export const NOTIFICATION_SETTINGS_LIMITS = {
   deliveriesRetentionDays: 90,
   deliveriesPageDefault: 50,
   deliveriesPageMax: 200,
+  /** File des heures calmes : messages gardés par personne et par canal (au-delà : regroupés). */
+  deferredPerUserMax: 20,
   /** « M'envoyer un test » : au plus 5 par heure et par personne, tous canaux confondus. */
   testsPerHour: 5,
   mandatoryMax: 200,
@@ -124,7 +126,14 @@ export interface NotificationChannelsView {
   whatsappSentToday: number;
 }
 
-export const NOTIFICATION_DELIVERY_STATUSES = ['sent', 'queued', 'skipped', 'failed'] as const;
+/** `deferred` (ADR-0079 § 5) : mis en file pendant les heures calmes, envoyé à leur fin. */
+export const NOTIFICATION_DELIVERY_STATUSES = [
+  'sent',
+  'queued',
+  'deferred',
+  'skipped',
+  'failed',
+] as const;
 export type NotificationDeliveryStatus = (typeof NOTIFICATION_DELIVERY_STATUSES)[number];
 
 /** Pourquoi un canal n'a pas servi. Liste fermée, affichée en clair. */

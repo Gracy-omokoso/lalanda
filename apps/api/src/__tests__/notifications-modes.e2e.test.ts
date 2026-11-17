@@ -23,7 +23,12 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { MailTransport } from '../mail/mail.transport.js';
 import type { MailMessage } from '../mail/mail.types.js';
-import { NotificationDispatcher } from '../notifications/notification-dispatcher.js';
+import { NotificationDeferredService } from '../notifications/notification-deferred.service.js';
+import {
+  NotificationDispatcher,
+  type PushMessage,
+} from '../notifications/notification-dispatcher.js';
+import { SlackNotifier } from '../slack/slack-notifier.service.js';
 import { NOTIFICATIONS_PORT, type NotificationsPort } from '../notifications/notifications.port.js';
 import { e2eSuite } from './e2e-utils.js';
 import { useWorkFixture } from './work-e2e-fixtures.js';
@@ -395,18 +400,85 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
       expect(log.filter((d) => d.channels['email']?.reason === 'grouped').length).toBe(2);
     });
 
-    it('heures calmes : Slack et WhatsApp retenus, cloche et e-mail partent', async () => {
+    it('heures calmes : Slack et WhatsApp mis en file, puis envoyés regroupés à la fin', async () => {
       const h = (new Date().getUTCHours() + 1) % 24;
       await putSettings('accountant', {
         quietHours: { enabled: true, start: h, end: (h + 1) % 24 },
       });
-      await task({ title: 'La nuit', assigneeUserId: f.userId('accountant') });
-      const log = (await deliveries('accountant')).find((d) => d.kind === 'work.task_assigned');
+      await task({ title: 'La nuit (1)', assigneeUserId: f.userId('accountant') });
+      await task({ title: 'La nuit (2)', assigneeUserId: f.userId('accountant') });
+      const logs = (await deliveries('accountant')).filter((d) => d.kind === 'work.task_assigned');
+      const log = logs[0];
       expect(log?.channels['bell']).toMatchObject({ status: 'sent' });
       expect(log?.channels['email']).toMatchObject({ status: 'sent' });
-      expect(log?.channels['slack']).toMatchObject({ status: 'skipped', reason: 'quiet_hours' });
-      expect(log?.channels['whatsapp']).toMatchObject({ status: 'skipped', reason: 'quiet_hours' });
+      expect(log?.channels['slack']).toMatchObject({ status: 'deferred', reason: 'quiet_hours' });
+      expect(log?.channels['whatsapp']).toMatchObject({
+        status: 'deferred',
+        reason: 'quiet_hours',
+      });
+      // Fin des heures calmes : un faux Slack enregistré reçoit UN message regroupé.
+      const dispatcher = f.app().get(NotificationDispatcher);
+      const recus: PushMessage[] = [];
+      dispatcher.registerSender('slack', {
+        direct: (_org, _p, messages, report) => {
+          for (const m of messages) {
+            recus.push(m);
+            report?.(m, { status: 'sent', reason: null });
+          }
+        },
+      });
+      try {
+        const lots = await f
+          .app()
+          .get(NotificationDeferredService)
+          .release(new Date(Date.now() + 25 * 3_600_000));
+        expect(lots).toBeGreaterThanOrEqual(1);
+        const mien = recus.filter((m) => m.recipientUserId === f.userId('accountant'));
+        expect(mien).toHaveLength(1);
+        expect(mien[0]!.title).toMatch(/^2 notifications pendant les heures calmes : /);
+        const apres = (await deliveries('accountant')).filter(
+          (d) => d.kind === 'work.task_assigned' && d.channels['slack']?.reason === 'grouped',
+        );
+        expect(apres.length).toBeGreaterThanOrEqual(2);
+        expect(apres[0]!.channels['slack']!.status).toBe('sent');
+        // Rejouer ne renvoie rien.
+        recus.length = 0;
+        await f
+          .app()
+          .get(NotificationDeferredService)
+          .release(new Date(Date.now() + 26 * 3_600_000));
+        expect(recus.filter((m) => m.recipientUserId === f.userId('accountant'))).toEqual([]);
+      } finally {
+        dispatcher.registerSender('slack', f.app().get(SlackNotifier));
+      }
       await putSettings('accountant', { quietHours: { enabled: false, start: 21, end: 7 } });
+    });
+
+    it('file bornée : au-delà de 20 messages, regroupés sur une seule ligne', async () => {
+      const svc = f.app().get(NotificationDeferredService);
+      const base = {
+        organizationId: f.orgId(),
+        userId: f.userId('viewer'),
+        channel: 'slack' as const,
+        kind: 'work.task_assigned',
+        projectId: '',
+        eventLabel: 'Une tâche m’est assignée',
+        href: '/projets',
+        template: null,
+        deliveryId: null,
+        releaseAt: new Date(Date.now() + 3_600_000),
+      };
+      await svc.enqueue(
+        Array.from({ length: 23 }, (_, i) => ({ ...base, title: `Tâche ${i}` })),
+        new Date(),
+      );
+      const rows = await f
+        .db()
+        .collection('notification_deferred')
+        .find({ organizationId: f.orgId(), userId: f.userId('viewer'), releasedAt: null })
+        .toArray();
+      expect(rows.filter((r) => !r['overflow'])).toHaveLength(20);
+      expect(rows.find((r) => r['overflow'])?.['overflowCount']).toBe(3);
     });
 
     it('plafond quotidien WhatsApp par personne', async () => {

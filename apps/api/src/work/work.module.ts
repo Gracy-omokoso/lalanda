@@ -46,6 +46,7 @@ import {
 import { WORK_ABSENCES_SOURCE } from './work-absences.port.js';
 // ADR-0078 : membres externes.
 import { WorkExternalLifecycle } from './external/work-external-lifecycle.js';
+import { WorkExternalNotifier } from './external/work-external-notifier.js';
 import {
   WorkExternalAccount,
   WorkExternalAccountSchema,
@@ -53,6 +54,8 @@ import {
   WorkExternalChallengeSchema,
   WorkExternalMembership,
   WorkExternalMembershipSchema,
+  WorkExternalNotification,
+  WorkExternalNotificationSchema,
   WorkExternalSession,
   WorkExternalSessionSchema,
 } from './external/work-external.schemas.js';
@@ -176,6 +179,7 @@ import {
       { name: WorkExternalMembership.name, schema: WorkExternalMembershipSchema },
       { name: WorkExternalChallenge.name, schema: WorkExternalChallengeSchema },
       { name: WorkExternalSession.name, schema: WorkExternalSessionSchema },
+      { name: WorkExternalNotification.name, schema: WorkExternalNotificationSchema },
     ]),
   ],
   controllers: [
@@ -251,9 +255,12 @@ import {
     { provide: WORK_AI_CHAT_CLIENT, useExisting: OPENAI_CHAT_CLIENT },
     // ADR-0078 § 3.1 : fermeture des accès externes (archivage, retrait, fiche désactivée).
     WorkExternalLifecycle,
+    // ADR-0079 § 9 : e-mails vers les comptes externes.
+    WorkExternalNotifier,
   ],
   exports: [
     WorkExternalLifecycle,
+    WorkExternalNotifier,
     WorkTimeService,
     WorkCommentsService,
     MongooseModule,

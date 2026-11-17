@@ -22,6 +22,8 @@ export const EXTERNAL_ACCOUNTS = 'work_external_accounts';
 export const EXTERNAL_MEMBERSHIPS = 'work_external_memberships';
 export const EXTERNAL_CHALLENGES = 'work_external_challenges';
 export const EXTERNAL_SESSIONS = 'work_external_sessions';
+/** ADR-0079 § 9 : e-mails envoyés aux comptes externes (rafales, journal), 30 jours. */
+export const EXTERNAL_NOTIFICATIONS = 'work_external_notifications';
 
 const CLOSE_REASONS = [
   'manual',
@@ -107,6 +109,13 @@ export class WorkExternalAccount {
 
   @Prop({ type: Number, default: 0 })
   codeRequestCount?: number;
+
+  /**
+   * ADR-0079 § 9 : ce que le compte reçoit par e-mail — `all` (défaut, champ absent),
+   * `approvals` (les livrables à valider seulement), `none`.
+   */
+  @Prop({ type: String, enum: ['all', 'approvals', 'none'], required: false })
+  notificationPreference?: 'all' | 'approvals' | 'none';
 
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;
@@ -260,3 +269,45 @@ export const WorkExternalSessionSchema = SchemaFactory.createForClass(WorkExtern
 WorkExternalSessionSchema.index({ tokenHash: 1 }, { unique: true });
 WorkExternalSessionSchema.index({ organizationId: 1, accountId: 1, revokedAt: 1 });
 WorkExternalSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86_400 });
+
+/**
+ * ADR-0079 § 9 : un e-mail de notification à un compte externe — ni adresse, ni titre :
+ * le genre d'événement, l'objet, le sort. Sert à regrouper les rafales (10 min).
+ */
+@Schema({ collection: EXTERNAL_NOTIFICATIONS, strict: true })
+export class WorkExternalNotification {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true })
+  accountId!: string;
+
+  @Prop({ type: String, required: true })
+  kind!: string;
+
+  @Prop({ type: String, required: true })
+  entityId!: string;
+
+  @Prop({ type: String, required: true })
+  status!: string;
+
+  @Prop({ type: Date, required: true })
+  createdAt!: Date;
+
+  @Prop({ type: Date, required: true })
+  expiresAt!: Date;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+}
+export type WorkExternalNotificationDocument = HydratedDocument<WorkExternalNotification>;
+export const WorkExternalNotificationSchema =
+  SchemaFactory.createForClass(WorkExternalNotification);
+WorkExternalNotificationSchema.index({
+  organizationId: 1,
+  accountId: 1,
+  kind: 1,
+  entityId: 1,
+  createdAt: -1,
+});
+WorkExternalNotificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

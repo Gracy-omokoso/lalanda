@@ -31,7 +31,7 @@ import {
   type UpdateTimeEntryBody,
   type WorkClientApprovalState,
 } from '@lalanda/shared/work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -44,6 +44,7 @@ import {
 import { WorkActivityService } from '../work-activity.service.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkNotifier } from '../work-notifier.js';
+import { WorkExternalNotifier } from './work-external-notifier.js';
 import { WorkTimeService } from '../work-time.service.js';
 import {
   conflict,
@@ -100,6 +101,8 @@ const TASK_PROJECTION = {
   consultantCollaboratorIds: 1,
   assigneeUserId: 1,
   followerUserIds: 1,
+  // ADR-0079 § 3 bis : destinataires internes des notifications (jamais servis à l’externe).
+  collaboratorUserIds: 1,
   revision: 1,
   rank: 1,
 } as const;
@@ -126,6 +129,9 @@ export class WorkPortalService {
     @Inject(WorkTimesheetApprovalsService)
     private readonly timesheets: WorkTimesheetApprovalsService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Optional()
+    @Inject(WorkExternalNotifier)
+    private readonly externalNotifier: WorkExternalNotifier | null = null,
   ) {}
 
   /** Appelant du module, côté écriture (son compte externe, sans rôle d'organisation). */
@@ -445,21 +451,37 @@ export class WorkPortalService {
       kind: 'comment.added',
       data: { commentId, mentions: 0, attachments: 0, visibility: 'shared', external: ctx.kind },
     });
+    // ADR-0079 § 3 bis : « un client ou un consultant commente » — responsable,
+    // collaborateurs, abonnés, chef et adjoint, selon leur mode.
     await this.notifier.taskEvent({
       organizationId: ctx.organizationId,
       recipients: [
-        ...new Set([
-          ...(task.followerUserIds ?? []),
-          ...(task.assigneeUserId ? [task.assigneeUserId] : []),
-          ...(access.project.ownerUserId ? [access.project.ownerUserId] : []),
-        ]),
+        task.assigneeUserId,
+        ...(task.collaboratorUserIds ?? []),
+        ...(task.followerUserIds ?? []),
+        access.project.ownerUserId,
+        access.project.deputyUserId,
       ],
-      kind: 'work.comment_on_followed',
+      kind: 'work.external_comment',
       projectId: task.projectId,
       taskId: String(task._id),
       title: `${ctx.name} (${ctx.kind === 'client' ? 'client' : 'consultant'}) a commenté #${task.number} ${task.title}`,
       actorUserId: ctx.accountId,
     });
+    // ADR-0079 § 9 : les AUTRES externes qui voient la tâche reçoivent un e-mail.
+    await this.externalNotifier?.sharedComment(
+      ctx.organizationId,
+      {
+        id: String(task._id),
+        projectId: task.projectId,
+        number: task.number,
+        title: task.title,
+        clientVisible: task.clientVisible ?? false,
+        consultantAssigneeId: task.consultantAssigneeId ?? null,
+        consultantCollaboratorIds: task.consultantCollaboratorIds ?? [],
+      },
+      ctx.accountId,
+    );
     const doc = await this.comments.findById(created._id).lean<WorkCommentLean>().exec();
     return (await this.commentViews(ctx, access.project, [doc!]))[0]!;
   }
@@ -529,16 +551,17 @@ export class WorkPortalService {
       targetId: String(task._id),
       metadata: { projectId: task.projectId, accountId: ctx.accountId },
     });
+    // ADR-0079 § 3 bis : validé ou modifications demandées par le client — responsable,
+    // collaborateurs, chef, adjoint. Le MOTIF reste dans Lalanda (jamais dans le titre).
     await this.notifier.taskEvent({
       organizationId: ctx.organizationId,
       recipients: [
-        ...new Set(
-          [task.assigneeUserId, access.project.ownerUserId, access.project.deputyUserId].filter(
-            (u): u is string => !!u,
-          ),
-        ),
+        task.assigneeUserId,
+        ...(task.collaboratorUserIds ?? []),
+        access.project.ownerUserId,
+        access.project.deputyUserId,
       ],
-      kind: 'work.task_approval_decided',
+      kind: state === 'approved' ? 'work.client_approved' : 'work.client_changes_requested',
       projectId: task.projectId,
       taskId: String(task._id),
       title:
@@ -581,6 +604,24 @@ export class WorkPortalService {
         external: true,
       },
     );
+    // ADR-0079 § 3 bis : le référent interne voit le temps de son consultant (rafales
+    // regroupées par tâche). Jamais de taux ni de montant.
+    const consultant = await this.timesheets.consultantOf(ctx.organizationId, ctx.accountId);
+    if (consultant?.referentUserId) {
+      const h = Math.floor(view.minutes / 60);
+      const m = view.minutes % 60;
+      const duree = h > 0 ? `${h} h${m > 0 ? ` ${String(m).padStart(2, '0')}` : ''}` : `${m} min`;
+      await this.notifier.taskEvent({
+        organizationId: ctx.organizationId,
+        recipients: [consultant.referentUserId],
+        kind: 'work.consultant_time_logged',
+        projectId: task.projectId,
+        taskId: String(task._id),
+        title: `${ctx.name} (consultant) a saisi ${duree} sur #${task.number} ${task.title}`,
+        actorUserId: ctx.accountId,
+        audience: 'manager',
+      });
+    }
     return {
       id: view.id,
       taskId: view.taskId,

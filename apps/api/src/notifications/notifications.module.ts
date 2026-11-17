@@ -20,10 +20,13 @@ import {
   NotificationPreferencesSchema,
   NotificationSchema,
 } from './notification.schemas.js';
+import { NotificationDeferredService } from './notification-deferred.service.js';
 import { NotificationDeliveriesService } from './notification-deliveries.service.js';
 import { NotificationDispatcher } from './notification-dispatcher.js';
 import { NotificationSettingsController } from './notification-settings.controller.js';
 import {
+  NotificationDeferredDoc,
+  NotificationDeferredSchema,
   NotificationDeliveryDoc,
   NotificationDeliverySchema,
   NotificationOrgSettingsDoc,
@@ -52,6 +55,7 @@ import { NOTIFICATIONS_CLOCK, NotificationsService } from './notifications.servi
       { name: NotificationSettingsDoc.name, schema: NotificationSettingsSchema },
       { name: NotificationOrgSettingsDoc.name, schema: NotificationOrgSettingsSchema },
       { name: NotificationDeliveryDoc.name, schema: NotificationDeliverySchema },
+      { name: NotificationDeferredDoc.name, schema: NotificationDeferredSchema },
     ]),
   ],
   controllers: [NotificationsController, NotificationSettingsController],
@@ -59,6 +63,8 @@ import { NOTIFICATIONS_CLOCK, NotificationsService } from './notifications.servi
     { provide: NOTIFICATIONS_CLOCK, useValue: () => new Date() },
     NotificationSettingsService,
     NotificationDeliveriesService,
+    // ADR-0079 § 5 : file des heures calmes (tâche `notifications.deferred-release`).
+    NotificationDeferredService,
     NotificationDispatcher,
     NotificationsService,
     { provide: NOTIFICATIONS_PORT, useExisting: NotificationsService },
@@ -77,6 +83,7 @@ import { NOTIFICATIONS_CLOCK, NotificationsService } from './notifications.servi
     NotificationsService,
     NotificationSettingsService,
     NotificationDispatcher,
+    NotificationDeferredService,
   ],
 })
 export class NotificationsModule {}

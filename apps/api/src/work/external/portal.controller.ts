@@ -14,6 +14,8 @@
 //   DELETE /portal/time-entries/:entryId           (consultant, ses saisies)
 //   GET    /portal/timesheet?week=                 (consultant)
 //   POST   /portal/timesheet/submit                (consultant)
+//   GET    /portal/me/notifications                (ADR-0079 § 9 : ses e-mails)
+//   PUT    /portal/me/notifications
 
 import {
   Body,
@@ -43,6 +45,8 @@ import {
   type PortalTaskView,
   type PortalTimeEntryView,
   type PortalTimesheetView,
+  PutPortalNotificationPreferenceBody,
+  type PortalNotificationPreferenceView,
 } from '@lalanda/shared/work';
 
 import { invalidRequest } from '../../sales/sales.errors.js';
@@ -50,6 +54,7 @@ import { WorkIdPipe } from '../work.common.js';
 import { CurrentExternal, ExternalAuthGuard } from './external-auth.guard.js';
 import { PortalOriginGuard } from './portal-origin.guard.js';
 import { WorkExternalAuthService, type ExternalContext } from './work-external-auth.service.js';
+import { WorkExternalNotifier } from './work-external-notifier.js';
 import { WorkPortalService } from './work-portal.service.js';
 
 /** Saisie d'un consultant : pour lui-même seulement (`userId` refusé). */
@@ -61,7 +66,29 @@ export class PortalController {
   constructor(
     @Inject(WorkPortalService) private readonly portal: WorkPortalService,
     @Inject(WorkExternalAuthService) private readonly auth: WorkExternalAuthService,
+    @Inject(WorkExternalNotifier) private readonly notifier: WorkExternalNotifier,
   ) {}
+
+  @Get('me/notifications')
+  @Header('cache-control', 'no-store')
+  async myNotifications(
+    @CurrentExternal() ctx: ExternalContext,
+  ): Promise<PortalNotificationPreferenceView> {
+    return {
+      preference: (await this.notifier.preferenceOf(ctx.organizationId, ctx.accountId)) ?? 'all',
+    };
+  }
+
+  @Put('me/notifications')
+  async putMyNotifications(
+    @CurrentExternal() ctx: ExternalContext,
+    @Body() body: unknown,
+  ): Promise<PortalNotificationPreferenceView> {
+    const parsed = PutPortalNotificationPreferenceBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    await this.notifier.setPreference(ctx.organizationId, ctx.accountId, parsed.data.preference);
+    return { preference: parsed.data.preference };
+  }
 
   @Get('me')
   @Header('cache-control', 'no-store')

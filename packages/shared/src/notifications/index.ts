@@ -51,6 +51,13 @@ export const NOTIFICATION_KINDS = [
   'work.timesheet_approved',
   'work.timesheet_returned',
   'work.timesheet_reopened',
+  // ADR-0079 § 3 bis : gestes des membres externes (ADR-0078) — validation et modifications
+  // demandées par le client, commentaire d'un client ou d'un consultant, temps saisi par un
+  // consultant (vers son référent). Le motif d'une demande n'est jamais recopié.
+  'work.client_approved',
+  'work.client_changes_requested',
+  'work.external_comment',
+  'work.consultant_time_logged',
   // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM. `crm.opportunity_won`
   // est déclaré ici et émis par le lot C7 (opportunité gagnée → projet).
   'crm.activity_assigned',

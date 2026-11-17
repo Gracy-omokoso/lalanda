@@ -109,6 +109,10 @@ export function EntetePortail({ me }: { me: PortalMeView | null }): React.ReactE
             Ma feuille de temps
           </Link>
         ) : null}
+        {/* ADR-0079 § 9 : ce que je reçois par e-mail. */}
+        <Link href="/portail/notifications" className="underline-offset-2 hover:underline">
+          Mes e-mails
+        </Link>
         <Button size="sm" variant="secondary" onClick={() => void sortir()}>
           Se déconnecter
         </Button>

@@ -12,6 +12,12 @@ import {
 import { WORK_NOTIFICATION_EVENTS, defaultWorkNotificationPreferences } from '@lalanda/shared/work';
 import { describe, expect, it } from 'vitest';
 
+import {
+  externalPreferenceToken,
+  readExternalPreferenceToken,
+} from '../work/external/work-external-crypto.js';
+import { externalPreferenceAllows } from '../work/external/work-external-notifier.js';
+import { deferredGroupTitle, quietEndAfter } from './notification-deferred.service.js';
 import { kinshasaDayStart } from './notification-deliveries.service.js';
 import { maskEmail } from './notification-dispatcher.js';
 import { decodeKind, encodeKind } from './notification-settings.schemas.js';
@@ -159,5 +165,45 @@ describe('modèles WhatsApp proposés (§ 7)', () => {
         href: '/projets/x',
       }).name,
     ).toBe('lalanda_notification_projet');
+  });
+});
+
+describe('file des heures calmes (§ 5)', () => {
+  it('fin des heures calmes : le jour même ou le lendemain, à l’heure de Kinshasa', () => {
+    const q = { enabled: true, start: 21, end: 7 };
+    // 22 h 30 à Kinshasa (21 h 30 UTC) → 7 h le lendemain (6 h UTC).
+    expect(quietEndAfter(q, new Date('2026-11-17T21:30:00Z')).toISOString()).toBe(
+      '2026-11-18T06:00:00.000Z',
+    );
+    // 3 h à Kinshasa (2 h UTC) → 7 h le même jour.
+    expect(quietEndAfter(q, new Date('2026-11-18T02:10:00Z')).toISOString()).toBe(
+      '2026-11-18T06:00:00.000Z',
+    );
+    expect(deferredGroupTitle(3, ['A', 'B'])).toBe(
+      '3 notifications pendant les heures calmes : A ; B',
+    );
+    expect(deferredGroupTitle(30, ['x'.repeat(400)])).toHaveLength(200);
+  });
+});
+
+describe('e-mails vers les externes (§ 9)', () => {
+  it('préférence : tout, validations seulement, rien', () => {
+    expect(externalPreferenceAllows(undefined, 'shared_comment')).toBe(true);
+    expect(externalPreferenceAllows('approvals', 'shared_comment')).toBe(false);
+    expect(externalPreferenceAllows('approvals', 'approval_requested')).toBe(true);
+    expect(externalPreferenceAllows('none', 'approval_requested')).toBe(false);
+  });
+
+  it('jeton de désinscription signé, refusé s’il est altéré', () => {
+    process.env['AUTH_SECRET'] ??= 'secret-de-test-unitaire-0123456789abcdef';
+    const org = '64b7f0c2a1b2c3d4e5f60718';
+    const acc = '64b7f0c2a1b2c3d4e5f60719';
+    const t = externalPreferenceToken(org, acc);
+    expect(readExternalPreferenceToken(t)).toEqual({ organizationId: org, accountId: acc });
+    expect(
+      readExternalPreferenceToken(`${t.slice(0, -1)}${t.endsWith('A') ? 'B' : 'A'}`),
+    ).toBeNull();
+    expect(readExternalPreferenceToken(t.replace(acc, org))).toBeNull();
+    expect(readExternalPreferenceToken('nimporte-quoi')).toBeNull();
   });
 });

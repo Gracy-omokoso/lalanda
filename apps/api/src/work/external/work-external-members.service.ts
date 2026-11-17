@@ -36,7 +36,7 @@ import {
   type WorkMemberRateView,
   type WorkTaskExternalView,
 } from '@lalanda/shared/work';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
 
@@ -81,6 +81,7 @@ import {
   type WorkTaskLean,
 } from '../work.schemas.js';
 import { WorkExternalLifecycle } from './work-external-lifecycle.js';
+import { WorkExternalNotifier } from './work-external-notifier.js';
 import {
   WorkExternalAccount,
   WorkExternalMembership,
@@ -119,7 +120,25 @@ export class WorkExternalMembersService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(MailService) private readonly mail: MailService,
     @Inject(WorkExternalLifecycle) private readonly lifecycle: WorkExternalLifecycle,
+    // ADR-0079 § 9 : e-mails vers les externes (livrable à valider, nouvel accès).
+    @Optional()
+    @Inject(WorkExternalNotifier)
+    private readonly notifier: WorkExternalNotifier | null = null,
   ) {}
+
+  private async notifyApproval(organizationId: string, taskId: string): Promise<void> {
+    if (!this.notifier) return;
+    const t = await this.taskService.requireOwn(organizationId, taskId);
+    await this.notifier.approvalRequested(organizationId, {
+      id: String(t._id),
+      projectId: t.projectId,
+      number: t.number,
+      title: t.title,
+      clientVisible: t.clientVisible ?? false,
+      consultantAssigneeId: t.consultantAssigneeId ?? null,
+      consultantCollaboratorIds: t.consultantCollaboratorIds ?? [],
+    });
+  }
 
   // ── Lectures ─────────────────────────────────────────────────────────────
 
@@ -669,15 +688,23 @@ export class WorkExternalMembersService {
       String(project._id),
     );
     const id = String(project._id);
+    // ADR-0079 § 9 : un compte déjà ouvert ailleurs reçoit « un nouveau projet vous est
+    // ouvert » (selon SA préférence) ; un premier accès, l'invitation d'ADR-0078.
+    const hadOpenAccess =
+      (await this.lifecycle.openProjectsOf(organizationId, String(account._id))).length > 0;
     await this.openMembership(organizationId, account, id, body.canOpenProject === true, actor);
-    // L'invitation reste valable même si l'e-mail ne part pas (`MailService` ne lève pas).
-    await this.mail.sendExternalInvitation({
-      to: account.email,
-      organizationName: await this.organizationName(organizationId),
-      projectName: project.name,
-      kindLabel: WORK_EXTERNAL_KIND_LABELS[account.kind],
-      name: account.name,
-    });
+    if (hadOpenAccess && this.notifier) {
+      await this.notifier.accessOpened(organizationId, String(account._id), id);
+    } else {
+      // L'invitation reste valable même si l'e-mail ne part pas (`MailService` ne lève pas).
+      await this.mail.sendExternalInvitation({
+        to: account.email,
+        organizationName: await this.organizationName(organizationId),
+        projectName: project.name,
+        kindLabel: WORK_EXTERNAL_KIND_LABELS[account.kind],
+        name: account.name,
+      });
+    }
     const row = await this.memberships
       .findOne({ organizationId, accountId: String(account._id), projectId: id })
       .lean<WorkExternalMembershipLean>()
@@ -1287,6 +1314,8 @@ export class WorkExternalMembersService {
           : {}),
       },
     });
+    // ADR-0079 § 9 : un livrable qui passe « à valider » prévient les contacts client.
+    if (required && !currentRequired) await this.notifyApproval(organizationId, taskId);
     const fresh = await this.taskService.requireOwn(organizationId, taskId);
     return this.taskExternalView(organizationId, fresh, project, actor);
   }
@@ -1344,6 +1373,7 @@ export class WorkExternalMembersService {
       targetId: String(task._id),
       metadata: { projectId: task.projectId, fromState: task.clientApproval.state },
     });
+    await this.notifyApproval(organizationId, taskId);
     return this.taskExternalView(
       organizationId,
       await this.taskService.requireOwn(organizationId, taskId),

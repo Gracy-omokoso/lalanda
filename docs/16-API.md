@@ -1147,6 +1147,15 @@ d'un autre. Pas de fonction d'offre (comme `/notifications`).
   `work.project_restored`, `work.project_created`, `work.timesheet_submitted`,
   `work.timesheet_approved`, `work.timesheet_returned`, `work.timesheet_reopened`,
   `organization.notification_test` ; nature d'entité `timesheet`.
+- Heures calmes : Slack et WhatsApp différés (`status: deferred`, `reason: quiet_hours`) puis
+  envoyés à la fin (tâche `notifications.deferred-release`, 5 min), regroupés s'il y en a
+  plusieurs (`reason: grouped`) ; 20 par personne et par canal au plus.
+- Types des membres externes (ADR-0078) : `work.client_approved`, `work.client_changes_requested`,
+  `work.external_comment`, `work.consultant_time_logged`.
+- **Vers les externes** (e-mail seulement) : `GET|PUT /portal/me/notifications` (session de
+  l'espace externe) et `GET|PUT /portal/notifications/preference` (publiques, jeton signé du lien
+  de désinscription ; `{ preference: all | approvals | none }` ; `404
+  EXTERNAL_PREFERENCE_NOT_FOUND`).
 - Variables : `NOTIFICATIONS_QUIET_HOURS_DEFAULT` (`off` ou `HH-HH`, défaut `21-7`),
   `WHATSAPP_APPROVED_TEMPLATES` (modèles proposés approuvés par Meta, séparés par des virgules).
 

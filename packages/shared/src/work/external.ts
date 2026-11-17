@@ -593,3 +593,38 @@ export interface PortalTimesheetView {
   canSubmit: boolean;
   locked: boolean;
 }
+
+// ── ADR-0079 § 9 : e-mails vers les comptes externes ───────────────────────
+
+/** Ce qu'un compte externe reçoit par e-mail : tout, les validations seulement, rien. */
+export const EXTERNAL_NOTIFICATION_PREFERENCES = ['all', 'approvals', 'none'] as const;
+export type ExternalNotificationPreferenceValue =
+  (typeof EXTERNAL_NOTIFICATION_PREFERENCES)[number];
+
+export const EXTERNAL_NOTIFICATION_PREFERENCE_LABELS: Readonly<
+  Record<ExternalNotificationPreferenceValue, string>
+> = {
+  all: 'Tout : livrables à valider, commentaires, nouveaux projets',
+  approvals: 'Seulement les livrables qui attendent ma validation',
+  none: 'Rien',
+};
+
+export interface PortalNotificationPreferenceView {
+  preference: ExternalNotificationPreferenceValue;
+}
+
+const Preference = z.enum(EXTERNAL_NOTIFICATION_PREFERENCES, {
+  error: 'Choix attendu : all, approvals ou none.',
+});
+
+/** `PUT /portal/me/notifications` (session de l'espace externe). */
+export const PutPortalNotificationPreferenceBody = z.object({ preference: Preference }).strict();
+export type PutPortalNotificationPreferenceBody = z.output<
+  typeof PutPortalNotificationPreferenceBody
+>;
+
+/** `PUT /portal/notifications/preference` (lien signé de l'e-mail, sans session). */
+export const PutPortalPreferenceByTokenBody = z
+  .object({ jeton: z.string().min(1).max(200), preference: Preference })
+  .strict();
+export type PutPortalPreferenceByTokenBody = z.output<typeof PutPortalPreferenceByTokenBody>;

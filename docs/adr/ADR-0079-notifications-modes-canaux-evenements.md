@@ -216,9 +216,18 @@ du port pour « autorisations changées ») bloquait le démarrage de Nest par u
   « 3 nouveaux commentaires — Gracy a commenté #12 Maquette », `count` dans la vue ; l'e-mail,
   Slack et WhatsApp ne repartent pas (`grouped` au journal). Jamais pour un rappel (`dedupeKey`).
 - **Heures calmes** (WhatsApp et Slack seulement) : par personne, défaut **21 h → 7 h, heure de
-  Kinshasa** (`NOTIFICATIONS_QUIET_HOURS_DEFAULT` = `off` ou `HH-HH`) ; pendant ces heures, le
-  message n'est **pas** envoyé (`quiet_hours` au journal), la cloche et l'e-mail partent. Pas de
-  file différée en R1. *Tranché seul — à revoir avec l'expert.*
+  Kinshasa** (`NOTIFICATIONS_QUIET_HOURS_DEFAULT` = `off` ou `HH-HH`) ; la cloche et l'e-mail
+  partent aussitôt. **Aucun message n'est perdu** (révision du 17 nov., demande du coordinateur) :
+  Slack et WhatsApp entrent dans la file `notification_deferred` (journal : `deferred` ·
+  `quiet_hours`) et partent à la **fin des heures calmes** de la personne (tâche
+  `notifications.deferred-release`, toutes les 5 min, réclamation atomique, rejouable sans double
+  envoi) : un message seul tel quel ; plusieurs **regroupés en un seul** (« 4 notifications pendant
+  les heures calmes : … », lien `/notifications`, modèle WhatsApp `lalanda_notification_projet`) ;
+  le journal de chacun passe à `sent` (`grouped` s'il a été regroupé) ou à l'échec. **File bornée**
+  à **20 messages** par personne et par canal ; au-delà, une ligne `overflow` les compte et ils
+  rejoignent le message regroupé. Les lignes libérées restent 7 jours (trace), jamais renvoyées.
+  Un message différé compte dans le plafond WhatsApp du jour. *Tranché seul — à revoir avec
+  l'expert.*
 - **Plafond quotidien WhatsApp** : par personne et par jour de Kinshasa, défaut **20** (0 à 200),
   réglé par l'organisation ; tests compris ; au-delà `daily_cap`. Le plafond mensuel de la
   plateforme (ADR-0065 § 7) reste.
@@ -308,12 +317,54 @@ le journal dit `template_unavailable`, l'écran affiche « En attente ». Rien n
   de temps, archivage, producteur CRM, tests par canal, état des canaux, journal et isolation),
   `reglages-model.test.ts` (web), `routes-coverage.test.ts`.
 
+## § 3 bis — Événements des membres externes (ADR-0078), vers l'équipe
+
+Rebasé sur ADR-0078. Quatre types ajoutés, émis par `work/external/work-portal.service.ts` et la
+validation des feuilles de temps, selon les modes de chaque destinataire :
+
+| Événement (type) | Destinataires | Palier · importance |
+|---|---|---|
+| le client valide un livrable (`work.client_approved`) | responsable, collaborateurs, chef, adjoint | Essentiel · important |
+| le client demande des modifications (`work.client_changes_requested`) — le **motif** reste dans Lalanda (historique de la tâche), jamais dans le titre, l'e-mail, Slack ni WhatsApp | responsable, collaborateurs, chef, adjoint | Essentiel · urgent |
+| un client ou un consultant commente (`work.external_comment`) | responsable, collaborateurs, abonnés, chef, adjoint | Essentiel · important · rafale |
+| un consultant saisit du temps (`work.consultant_time_logged`) — durée seule, jamais de taux | son référent interne | Essentiel · info · rafale |
+| feuille soumise par un consultant (`work.timesheet_submitted`) | son référent interne (ADR-0078 § 2.5), à défaut `work.manage` | Essentiel · important |
+
+Ces gestes remplacent les émissions provisoires d'ADR-0078 (`task_approval_decided` et
+`comment_on_followed`, qui notifiaient seulement le responsable, les abonnés et le chef).
+
+## § 9 — Notifications VERS les membres externes (e-mail seulement)
+
+ADR-0078 les avait laissées hors périmètre. `WorkExternalNotifier` (`work/external/`) :
+
+| Événement | Destinataires | Déclencheur |
+|---|---|---|
+| « Un livrable attend votre validation » | contacts **client** ouverts sur le projet | validation client requise posée, ou remise en attente |
+| « Nouveau commentaire sur une tâche de votre projet » | externes qui **voient** la tâche (client : tâche visible ; consultant : ses tâches, ou toutes s'il « peut ouvrir le projet »), jamais l'auteur | commentaire **partagé** créé (interne ou externe) ou rendu partagé |
+| « Un nouveau projet vous est ouvert » | compte **déjà actif** sur un autre projet | invitation sur un projet de plus (le PREMIER accès garde l'e-mail d'invitation d'ADR-0078) |
+
+- E-mail **seulement** (gabarit `renderExternalNotification`, intention
+  `MailService.sendExternalNotification`) ; lien vers `/portail/projets/<id>` ; titre de tâche et
+  nom de projet seulement — **jamais** de montant, temps, coût ni nom interne ; `redactInLogs`
+  (adresse masquée, objet remplacé par un libellé).
+- **Rafales** (commentaires) : un e-mail sur la même tâche il y a moins de 10 min → rien ne repart.
+  Une nouvelle demande de validation part toujours. Journal `work_external_notifications`
+  (type, objet, sort ; ni adresse ni titre ; 30 jours).
+- **Préférence par compte externe** (`work_external_accounts.notificationPreference`) : `all`
+  (défaut), `approvals` (les livrables à valider seulement), `none`. Réglable par le **lien de
+  désinscription** de chaque e-mail (`/portail/notifications?jeton=…` ; jeton HMAC-SHA256, clé HKDF
+  d'`AUTH_SECRET`, organisation + compte, sans expiration, ne règle QUE les e-mails) — routes
+  publiques `GET|PUT /portal/notifications/preference` (`404 EXTERNAL_PREFERENCE_NOT_FOUND` pour un
+  jeton faux ; écriture sous `PortalOriginGuard`) — ou depuis l'espace (« Mes e-mails »,
+  `GET|PUT /portal/me/notifications`).
+
 ## Coordination
 
-ADR-0078 (membres externes, branche `feat/projets-externes`) entre dans `main` avant ce lot : ce lot
-reste additif dans `apps/api/src/work/**` et `apps/api/src/mail/**` et ne touche pas
-`apps/api/src/work/external/`. Après rebase, les événements externes (validation client,
-commentaire du client) seront ajoutés au catalogue et branchés sur le même répartiteur.
+Rebasé sur `main` (e8cebd9f, ADR-0078). Conflits résolus en gardant les deux côtés :
+`work-timesheet-approvals.service.ts` (consultants d'ADR-0078 et notifications ; le valideur d'un
+consultant est son référent), `work-projects.service.ts` (fermeture des accès externes ET
+notification à l'archivage), `docs/adr/README.md`. `WorkMembersService.refs` reçoit l'organisation
+partout où un auteur peut être externe.
 
 ## Décisions prises seules — à revoir avec l'expert
 
@@ -322,7 +373,8 @@ commentaire du client) seront ajoutés au catalogue et branchés sur le même r�
 3. RH : cloche et e-mail seulement, jamais Slack ni WhatsApp.
 4. Mode « chef » appliqué au chef **et** à l'adjoint, pour les seuls événements de leur projet.
 5. Aucune obligation par défaut ; proposition en un clic des validations dans la cloche.
-6. Heures calmes 21 h → 7 h (Kinshasa) par défaut, message non envoyé (pas différé).
+6. Heures calmes 21 h → 7 h (Kinshasa) par défaut ; Slack et WhatsApp différés à leur fin,
+   regroupés s'il y en a plusieurs ; file bornée à 20 par personne et par canal.
 7. Plafond WhatsApp 20 par personne et par jour ; tests compris.
 8. Rafales : 10 minutes, commentaires et pièces jointes ; place de la ligne inchangée.
 9. Journal : 90 jours ; nom du destinataire visible de l'administrateur, jamais le contenu.
@@ -333,10 +385,17 @@ commentaire du client) seront ajoutés au catalogue et branchés sur le même r�
     document commercial : détenteurs de `work.manage` ; archivage : chef, adjoint, membres directs.
 13. Modèles WhatsApp d'ADR-0065 tenus pour approuvés (comportement inchangé) ; nouveaux modèles
     activés par `WHATSAPP_APPROVED_TEMPLATES`.
+14. Externes : « modifications demandées » urgente, « validé » importante ; temps du consultant
+    vers son seul référent, regroupé par tâche ; commentaire externe aussi aux abonnés.
+15. E-mails aux externes : le premier accès garde l'invitation d'ADR-0078 ; « nouveau projet
+    ouvert » seulement pour un compte déjà actif ; l'invitation part quelle que soit la
+    préférence (elle donne l'accès), les trois notifications la respectent.
+16. Préférence externe par défaut `all` ; lien de désinscription sans expiration ; rafale des
+    commentaires externes : 10 min par tâche ; journal externe 30 jours.
 
 ## Décisions ouvertes
 
-1. File différée après les heures calmes (au lieu de ne pas envoyer).
+1. Mentions d'un externe, pièces jointes dans l'espace externe (ADR-0078, hors périmètre).
 2. Réglages par projet (couper un projet bruyant) — toujours non en R1 (ADR-0061 n° 1).
 3. Résumé quotidien sur Slack et WhatsApp.
 4. Événements du canal Slack d'un projet (commentaires, tâches créées) : inchangés (ADR-0064 n° 3).

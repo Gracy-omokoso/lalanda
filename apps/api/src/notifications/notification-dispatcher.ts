@@ -29,10 +29,11 @@ import {
   type NotificationKind,
   type NotificationSkipReason,
   type NotificationTestView,
+  type QuietHours,
 } from '@lalanda/shared/notifications';
 import type { WorkNotificationEvent } from '@lalanda/shared/work';
 import { workEventOf } from '@lalanda/shared/work';
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Types, type Connection } from 'mongoose';
 
@@ -43,6 +44,12 @@ import {
   type DeliveryOutcome,
   type NewDelivery,
 } from './notification-deliveries.service.js';
+import {
+  NotificationDeferredService,
+  deferredGroupTitle,
+  quietEndAfter,
+  type DeferredBatch,
+} from './notification-deferred.service.js';
 import { NotificationSettingsService } from './notification-settings.service.js';
 import type { NotificationInput } from './notifications.port.js';
 
@@ -119,10 +126,13 @@ interface Planned {
   slack: boolean;
   whatsapp: boolean;
   template: string | null;
+  /** § 5 : canaux mis en file pendant les heures calmes. */
+  deferred: ('slack' | 'whatsapp')[];
+  quietHours: QuietHours;
 }
 
 @Injectable()
-export class NotificationDispatcher {
+export class NotificationDispatcher implements OnModuleInit {
   private readonly logger = new Logger('NotificationDispatcher');
   private readonly senders = new Map<'slack' | 'whatsapp', RegisteredSender>();
   private readonly pending = new Set<Promise<unknown>>();
@@ -134,8 +144,79 @@ export class NotificationDispatcher {
     // PAS `MembersService` : il dépend lui-même du port de notifications (autorisations
     // changées) — l'injecter ici ferait un cycle qui BLOQUE le démarrage de Nest.
     @InjectConnection() private readonly connection: Connection,
+    @Inject(NotificationDeferredService) private readonly deferred: NotificationDeferredService,
     @Optional() @Inject(MailService) private readonly mail: MailService | null = null,
   ) {}
+
+  onModuleInit(): void {
+    this.deferred.setReleaseHandler((b) => this.releaseBatch(b));
+  }
+
+  private settleDelivery(
+    id: string | null,
+    channel: NotificationChannel,
+    o: DeliveryOutcome,
+  ): void {
+    const t = this.deliveries.settle(id, channel, o);
+    this.pending.add(t);
+    void t.finally(() => this.pending.delete(t));
+  }
+
+  /**
+   * § 5 : fin des heures calmes — un message seul part tel quel ; plusieurs (ou au-delà de
+   * la borne) partent en UN message regroupé. Le journal de chacun passe de « différée » à
+   * « envoyée » (ou échec), par l'expéditeur enregistré du canal.
+   */
+  async releaseBatch(b: DeferredBatch): Promise<void> {
+    const sender = this.senders.get(b.channel);
+    const settleAll = (o: DeliveryOutcome) => {
+      for (const id of b.deliveryIds) this.settleDelivery(id, b.channel, o);
+    };
+    if (!sender) {
+      settleAll({
+        status: 'skipped',
+        reason: b.channel === 'slack' ? 'slack_unavailable' : 'whatsapp_unavailable',
+      });
+      return;
+    }
+    const total = b.items.length + b.overflowCount;
+    if (total === 0) return;
+    const single = total === 1 && b.items.length === 1 ? b.items[0]! : null;
+    const message: PushMessage = single
+      ? {
+          recipientUserId: b.userId,
+          ...(single.kind ? { kind: single.kind as NotificationKind } : {}),
+          ...(single.kind && workEventOf(single.kind) ? { event: workEventOf(single.kind)! } : {}),
+          ...(single.template ? { template: single.template } : {}),
+          eventLabel: single.eventLabel,
+          title: single.title,
+          href: single.href,
+        }
+      : {
+          recipientUserId: b.userId,
+          template: 'lalanda_notification_projet',
+          eventLabel: 'Notifications des heures calmes',
+          title: deferredGroupTitle(
+            total,
+            b.items.map((i) => i.title),
+          ),
+          href: '/notifications',
+        };
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 30_000);
+      try {
+        sender.direct(b.organizationId, single?.projectId ?? '', [message], (_m, o) => {
+          clearTimeout(timer);
+          settleAll(o.status === 'sent' && !single ? { status: 'sent', reason: 'grouped' } : o);
+          resolve();
+        });
+      } catch {
+        clearTimeout(timer);
+        settleAll({ status: 'failed', reason: 'error' });
+        resolve();
+      }
+    });
+  }
 
   /** Slack et WhatsApp s'enregistrent au démarrage (le module générique ne les importe pas). */
   registerSender(channel: 'slack' | 'whatsapp', sender: RegisteredSender): void {
@@ -228,6 +309,8 @@ export class NotificationDispatcher {
         slack: false,
         whatsapp: false,
         template: null,
+        deferred: [],
+        quietHours: s.quietHours,
       };
       // 2. Canaux qui sortent de Lalanda.
       for (const c of ['email', 'slack', 'whatsapp'] as const) {
@@ -263,13 +346,16 @@ export class NotificationDispatcher {
           row.channels.email = { status: 'queued', reason: null };
           continue;
         }
-        if (inQuietHours(s.quietHours, now)) {
-          row.channels[c] = { status: 'skipped', reason: 'quiet_hours' };
-          continue;
-        }
+        const quiet = inQuietHours(s.quietHours, now);
         if (c === 'slack') {
           if (!slack) {
             row.channels.slack = { status: 'skipped', reason: 'slack_unavailable' };
+            continue;
+          }
+          // § 5 : heures calmes — mis en FILE, envoyé à leur fin (« différée »).
+          if (quiet) {
+            p.deferred.push('slack');
+            row.channels.slack = { status: 'deferred', reason: 'quiet_hours' };
             continue;
           }
           p.slack = true;
@@ -294,8 +380,13 @@ export class NotificationDispatcher {
           continue;
         }
         waToday.set(input.recipientUserId, count + 1);
-        p.whatsapp = true;
         p.template = template;
+        if (quiet) {
+          p.deferred.push('whatsapp');
+          row.channels.whatsapp = { status: 'deferred', reason: 'quiet_hours' };
+          continue;
+        }
+        p.whatsapp = true;
         row.channels.whatsapp = { status: 'queued', reason: null };
       }
       planned.push(p);
@@ -315,6 +406,24 @@ export class NotificationDispatcher {
       (c: NotificationChannel): PushReport =>
       (m, o) =>
         settle(m.deliveryId ?? null, c, o);
+
+    // § 5 : file des heures calmes (envoyée à leur fin, regroupée s'il y a plusieurs messages).
+    const toDefer = planned.flatMap((p, i) =>
+      p.deferred.map((channel) => ({
+        organizationId,
+        userId: p.input.recipientUserId,
+        channel,
+        kind: p.input.kind,
+        projectId: p.input.source.projectId ?? '',
+        eventLabel: notificationSpecOf(p.input.kind)!.label,
+        title: p.input.title,
+        href: p.input.href,
+        template: p.template,
+        deliveryId: ids[i] ?? null,
+        releaseAt: quietEndAfter(p.quietHours, now),
+      })),
+    );
+    if (toDefer.length > 0) await this.deferred.enqueue(toDefer, now);
 
     // 3. Slack et WhatsApp : non bloquants, groupés par projet (contexte du message).
     const byProject = (channel: 'slack' | 'whatsapp') => {

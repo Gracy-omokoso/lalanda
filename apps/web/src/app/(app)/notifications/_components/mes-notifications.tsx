@@ -440,7 +440,7 @@ export function MesNotifications(): React.ReactElement {
             id={`${id}-calme`}
             checked={vue.quietHours.enabled}
             label="Heures calmes pour WhatsApp et Slack"
-            description="Rien ne part sur WhatsApp ni Slack pendant ces heures (heure de Kinshasa) ; la cloche et l’e-mail continuent."
+            description="Pendant ces heures (heure de Kinshasa), vos messages WhatsApp et Slack attendent et partent à la fin, regroupés s’il y en a plusieurs ; la cloche et l’e-mail continuent."
             onChange={() =>
               void enregistrer({
                 ...vue,

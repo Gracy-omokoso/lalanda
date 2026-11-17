@@ -23,6 +23,7 @@ import {
   renderEmailVerification,
   renderExternalAccessCode,
   renderExternalInvitation,
+  renderExternalNotification,
   renderExternalLockWarning,
   renderInvitation,
   renderMorningBrief,
@@ -160,6 +161,25 @@ export interface ExternalInvitationMail {
 }
 
 /**
+ * ADR-0079 § 9 : notification e-mail à un compte EXTERNE (contact client, consultant).
+ * Jamais de montant ; lien vers l'espace externe ; lien de désinscription signé.
+ */
+export interface ExternalNotificationMail {
+  to: string;
+  name?: string | null | undefined;
+  organizationName: string;
+  projectName: string;
+  /** « Un livrable attend votre validation »… */
+  eventLabel: string;
+  /** Détail (titre de la tâche), sans montant. */
+  detail: string;
+  /** Chemin RELATIF sous `/portail` (« /portail/projets/<id> »). */
+  portalPath: string;
+  /** Chemin RELATIF de la page de préférences (jeton signé). */
+  preferencesPath: string;
+}
+
+/**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
  * Aucune méthode ne LÈVE sur échec d'envoi : toutes retournent un
@@ -183,6 +203,7 @@ export abstract class MailService {
   abstract sendExternalAccessCode(input: ExternalAccessCodeMail): Promise<MailDeliveryResult>;
   abstract sendExternalInvitation(input: ExternalInvitationMail): Promise<MailDeliveryResult>;
   abstract sendExternalLockWarning(input: ExternalLockWarningMail): Promise<MailDeliveryResult>;
+  abstract sendExternalNotification(input: ExternalNotificationMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -343,6 +364,25 @@ export class TemplatedMailService extends MailService {
         name: input.name ?? null,
         pausedUntil: input.pausedUntil,
         minutes: input.minutes,
+      }),
+    });
+  }
+
+  async sendExternalNotification(input: ExternalNotificationMail): Promise<MailDeliveryResult> {
+    const safe = (p: string, repli: string) =>
+      /^\/portail(\/[^\s\\]*)?(\?[^\s\\]*)?$/.test(p) ? p : repli;
+    return this.transport.send({
+      to: input.to,
+      redactInLogs: true,
+      redactLabel: '(notification de l’espace externe)',
+      ...renderExternalNotification({
+        url: `${webUrl()}${safe(input.portalPath, '/portail')}`,
+        preferencesUrl: `${webUrl()}${safe(input.preferencesPath, '/portail')}`,
+        name: input.name ?? null,
+        organizationName: input.organizationName,
+        projectName: input.projectName,
+        eventLabel: input.eventLabel,
+        detail: input.detail,
       }),
     });
   }

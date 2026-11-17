@@ -14,6 +14,7 @@ import { ExternalAuthGuard } from './external-auth.guard.js';
 import { PortalAuthController } from './portal-auth.controller.js';
 import { PortalOriginGuard } from './portal-origin.guard.js';
 import { PortalController } from './portal.controller.js';
+import { PortalNotificationsController } from './portal-notifications.controller.js';
 import { WorkExternalAuthService } from './work-external-auth.service.js';
 import { WorkExternalController } from './work-external.controller.js';
 import { WorkExternalMembersService } from './work-external-members.service.js';
@@ -31,7 +32,13 @@ import { WorkPortalService } from './work-portal.service.js';
     OrganizationsModule,
     WorkModule,
   ],
-  controllers: [WorkExternalController, PortalAuthController, PortalController],
+  controllers: [
+    WorkExternalController,
+    PortalAuthController,
+    PortalController,
+    // ADR-0079 § 9 : lien de désinscription des e-mails.
+    PortalNotificationsController,
+  ],
   providers: [
     WorkExternalMembersService,
     WorkExternalAuthService,
