@@ -64,6 +64,10 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   // Référentiels publics, identiques pour toutes les sociétés.
   edef_reference_snapshots: 'référentiel public e-MCF de la DGI',
   accounting_chart_packs: 'plans comptables SYSCOHADA publiés (référentiel)',
+  // ADR-0078 : défi de connexion d'une ADRESSE à l'espace externe ; il peut couvrir les
+  // comptes de plusieurs organisations (choix après un code juste). Code haché, identifiants
+  // de comptes seulement, purgé par TTL une heure après expiration.
+  work_external_challenges: 'code de connexion d’une adresse à l’espace externe (haché, TTL)',
 };
 
 /**
