@@ -61,9 +61,41 @@
 // transactions et des hachages de mot de passe (scrypt, coûteux en CPU) : voir
 // `e2e-timeouts.ts`. Un test ou un hook qui fixe son propre délai le garde.
 
+//
+// ── Pool de connexions borné (constat du 17 nov. 2026) ────────────────────────
+//
+// La CI échouait au hasard (`MongoNetworkError … closed`, `ECONNRESET`,
+// `MongoServerSelectionError` pendant le montage) sur des suites sans rapport
+// entre elles, avec ~320 connexions ouvertes sur le mongod de la CI. Mesuré en
+// local avec les variables de ci.yml : UN fichier e2e seul fait passer mongod
+// de 9 à 113 connexions, et 29 fichiers sur 3 workers (le runner a 4 vCPU)
+// culminent à 331 connexions pour ~3 900 créées.
+//
+// La cause : au démarrage, `IndexesService.awaitAutoIndex` attend `init()` des
+// ~200 modèles EN PARALLÈLE sur une base neuve. Chaque `createIndex` emprunte
+// une connexion, le pool Mongoose grossit jusqu'à son `maxPoolSize` par défaut
+// (100) — puis les ferme à l'inactivité, et la suite suivante recommence. Sur
+// 4 vCPU partagés avec la compilation et les workers, ces rafales de centaines
+// de threads mongod suffisent à faire expirer le moniteur du driver, qui vide
+// le pool : toutes les opérations en vol tombent d'un coup.
+//
+// Un test n'a aucun besoin de 100 connexions : `maxPoolSize` est borné ici,
+// pour les seuls fichiers e2e et seulement si l'URI ne le fixe pas déjà. Il
+// s'applique à tous les clients de la suite (Mongoose, better-auth, ce fichier),
+// qui lisent tous `MONGODB_URI`. Les opérations au-delà ATTENDENT une connexion
+// libre (aucun délai d'attente par défaut) : rien n'échoue, rien n'est masqué.
+//
+// ── Base supprimée en fin de suite ────────────────────────────────────────────
+//
+// Une centaine de suites laissaient leur base (≈200 collections et leurs index)
+// derrière elles : ~20 000 collections sur le mongod de la CI à la fin d'un
+// run, autant de fichiers WiredTiger à garder ouverts et à checkpointer. La
+// base de la suite est donc supprimée après son propre `afterAll` — jamais la
+// base de rattachement partagée.
+
 import { MongoClient } from 'mongodb';
 import { basename } from 'node:path';
-import { beforeAll, expect, vi } from 'vitest';
+import { afterAll, beforeAll, expect, vi } from 'vitest';
 
 import { E2E_HOOK_TIMEOUT_MS, E2E_TEST_TIMEOUT_MS } from './e2e-timeouts.js';
 
@@ -85,11 +117,28 @@ function suiteDbName(testPath: string): string {
   return `${BASE_DB}_${slug}`.slice(0, 63);
 }
 
+/** Connexions par client et par fichier e2e (voir l'en-tête). */
+const E2E_MAX_POOL_SIZE = 10;
+
+/**
+ * `uri` avec `maxPoolSize` borné, sauf si l'URI le fixe déjà (réglage explicite
+ * de l'environnement, respecté tel quel).
+ */
+function withBoundedPool(uri: string, maxPoolSize = E2E_MAX_POOL_SIZE): string {
+  if (/[?&]maxPoolSize=/i.test(uri)) return uri;
+  if (uri.includes('?')) return `${uri}&maxPoolSize=${maxPoolSize}`;
+  // `mongodb://hôte:port` sans chemin : les options exigent le `/` qui le sépare.
+  const base = /^mongodb(\+srv)?:\/\/[^/]+$/.test(uri) ? `${uri}/` : uri;
+  return `${base}?maxPoolSize=${maxPoolSize}`;
+}
+
 const testPath = expect.getState().testPath ?? '';
 const isE2E = testPath.endsWith('.e2e.test.ts');
-const uri = process.env['MONGODB_URI'];
+const rawUri = process.env['MONGODB_URI'];
 
-if (isE2E && uri) {
+if (isE2E && rawUri) {
+  const uri = withBoundedPool(rawUri);
+  process.env['MONGODB_URI'] = uri;
   const dbName = suiteDbName(testPath);
   process.env['MONGODB_DB'] = dbName;
   // ADR-0079 § 5 : sans réglage, les heures calmes (21 h – 7 h, Kinshasa) couperaient
@@ -120,6 +169,22 @@ if (isE2E && uri) {
     try {
       await client.connect();
       await client.db(dbName).dropDatabase();
+    } finally {
+      await client.close();
+    }
+  }, E2E_HOOK_TIMEOUT_MS);
+
+  // Enregistré AVANT les hooks de la suite : vitest exécute les `afterAll` en
+  // pile (`sequence.hooks: 'stack'`), celui-ci passe donc en dernier, après la
+  // fermeture de l'application. La base visée est celle que la suite a
+  // RÉELLEMENT utilisée — certaines choisissent la leur à l'import.
+  afterAll(async () => {
+    const suiteDb = process.env['MONGODB_DB'];
+    if (!suiteDb || suiteDb === BASE_DB) return;
+    const client = new MongoClient(uri);
+    try {
+      await client.connect();
+      await client.db(suiteDb).dropDatabase();
     } finally {
       await client.close();
     }

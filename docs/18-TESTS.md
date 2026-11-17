@@ -112,6 +112,12 @@ Les `afterAll` utilisaient `mongoose.connection` — la connexion **globale** du
 
 `teardown(app, emails)` remplace ces blocs : il récupère la connexion réellement utilisée par l’application, puis purge **en cascade** à partir des seuls emails de test — users → organisations → collections applicatives (toutes portent un `organizationId`). Les anciens `deleteMany({})` sans filtre sur `session`, `account`, `memberships`, `subscriptions` et `invitations` ont été supprimés : inoffensifs tant qu’ils écrivaient sur une connexion morte, ils auraient déconnecté les suites encore en cours une fois le bug corrigé (vitest exécute les fichiers en parallèle sur la même base).
 
+### Connexions MongoDB des suites e2e (nov. 2026)
+
+La CI échouait au hasard, sur des suites sans rapport entre elles (`MongoNetworkError … closed`, `ECONNRESET`, `MongoServerSelectionError` au montage), avec ~320 connexions ouvertes sur le `mongod`. Mesure locale avec les variables de `ci.yml` : un fichier e2e seul ouvrait ~105 connexions — au démarrage, `IndexesService` attend l’`init()` des ~200 modèles en parallèle sur une base neuve, et le pool Mongoose grossit jusqu’à son `maxPoolSize` par défaut (100). Sur 3 workers (runner à 4 vCPU), 29 fichiers culminaient à 331 connexions.
+
+`apps/api/src/__tests__/e2e-database.setup.ts` borne donc `maxPoolSize` à 10 dans `MONGODB_URI` pour les fichiers e2e (sauf si l’URI le fixe déjà) : Mongoose, better-auth et le setup lisent tous cette URI. Au-delà, une opération attend une connexion libre — rien n’échoue, rien n’est masqué. Même lot après correctif : 62 connexions au pic. Le même fichier supprime aussi la base de la suite après son dernier `afterAll`, jamais la base de rattachement : une centaine de suites laissaient ~200 collections chacune derrière elles.
+
 ## Sortie
 
 Un défaut financier ou d’isolation bloque la livraison. Les exceptions documentent risque, propriétaire, échéance et mesure compensatoire.
