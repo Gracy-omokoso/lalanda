@@ -188,13 +188,19 @@ export function ReglagesOrganisation(): React.ReactElement | null {
         </div>
         <div className="flex flex-col gap-2">
           {groupesCatalogue().map((g) => (
-            <details key={g.module} className="rounded-[var(--radius-md)] border border-[var(--border)]">
+            <details
+              key={g.module}
+              className="rounded-[var(--radius-md)] border border-[var(--border)]"
+            >
               <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
                 {g.label}{' '}
                 <span className="text-xs font-normal text-[var(--foreground-muted)]">
-                  ({g.familles
-                    .flatMap((f) => f.specs)
-                    .filter((s) => vue.mandatory.some((m) => m.kind === s.kind)).length}{' '}
+                  (
+                  {
+                    g.familles
+                      .flatMap((f) => f.specs)
+                      .filter((s) => vue.mandatory.some((m) => m.kind === s.kind)).length
+                  }{' '}
                   obligatoire(s))
                 </span>
               </summary>

@@ -211,7 +211,9 @@ export interface UnreadElsewhereView {
 
 // ── Corps ───────────────────────────────────────────────────────────────────
 
-const Mode = z.enum(NOTIFICATION_MODES, { error: 'Mode attendu : perroquet, attenue ou essentiel.' });
+const Mode = z.enum(NOTIFICATION_MODES, {
+  error: 'Mode attendu : perroquet, attenue ou essentiel.',
+});
 const Hour = z.number({ error: 'Heure attendue (0 à 23).' }).int().min(0).max(23);
 const Bool = z.boolean({ error: 'Vrai ou faux attendu.' });
 const Kind = z.enum(CONFIGURABLE_NOTIFICATION_KINDS as [NotificationKind, ...NotificationKind[]], {
@@ -223,20 +225,18 @@ const ChannelOverride = z
   .object(Object.fromEntries(NOTIFICATION_CHANNELS.map((c) => [c, Bool.optional()])))
   .strict();
 
-const ModeOverrides = z
-  .record(z.string(), ChannelOverride)
-  .superRefine((rec, ctx) => {
-    for (const k of Object.keys(rec)) {
-      if (!Kind.safeParse(k).success) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Type de notification inconnu ou non réglable : ${k}.`,
-          path: [k],
-          params: { code: 'NOTIFICATION_KIND_UNKNOWN' },
-        });
-      }
+const ModeOverrides = z.record(z.string(), ChannelOverride).superRefine((rec, ctx) => {
+  for (const k of Object.keys(rec)) {
+    if (!Kind.safeParse(k).success) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Type de notification inconnu ou non réglable : ${k}.`,
+        path: [k],
+        params: { code: 'NOTIFICATION_KIND_UNKNOWN' },
+      });
     }
-  });
+  }
+});
 
 /** `PUT /notifications/settings` — remplace les réglages de l'appelant. */
 export const PutNotificationSettingsBody = z

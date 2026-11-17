@@ -50,10 +50,10 @@ const ORDRE_MODULES: readonly NotificationSourceModule[] = [
 /** Catalogue groupé par module puis par famille, dans l'ordre du catalogue. */
 export function groupesCatalogue(modules?: readonly NotificationSourceModule[]): GroupeModule[] {
   const out: GroupeModule[] = [];
-  for (const module of ORDRE_MODULES) {
-    if (modules && !modules.includes(module)) continue;
+  for (const mod of ORDRE_MODULES) {
+    if (modules && !modules.includes(mod)) continue;
     const specs = CONFIGURABLE_NOTIFICATION_KINDS.map((k) => notificationSpecOf(k)!).filter(
-      (s) => s.module === module,
+      (s) => s.module === mod,
     );
     if (specs.length === 0) continue;
     const familles: GroupeModule['familles'] = [];
@@ -65,7 +65,7 @@ export function groupesCatalogue(modules?: readonly NotificationSourceModule[]):
       }
       f.specs.push(s);
     }
-    out.push({ module, label: NOTIFICATION_MODULE_LABELS[module], familles });
+    out.push({ module: mod, label: NOTIFICATION_MODULE_LABELS[mod], familles });
   }
   return out;
 }
@@ -107,8 +107,8 @@ export type EtatCellule =
 
 /**
  * État d'une cellule événement × canal : non permis (« — »), imposé, indisponible
- * (Slack non connecté, numéro non vérifié, modèle WhatsApp en attente) ou réglable.
- * Un canal indisponible reste RÉGLABLE si la personne l'a déjà allumé (elle peut l'éteindre).
+ * (modèle WhatsApp en attente d'approbation) ou réglable. Slack non connecté et numéro non
+ * vérifié restent réglables : le réglage vaudra dès que le canal sera prêt.
  */
 export function etatCellule(
   v: NotificationSettingsView,
@@ -118,13 +118,11 @@ export function etatCellule(
 ): EtatCellule {
   if (!spec.channels.includes(canal)) return { etat: 'non_permis' };
   if (estObligatoire(v, spec.kind, canal)) return { etat: 'obligatoire' };
-  const coche = canauxDe(v, spec)[canal];
   if (canal === 'whatsapp' && canaux && !canaux.whatsappKinds.includes(spec.kind)) {
-    return coche
-      ? { etat: 'reglable', coche }
-      : { etat: 'indisponible', raison: 'Modèle WhatsApp en attente d’approbation' };
+    // Rien ne part tant que Meta n'a pas approuvé le modèle (journal : `template_unavailable`).
+    return { etat: 'indisponible', raison: 'Modèle WhatsApp en attente d’approbation' };
   }
-  return { etat: 'reglable', coche };
+  return { etat: 'reglable', coche: canauxDe(v, spec)[canal] };
 }
 
 /**
@@ -204,7 +202,10 @@ export function libelleEtatCanal(c: NotificationChannelsView['channels'][number]
 }
 
 /** Libellé d'un sort du journal d'envoi. */
-export function libelleSort(status: NotificationDeliveryStatus, raison: NotificationSkipReason | null): string {
+export function libelleSort(
+  status: NotificationDeliveryStatus,
+  raison: NotificationSkipReason | null,
+): string {
   const base = {
     sent: 'Envoyée',
     queued: 'En cours d’envoi',

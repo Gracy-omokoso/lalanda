@@ -315,3 +315,14 @@ Décideurs :
   automatique (archivage, retrait, fiche désactivée) et sessions révoquées, audit par
   identifiants ; `guest` conservé, conversion manuelle ; le Lecteur ne modifie plus ses saisies de
   temps. Statut : **accepté** (17 nov. 2026 ; huit points « à revoir » listés).
+- [ADR-0079](ADR-0079-notifications-modes-canaux-evenements.md) — Notifications de tout Lalanda :
+  diagnostic de la cloche (organisation active : non lues des autres organisations signalées ;
+  option « Me notifier aussi de mes propres actions »), catalogue des événements (module, famille,
+  audience, palier, importance, canaux permis, modèle WhatsApp), modes **Perroquet / Atténué /
+  Essentiel** personnalisables et gardés par mode (chef et adjoint → Atténué, membre → Essentiel,
+  défauts par rôle et obligations réglés par l'administrateur), répartiteur commun cloche, e-mail,
+  Slack et WhatsApp (rafales, heures calmes de Kinshasa, plafond quotidien WhatsApp), journal
+  d'envoi et « M'envoyer un test », conversion sans perte des préférences ADR-0061 et route de
+  compatibilité, nouveaux événements des Projets (tâches, échanges, jalons et facture, projet,
+  feuilles de temps), écran unique « Mes notifications ». Statut : **accepté** (17 nov. 2026 ;
+  points tranchés seuls listés).

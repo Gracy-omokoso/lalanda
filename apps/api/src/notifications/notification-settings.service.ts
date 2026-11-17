@@ -34,7 +34,7 @@ import {
   type QuietHours,
 } from '@lalanda/shared/notifications';
 import { WORK_NOTIFICATION_EVENTS, resolveWorkNotificationPreferences } from '@lalanda/shared/work';
-import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
@@ -270,7 +270,12 @@ export class NotificationSettingsService {
     if (current.revision !== body.expectedRevision) this.stale(current.revision);
     if (body.expectedRevision === 0) {
       try {
-        await this.orgSettings.create({ organizationId, ...values, revision: 1, _schemaVersion: 1 });
+        await this.orgSettings.create({
+          organizationId,
+          ...values,
+          revision: 1,
+          _schemaVersion: 1,
+        });
       } catch (err) {
         if ((err as { code?: number }).code === 11000) {
           this.stale((await this.org(organizationId)).revision);
@@ -315,7 +320,10 @@ export class NotificationSettingsService {
         .find({ organizationId, userId: { $in: ids } })
         .lean<NotificationSettingsLean[]>()
         .exec(),
-      this.muted.find({ organizationId, userId: { $in: ids } }).lean().exec(),
+      this.muted
+        .find({ organizationId, userId: { $in: ids } })
+        .lean()
+        .exec(),
       this.memberships
         .find({ organizationId, userId: { $in: ids } }, { userId: 1, role: 1 })
         .lean()
@@ -361,7 +369,10 @@ export class NotificationSettingsService {
   }
 
   async view(organizationId: string, userId: string): Promise<NotificationSettingsView> {
-    const [s, org] = await Promise.all([this.one(organizationId, userId), this.org(organizationId)]);
+    const [s, org] = await Promise.all([
+      this.one(organizationId, userId),
+      this.org(organizationId),
+    ]);
     const defaultMode = NotificationSettingsService.modeFor({ ...s, mode: null }, org, false);
     const customized = {} as Record<NotificationMode, boolean>;
     for (const m of NOTIFICATION_MODES) customized[m] = isModeCustomized(m, s.overrides[m]);

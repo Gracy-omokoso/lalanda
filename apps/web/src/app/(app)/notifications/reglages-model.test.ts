@@ -111,10 +111,19 @@ describe('cellules', () => {
       ),
     ).toEqual({ etat: 'obligatoire' });
     expect(etatCellule(vue(), spec('crm.activity_assigned'), 'whatsapp', canaux).etat).toBe(
-      'reglable',
+      'indisponible',
     );
+    expect(etatCellule(vue(), spec('crm.activity_assigned'), 'email', canaux)).toEqual({
+      etat: 'reglable',
+      coche: true,
+    });
     expect(
-      etatCellule(vue({ mode: 'perroquet' }), spec('purchases.approval_requested'), 'whatsapp', canaux),
+      etatCellule(
+        vue({ mode: 'perroquet' }),
+        spec('purchases.approval_requested'),
+        'whatsapp',
+        canaux,
+      ),
     ).toEqual({ etat: 'indisponible', raison: 'Modèle WhatsApp en attente d’approbation' });
     expect(etatCellule(vue(), spec('work.task_assigned'), 'whatsapp', canaux)).toEqual({
       etat: 'reglable',

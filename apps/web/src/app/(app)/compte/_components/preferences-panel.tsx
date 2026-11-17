@@ -317,9 +317,12 @@ export function PreferencesPanel(): React.ReactElement {
 
         {/* ADR-0079 § 8 : les notifications des modules ont leur écran unique. */}
         <p className="text-xs text-[var(--foreground-muted)]">
-          Les notifications de vos projets et de vos modules (mode, cloche, e-mail, Slack,
-          WhatsApp) se règlent dans l’onglet{' '}
-          <a href="/compte/notifications" className="text-[var(--accent)] underline-offset-2 hover:underline">
+          Les notifications de vos projets et de vos modules (mode, cloche, e-mail, Slack, WhatsApp)
+          se règlent dans l’onglet{' '}
+          <a
+            href="/compte/notifications"
+            className="text-[var(--accent)] underline-offset-2 hover:underline"
+          >
             Notifications
           </a>
           .

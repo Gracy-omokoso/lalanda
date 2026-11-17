@@ -222,12 +222,16 @@ export function NotificationsBell(): React.ReactElement {
                 {ailleurs.map((o) => (
                   <li key={o.organizationId} className="px-3 py-2 text-xs">
                     <span>
-                      {o.unread} non lue{o.unread > 1 ? 's' : ''} dans <strong>{o.name}</strong>.{' '}
+                      {o.unread} non lue{o.unread > 1 ? 's' : ''} dans <strong>{o.name}</strong>
+                      .{' '}
                     </span>
                     <button
                       type="button"
                       onClick={() =>
-                        basculerOrganisation({ id: o.organizationId, name: o.name }, '/notifications')
+                        basculerOrganisation(
+                          { id: o.organizationId, name: o.name },
+                          '/notifications',
+                        )
                       }
                       className="text-[var(--accent)] underline-offset-2 hover:underline"
                     >

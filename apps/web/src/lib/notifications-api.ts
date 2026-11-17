@@ -58,7 +58,8 @@ export const notificationsApi = {
   // ADR-0079 : non lues des autres organisations, réglages, canaux, tests, journal.
   unreadElsewhere: () =>
     jsonRequest<UnreadElsewhereView>('/notifications/unread-elsewhere', { method: 'GET' }),
-  settings: () => jsonRequest<NotificationSettingsView>('/notifications/settings', { method: 'GET' }),
+  settings: () =>
+    jsonRequest<NotificationSettingsView>('/notifications/settings', { method: 'GET' }),
   putSettings: (body: PutNotificationSettingsBody) =>
     jsonRequest<NotificationSettingsView>('/notifications/settings', { method: 'PUT', body }),
   orgSettings: () =>
@@ -70,7 +71,8 @@ export const notificationsApi = {
       method: 'PUT',
       body,
     }),
-  channels: () => jsonRequest<NotificationChannelsView>('/notifications/channels', { method: 'GET' }),
+  channels: () =>
+    jsonRequest<NotificationChannelsView>('/notifications/channels', { method: 'GET' }),
   test: (channel: NotificationChannel) =>
     jsonRequest<NotificationTestView>('/notifications/test', { method: 'POST', body: { channel } }),
   deliveries: (params: { cursor?: string | null; organization?: boolean } = {}) =>

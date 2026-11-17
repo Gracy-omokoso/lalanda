@@ -133,7 +133,9 @@ export class NotificationDeliveriesService {
         )
         .exec();
     } catch (err) {
-      this.logger.warn(`journal d'envoi non mis à jour : ${err instanceof Error ? err.name : 'erreur'}`);
+      this.logger.warn(
+        `journal d'envoi non mis à jour : ${err instanceof Error ? err.name : 'erreur'}`,
+      );
     }
   }
 
@@ -218,20 +220,18 @@ export class NotificationDeliveriesService {
     const nameOf = names ? await names([...new Set(page.map((d) => d.userId))]) : null;
     const last = page[page.length - 1];
     return {
-      items: page.map(
-        (d): NotificationDeliveryView => ({
-          id: String(d._id),
-          kind: d.kind as NotificationKind,
-          module: d.module as NotificationDeliveryView['module'],
-          userId: d.userId,
-          ...(nameOf ? { userName: nameOf.get(d.userId) ?? 'Ancien membre' } : {}),
-          channels: Object.fromEntries(
-            Object.entries(d.channels ?? {}).map(([c, o]) => [c, outcomeView(o)]),
-          ),
-          test: d.test === true,
-          createdAt: d.createdAt.toISOString(),
-        }),
-      ),
+      items: page.map((d): NotificationDeliveryView => ({
+        id: String(d._id),
+        kind: d.kind as NotificationKind,
+        module: d.module as NotificationDeliveryView['module'],
+        userId: d.userId,
+        ...(nameOf ? { userName: nameOf.get(d.userId) ?? 'Ancien membre' } : {}),
+        channels: Object.fromEntries(
+          Object.entries(d.channels ?? {}).map(([c, o]) => [c, outcomeView(o)]),
+        ),
+        test: d.test === true,
+        createdAt: d.createdAt.toISOString(),
+      })),
       nextCursor:
         docs.length > query.limit && last
           ? encodeTimeCursor(last.createdAt, String(last._id))

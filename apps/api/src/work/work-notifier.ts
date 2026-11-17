@@ -221,9 +221,7 @@ export class WorkNotifier {
       recipients.includes(actorUserId) &&
       !!(await this.settings?.notifyOwnActions(organizationId, actorUserId).catch(() => false));
     const ids = [
-      ...new Set(
-        recipients.filter((r): r is string => !!r && (r !== actorUserId || keepActor)),
-      ),
+      ...new Set(recipients.filter((r): r is string => !!r && (r !== actorUserId || keepActor))),
     ];
     if (ids.length === 0) return [];
     const perms = await this.members.permissions(organizationId, ids);
@@ -353,7 +351,9 @@ export class WorkNotifier {
     try {
       const keepActor =
         n.actorUserId !== null &&
-        !!(await this.settings?.notifyOwnActions(n.organizationId, n.actorUserId).catch(() => false));
+        !!(await this.settings
+          ?.notifyOwnActions(n.organizationId, n.actorUserId)
+          .catch(() => false));
       const ids = [
         ...new Set(
           n.recipients.filter((r): r is string => !!r && (r !== n.actorUserId || keepActor)),

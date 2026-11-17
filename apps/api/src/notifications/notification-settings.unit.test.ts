@@ -9,10 +9,7 @@ import {
   effectiveChannels,
   notificationSpecOf,
 } from '@lalanda/shared/notifications';
-import {
-  WORK_NOTIFICATION_EVENTS,
-  defaultWorkNotificationPreferences,
-} from '@lalanda/shared/work';
+import { WORK_NOTIFICATION_EVENTS, defaultWorkNotificationPreferences } from '@lalanda/shared/work';
 import { describe, expect, it } from 'vitest';
 
 import { kinshasaDayStart } from './notification-deliveries.service.js';
@@ -55,9 +52,9 @@ describe('conversion des préférences ADR-0061 (§ 4.3)', () => {
     const overrides = overridesFromLegacy(legacy);
     for (const e of WORK_NOTIFICATION_EVENTS) {
       const spec = notificationSpecOf(`work.${e}`)!;
-      expect(effectiveChannels({ spec, mode: 'essentiel', overrides: overrides.essentiel })).toEqual(
-        legacy.events[e],
-      );
+      expect(
+        effectiveChannels({ spec, mode: 'essentiel', overrides: overrides.essentiel }),
+      ).toEqual(legacy.events[e]);
     }
   });
 

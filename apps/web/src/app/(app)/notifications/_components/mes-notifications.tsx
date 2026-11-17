@@ -128,7 +128,9 @@ function EtatDesCanaux({
               {ICONES[c.channel]}
               {LIBELLES_CANAUX[c.channel]}
             </span>
-            <StatusPill tone={c.ready ? 'ok' : 'draft'}>{c.ready ? 'Prêt' : 'Indisponible'}</StatusPill>
+            <StatusPill tone={c.ready ? 'ok' : 'draft'}>
+              {c.ready ? 'Prêt' : 'Indisponible'}
+            </StatusPill>
           </div>
           <p className="text-xs text-[var(--foreground-muted)]">{libelleEtatCanal(c)}</p>
           {c.channel === 'whatsapp' ? (
@@ -195,7 +197,10 @@ function Journal({ organisation = false }: { organisation?: boolean }): React.Re
               <span className="font-medium">
                 {libelleType(d.kind)}
                 {d.userName ? (
-                  <span className="font-normal text-[var(--foreground-muted)]"> — {d.userName}</span>
+                  <span className="font-normal text-[var(--foreground-muted)]">
+                    {' '}
+                    — {d.userName}
+                  </span>
                 ) : null}
               </span>
               <time className="text-xs text-[var(--foreground-muted)]" dateTime={d.createdAt}>
@@ -211,7 +216,8 @@ function Journal({ organisation = false }: { organisation?: boolean }): React.Re
                 <li key={c} className="inline-flex items-center gap-1">
                   {ICONES[c]}
                   <span>
-                    {LIBELLES_CANAUX[c]} : {libelleSort(d.channels[c]!.status, d.channels[c]!.reason)}
+                    {LIBELLES_CANAUX[c]} :{' '}
+                    {libelleSort(d.channels[c]!.status, d.channels[c]!.reason)}
                   </span>
                 </li>
               ))}
@@ -333,7 +339,10 @@ export function MesNotifications(): React.ReactElement {
       setEnregistre(true);
     } catch (err) {
       setErreur(messageWork(err, 'Réglage non enregistré.'));
-      notificationsApi.settings().then(setVue).catch(() => undefined);
+      notificationsApi
+        .settings()
+        .then(setVue)
+        .catch(() => undefined);
     }
   }
 
@@ -380,13 +389,12 @@ export function MesNotifications(): React.ReactElement {
           />
         </Field>
         <p className="text-sm">
-          Mode appliqué :{' '}
-          <strong>{modeDisplayLabel(mode, vue.customized[mode])}</strong>
+          Mode appliqué : <strong>{modeDisplayLabel(mode, vue.customized[mode])}</strong>
           {vue.mode === null ? (
             <span className="text-[var(--foreground-muted)]">
               {' '}
-              — défaut de l’organisation pour votre rôle ; pour les projets que vous dirigez (chef ou
-              adjoint) : {NOTIFICATION_MODE_LABELS[vue.projectLeadMode]}.
+              — défaut de l’organisation pour votre rôle ; pour les projets que vous dirigez (chef
+              ou adjoint) : {NOTIFICATION_MODE_LABELS[vue.projectLeadMode]}.
             </span>
           ) : null}
         </p>

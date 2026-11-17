@@ -861,7 +861,10 @@ const SPECS: Record<
 /** Catalogue complet des événements RÉGLABLES (hors annonces et tests). */
 export const NOTIFICATION_CATALOG: Readonly<Record<string, NotificationEventSpec>> =
   Object.fromEntries(
-    Object.entries(SPECS).map(([kind, spec]) => [kind, { kind: kind as NotificationKind, ...spec }]),
+    Object.entries(SPECS).map(([kind, spec]) => [
+      kind,
+      { kind: kind as NotificationKind, ...spec },
+    ]),
   );
 
 /** Types réglables, dans l'ordre du catalogue (module, famille). */
@@ -874,7 +877,9 @@ export function notificationSpecOf(kind: string): NotificationEventSpec | null {
 export type NotificationChannelSet = Record<NotificationChannel, boolean>;
 export type NotificationChannelOverride = Partial<NotificationChannelSet>;
 /** Surcharges d'UN mode : par type, par canal. */
-export type NotificationModeOverrides = Partial<Record<NotificationKind, NotificationChannelOverride>>;
+export type NotificationModeOverrides = Partial<
+  Record<NotificationKind, NotificationChannelOverride>
+>;
 
 const MODE_RANK: Readonly<Record<NotificationMode, number>> = {
   essentiel: 0,

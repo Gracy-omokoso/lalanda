@@ -78,10 +78,12 @@ e2eSuite('paramètres des Projets : notifications, comportement, couleurs (ADR-0
         slack: true,
         whatsapp: true,
       });
+      // ADR-0079 § 4 : défauts du mode Essentiel — l'échéance dépassée est « urgente »,
+      // elle part aussi sur Slack (ADR-0061 ne l'y envoyait pas).
       expect(res.body.events.task_overdue).toEqual({
         bell: true,
         email: true,
-        slack: false,
+        slack: true,
         whatsapp: true,
       });
       expect(res.body.events.comment_on_followed).toEqual({

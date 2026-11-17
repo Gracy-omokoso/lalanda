@@ -1119,6 +1119,37 @@ Aucune route ne renvoie un secret du fournisseur ni un code.
 - Audit (sans numéro) : `whatsapp.code_sent`, `whatsapp.number_verified`, `whatsapp.number_removed`,
   `whatsapp.opted_out`.
 
+## Notifications : modes, canaux, journal — implémenté, ADR-0079
+
+Organisation active ET utilisateur de la session ; aucune route ne lit ni n'écrit les réglages
+d'un autre. Pas de fonction d'offre (comme `/notifications`).
+
+| Route | Droit | Effet |
+|---|---|---|
+| `GET /notifications/unread-elsewhere` | `analytics.read` | `UnreadElsewhereView` : `organizations[]` `{ organizationId, name, unread }` (autres organisations de l'appelant, droits revérifiés) |
+| `GET /notifications/settings` | `analytics.read` | `NotificationSettingsView` : `mode` (`perroquet` · `attenue` · `essentiel` · `null` = défaut), `defaultMode`, `projectLeadMode`, `effectiveMode`, `overrides.<mode>.<type>` `{ bell?, email?, slack?, whatsapp? }`, `customized.<mode>`, `notifyOwnActions`, `quietHours` `{ enabled, start, end }` (Kinshasa), `mandatory[]`, `mutedKinds[]`, `migratedFrom` (`adr-0061` · `null`), `revision` |
+| `PUT /notifications/settings` | `analytics.read` | `PutNotificationSettingsBody` strict (révision attendue, `409 STALE_REVISION`) ; un mode absent de `overrides` garde ses surcharges ; types inconnus ou non réglables → 400 |
+| `GET /notifications/organization-settings` | `analytics.read` | `NotificationOrgSettingsView` : `projectLeadMode` (défaut `attenue`), `memberMode` (`essentiel`), `byRole`, `mandatory[]` `{ kind, channel }`, `whatsappDailyCap` (20), `revision`, `canManage` |
+| `PUT /notifications/organization-settings` | `organization.manage` | `PutNotificationOrgSettingsBody` ; `400 NOTIFICATION_ROLE_UNKNOWN`, `400 NOTIFICATION_CHANNEL_NOT_PERMITTED` |
+| `GET /notifications/channels` | `analytics.read` | `NotificationChannelsView` : `channels[]` `{ channel, ready, reason, detail }`, `whatsappKinds[]`, `whatsappDailyCap`, `whatsappSentToday` |
+| `POST /notifications/test` | `analytics.read` | `{ channel }` → `NotificationTestView` `{ channel, outcome { status, reason, at } }` ; 5 par heure, sinon `429 NOTIFICATION_TEST_RATE_LIMITED` |
+| `GET /notifications/deliveries?limit&cursor&channel&status` | `analytics.read` | journal de l'appelant : `items[]` `{ id, kind, module, userId, channels.<canal> { status, reason, at }, test, createdAt }`, `nextCursor` — ni titre ni contenu |
+| `GET /notifications/deliveries/organization` | `organization.manage` | même forme, toute l'organisation, `userName` en plus |
+| `PUT /work/notification-preferences/digest` | `work.read` | `{ expectedRevision, digest }` : résumé quotidien seul |
+
+- `GET|PUT /work/notification-preferences` (ADR-0061) **restent servies** : le `GET` rend les
+  canaux EFFECTIFS des douze événements ; le `PUT` les convertit en surcharges (mode choisi, ou les
+  trois modes si la personne suit le défaut).
+- `NotificationView.count` (facultatif) : nombre d'événements regroupés dans une ligne (rafale).
+- Types ajoutés : `work.task_created`, `work.task_due_date_changed`, `work.task_completed`,
+  `work.task_reopened`, `work.project_task_overdue`, `work.comment_added`, `work.attachment_added`,
+  `work.invoice_draft_prepared`, `work.project_member_added`, `work.project_archived`,
+  `work.project_restored`, `work.project_created`, `work.timesheet_submitted`,
+  `work.timesheet_approved`, `work.timesheet_returned`, `work.timesheet_reopened`,
+  `organization.notification_test` ; nature d'entité `timesheet`.
+- Variables : `NOTIFICATIONS_QUIET_HOURS_DEFAULT` (`off` ou `HH-HH`, défaut `21-7`),
+  `WHATSAPP_APPROVED_TEMPLATES` (modèles proposés approuvés par Meta, séparés par des virgules).
+
 ## Import de fichier et construction par l'IA — implémenté, ADR-0062 et ADR-0063
 
 Fonction d'offre `run_work`, organisation active ; un projet d'une autre organisation répond 404.

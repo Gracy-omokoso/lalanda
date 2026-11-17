@@ -214,7 +214,9 @@ export class WorkBillingService {
     // ADR-0079 § 3 : projet créé depuis un devis, une opportunité ou un contrat ; brouillon
     // de facture d'un jalon. Facultatif : sans notifier, rien ne part et rien ne casse.
     @Optional() @Inject(WorkNotifier) private readonly notifier: WorkNotifier | null = null,
-    @Optional() @Inject(WorkMembersService) private readonly members: WorkMembersService | null = null,
+    @Optional()
+    @Inject(WorkMembersService)
+    private readonly members: WorkMembersService | null = null,
   ) {}
 
   private async actorName(actor: WorkActor): Promise<string> {

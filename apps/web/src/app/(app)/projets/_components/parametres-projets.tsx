@@ -12,12 +12,8 @@
 // l'organisation connectée.
 
 import {
-  WORK_NOTIFICATION_EVENTS,
-  WORK_NOTIFICATION_EVENT_LABELS,
   type SlackConnectionView,
-  type WhatsAppView,
   type WorkDefaultView,
-  type WorkNotificationPreferencesView,
   type WorkProjectVisibility,
   type WorkSettingsView,
   type WorkWeekday,
@@ -37,7 +33,6 @@ import {
   TabsNav,
   TextInput,
 } from '@lalanda/ui';
-import { Bell, Mail, MessageSquare, Smartphone } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 
@@ -45,51 +40,20 @@ import { renderNextLink } from '@/components/next-link';
 import { workApi } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
-
 import { MesNotifications } from '../../notifications/_components/mes-notifications';
+
 import {
-  HEURES_RESUME,
   JOURS,
   ROLES_CREATEURS,
-  basculerCanal,
   basculerJour,
   corpsComportement,
-  colonneWhatsApp,
-  corpsPreferences,
   createurs,
   libelleEtatSlack,
-  libelleHeure,
   ongletParametres,
   ongletsVisibles,
   retourSlack,
-  toutLeCanal,
 } from './parametres-model';
 import { messageWork } from './projets-model';
-
-/** Interrupteur d'une cellule de tableau : libellé lu seulement (la colonne le dit). */
-function Interrupteur({
-  id,
-  coche,
-  libelle,
-  disabled,
-  onChange,
-}: {
-  id: string;
-  coche: boolean;
-  libelle: string;
-  disabled?: boolean;
-  onChange: () => void;
-}): React.ReactElement {
-  return (
-    <Switch
-      id={id}
-      checked={coche}
-      aria-label={libelle}
-      {...(disabled === undefined ? {} : { disabled })}
-      onChange={() => onChange()}
-    />
-  );
-}
 
 function Carte({
   titre,

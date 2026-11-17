@@ -381,7 +381,10 @@ e2eSuite('notifications des Projets par Slack (ADR-0064)', () => {
     it('préférence Slack coupée : aucun message ; colonne Slack enregistrée', async () => {
       const cur = await f.get('analyst', '/work/notification-preferences');
       expect(cur.body.events.task_assigned).toMatchObject({ bell: true, email: true, slack: true });
-      expect(cur.body.events.task_overdue.slack).toBe(false);
+      // ADR-0079 § 4 : en mode Essentiel, l'échéance dépassée (urgente) part aussi sur Slack ;
+      // un commentaire suivi (information) non.
+      expect(cur.body.events.task_overdue.slack).toBe(true);
+      expect(cur.body.events.comment_on_followed.slack).toBe(false);
       const events = {
         ...cur.body.events,
         task_assigned: { bell: true, email: false, slack: false },

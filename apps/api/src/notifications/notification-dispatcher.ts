@@ -70,7 +70,12 @@ export type PushReport = (message: PushMessage, outcome: PushOutcome) => void;
 
 /** Ce que Slack et WhatsApp exposent au répartiteur. */
 export interface PushPort {
-  direct(organizationId: string, projectId: string, messages: PushMessage[], report?: PushReport): void;
+  direct(
+    organizationId: string,
+    projectId: string,
+    messages: PushMessage[],
+    report?: PushReport,
+  ): void;
 }
 
 export interface PushChannelStatus {
@@ -182,11 +187,7 @@ export class NotificationDispatcher {
         await this.ring(opts, input);
         continue;
       }
-      const mode = NotificationSettingsService.modeFor(
-        s,
-        org,
-        input.audience === 'project_lead',
-      );
+      const mode = NotificationSettingsService.modeFor(s, org, input.audience === 'project_lead');
       const ch = effectiveChannels({
         spec,
         mode,
@@ -220,7 +221,14 @@ export class NotificationDispatcher {
       } else {
         row.channels.bell = off('bell');
       }
-      const p: Planned = { input, row, email: false, slack: false, whatsapp: false, template: null };
+      const p: Planned = {
+        input,
+        row,
+        email: false,
+        slack: false,
+        whatsapp: false,
+        template: null,
+      };
       // 2. Canaux qui sortent de Lalanda.
       for (const c of ['email', 'slack', 'whatsapp'] as const) {
         if (!ch[c]) {
@@ -340,7 +348,9 @@ export class NotificationDispatcher {
         try {
           port.direct(organizationId, projectId, messages, report(channel));
         } catch (err) {
-          this.logger.warn(`Envoi ${channel} non lancé : ${err instanceof Error ? err.name : 'erreur'}`);
+          this.logger.warn(
+            `Envoi ${channel} non lancé : ${err instanceof Error ? err.name : 'erreur'}`,
+          );
           for (const m of messages) {
             settle(m.deliveryId ?? null, channel, { status: 'failed', reason: 'error' });
           }
@@ -380,7 +390,9 @@ export class NotificationDispatcher {
               : { status: 'failed', reason: 'provider_error' },
         );
       } catch (err) {
-        this.logger.warn(`E-mail de notification non remis : ${err instanceof Error ? err.name : 'erreur'}`);
+        this.logger.warn(
+          `E-mail de notification non remis : ${err instanceof Error ? err.name : 'erreur'}`,
+        );
         settle(id, 'email', { status: 'failed', reason: 'provider_error' });
       }
     }
@@ -406,7 +418,9 @@ export class NotificationDispatcher {
   ): Promise<Map<string, { email: string | null; name: string | null }>> {
     const out = new Map<string, { email: string | null; name: string | null }>();
     const db = this.connection.db;
-    const ids = userIds.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id));
+    const ids = userIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
     if (!db || ids.length === 0) return out;
     const docs = await db
       .collection('user')
@@ -595,4 +609,3 @@ export function maskEmail(email: string): string {
   if (!user || !domain) return '***';
   return `${user[0]}***@${domain}`;
 }
-

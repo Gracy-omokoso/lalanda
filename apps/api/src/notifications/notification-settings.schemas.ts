@@ -66,7 +66,12 @@ export type NotificationSettingsLean = NotificationSettingsDoc & { _id: Types.Ob
 export const NotificationSettingsSchema = SchemaFactory.createForClass(NotificationSettingsDoc);
 NotificationSettingsSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 
-@Schema({ collection: 'notification_org_settings', timestamps: true, strict: true, minimize: false })
+@Schema({
+  collection: 'notification_org_settings',
+  timestamps: true,
+  strict: true,
+  minimize: false,
+})
 export class NotificationOrgSettingsDoc {
   @Prop({ type: String, required: true })
   organizationId!: string;
@@ -155,6 +160,12 @@ NotificationDeliverySchema.index({ organizationId: 1, userId: 1, createdAt: -1, 
 /** Journal de l'organisation (administration). */
 NotificationDeliverySchema.index({ organizationId: 1, createdAt: -1, _id: -1 });
 /** Rafales : même personne, même type, même objet, fenêtre courte. */
-NotificationDeliverySchema.index({ organizationId: 1, userId: 1, kind: 1, entityId: 1, createdAt: -1 });
+NotificationDeliverySchema.index({
+  organizationId: 1,
+  userId: 1,
+  kind: 1,
+  entityId: 1,
+  createdAt: -1,
+});
 /** Conservation bornée (90 jours). */
 NotificationDeliverySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

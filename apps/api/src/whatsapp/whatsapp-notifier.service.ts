@@ -109,7 +109,11 @@ export class WhatsAppNotifier
     const v = await this.service.view(organizationId, userId);
     if (!v.available) return { ready: false, reason: 'whatsapp_unavailable', detail: null };
     if (v.number?.status !== 'verified') {
-      return { ready: false, reason: 'whatsapp_not_verified', detail: v.number?.phoneMasked ?? null };
+      return {
+        ready: false,
+        reason: 'whatsapp_not_verified',
+        detail: v.number?.phoneMasked ?? null,
+      };
     }
     if (v.quota.reached) {
       return { ready: false, reason: 'monthly_quota', detail: v.number.phoneMasked };

@@ -102,7 +102,9 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
       expect(count.status).toBe(200);
       expect(count.body.unread).toBe(before + 1);
       const items = await bell('analyst');
-      const mine = items.find((n) => n.kind === 'work.task_assigned' && n.title.includes(`#${t.number}`));
+      const mine = items.find(
+        (n) => n.kind === 'work.task_assigned' && n.title.includes(`#${t.number}`),
+      );
       expect(mine, JSON.stringify(items)).toBeDefined();
       expect((await bell('owner')).some((n) => n.kind === 'work.task_assigned')).toBe(false);
       const read = await f.post('analyst', `/notifications/${mine!.id}/read`);
@@ -118,14 +120,14 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
     it('« Me notifier aussi de mes propres actions » : désactivé par défaut, puis effectif', async () => {
       expect((await settings('accountant')).notifyOwnActions).toBe(false);
       await task({ title: 'Auto-assignée sans option', assigneeUserId: f.userId('owner') });
-      expect(
-        (await bell('owner')).some((n) => n.title.includes('Auto-assignée sans option')),
-      ).toBe(false);
+      expect((await bell('owner')).some((n) => n.title.includes('Auto-assignée sans option'))).toBe(
+        false,
+      );
       await putSettings('owner', { notifyOwnActions: true });
       await task({ title: 'Auto-assignée avec option', assigneeUserId: f.userId('owner') });
-      expect(
-        (await bell('owner')).some((n) => n.title.includes('Auto-assignée avec option')),
-      ).toBe(true);
+      expect((await bell('owner')).some((n) => n.title.includes('Auto-assignée avec option'))).toBe(
+        true,
+      );
       await putSettings('owner', { notifyOwnActions: false });
     });
 
@@ -326,7 +328,10 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
         revision: 3,
         _schemaVersion: 1,
       };
-      await f.db().collection('work_notification_preferences').insertOne({ ...legacy });
+      await f
+        .db()
+        .collection('work_notification_preferences')
+        .insertOne({ ...legacy });
       // L'ancien écran lit exactement ses cases.
       const old = await f.get('viewer', '/work/notification-preferences');
       expect(old.status).toBe(200);
@@ -392,7 +397,9 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
 
     it('heures calmes : Slack et WhatsApp retenus, cloche et e-mail partent', async () => {
       const h = (new Date().getUTCHours() + 1) % 24;
-      await putSettings('accountant', { quietHours: { enabled: true, start: h, end: (h + 1) % 24 } });
+      await putSettings('accountant', {
+        quietHours: { enabled: true, start: h, end: (h + 1) % 24 },
+      });
       await task({ title: 'La nuit', assigneeUserId: f.userId('accountant') });
       const log = (await deliveries('accountant')).find((d) => d.kind === 'work.task_assigned');
       expect(log?.channels['bell']).toMatchObject({ status: 'sent' });
@@ -490,9 +497,9 @@ e2eSuite('notifications : modes, canaux, événements (ADR-0079)', () => {
       const bellTest = await f.post('viewer', '/notifications/test', { channel: 'bell' });
       expect(bellTest.status, JSON.stringify(bellTest.body)).toBe(200);
       expect(bellTest.body.outcome.status).toBe('sent');
-      expect(
-        (await bell('viewer')).some((n) => n.kind === 'organization.notification_test'),
-      ).toBe(true);
+      expect((await bell('viewer')).some((n) => n.kind === 'organization.notification_test')).toBe(
+        true,
+      );
       mails.length = 0;
       const mailTest = await f.post('viewer', '/notifications/test', { channel: 'email' });
       expect(mailTest.body.outcome.status).toBe('sent');

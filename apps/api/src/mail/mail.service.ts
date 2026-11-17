@@ -282,7 +282,9 @@ export class TemplatedMailService extends MailService {
     // Chemin relatif seulement : une URL absolue fournie par un appelant n'est jamais suivie.
     const path = /^\/[^/]/.test(href) ? href : '/projets';
     const prefs =
-      preferencesPath && /^\/[^/\\\s][^\s\\]*$/.test(preferencesPath) ? preferencesPath : '/projets/parametres';
+      preferencesPath && /^\/[^/\\\s][^\s\\]*$/.test(preferencesPath)
+        ? preferencesPath
+        : '/projets/parametres';
     return this.transport.send({
       to,
       ...renderWorkNotification(content, `${webUrl()}${path}`, `${webUrl()}${prefs}`),

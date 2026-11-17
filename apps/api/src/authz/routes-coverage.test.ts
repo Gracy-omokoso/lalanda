@@ -158,6 +158,8 @@ import { MeController } from './me.controller.js';
 import { CatalogController } from './catalog.controller.js';
 // ADR-0039 — L2
 import { NotificationsController } from '../notifications/notifications.controller.js';
+// ADR-0079 : réglages, canaux, tests et journal d'envoi des notifications.
+import { NotificationSettingsController } from '../notifications/notification-settings.controller.js';
 // ADR-0040 — C1
 import { CrmAccountConversionController } from '../crm/accounts/conversion/crm-account-conversion.controller.js';
 import { CrmAccountsController } from '../crm/accounts/crm-accounts.controller.js';
@@ -274,6 +276,8 @@ const CONTROLEURS = [
   IdeaLabController,
   // ADR-0039 — L2
   NotificationsController,
+  // ADR-0079
+  NotificationSettingsController,
   // ADR-0039 — L1 : projets et tâches du RUN (API cœur).
   WorkSettingsController,
   WorkMembersController,
@@ -949,6 +953,18 @@ describe('couverture des routes par le RBAC', () => {
       'NotificationsController.markAllRead': ['analytics.read'],
       'NotificationsController.getPreferences': ['analytics.read'],
       'NotificationsController.putPreferences': ['analytics.read'],
+      // ADR-0079 § 1 : non lues des autres organisations de l'appelant.
+      'NotificationsController.unreadElsewhere': ['analytics.read'],
+      // ADR-0079 § 4 à § 6 : réglages PERSONNELS, état des canaux, tests et journal de
+      // l'appelant ; réglages et journal de l'ORGANISATION réservés à `organization.manage`.
+      'NotificationSettingsController.getSettings': ['analytics.read'],
+      'NotificationSettingsController.putSettings': ['analytics.read'],
+      'NotificationSettingsController.getOrgSettings': ['analytics.read'],
+      'NotificationSettingsController.putOrgSettings': ['organization.manage'],
+      'NotificationSettingsController.channels': ['analytics.read'],
+      'NotificationSettingsController.test': ['analytics.read'],
+      'NotificationSettingsController.myDeliveries': ['analytics.read'],
+      'NotificationSettingsController.orgDeliveries': ['organization.manage'],
       // ADR-0039 — L1 : lire `work.read`, travailler `work.update`, gouverner
       // `work.manage` ; les taux (donnée salariale) cumulent `treasury.manage`.
       'WorkSettingsController.get': ['work.read'],
@@ -3094,6 +3110,8 @@ describe('ADR-0060 et ADR-0061 : équipes, membres d’un projet, mes notificati
       // ADR-0061 : préférences PERSONNELLES de l'appelant.
       'WorkNotificationPreferencesController.get': ['work.read'],
       'WorkNotificationPreferencesController.put': ['work.read'],
+      // ADR-0079 § 8 : le résumé quotidien seul (écran unique).
+      'WorkNotificationPreferencesController.putDigest': ['work.read'],
     };
     const routes = TOUTES_LES_ROUTES.filter((r) =>
       /^(HrTeams|WorkProjectMembers|WorkNotificationPreferences)Controller\./.test(r.cle),
