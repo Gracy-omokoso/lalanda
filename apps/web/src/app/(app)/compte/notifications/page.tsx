@@ -3,11 +3,16 @@
 // administrateurs (`organization.manage`).
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
 import { NotificationsCompte } from '../../notifications/_components/notifications-compte';
 
 export const metadata: Metadata = { title: 'Notifications — Mon compte · Lalanda' };
 
 export default function AccountNotificationsPage(): React.ReactElement {
-  return <NotificationsCompte />;
+  return (
+    <Suspense fallback={null}>
+      <NotificationsCompte />
+    </Suspense>
+  );
 }
