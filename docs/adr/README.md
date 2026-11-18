@@ -326,3 +326,11 @@ Décideurs :
   compatibilité, nouveaux événements des Projets (tâches, échanges, jalons et facture, projet,
   feuilles de temps), écran unique « Mes notifications ». Statut : **accepté** (17 nov. 2026 ;
   points tranchés seuls listés).
+- [ADR-0080](ADR-0080-heures-debut-echeance.md) — Projets : heures de début et d'échéance
+  facultatives (`startTime`, `dueTime` en `HH:mm` à côté des jours, projets, tâches et jalons,
+  aucune migration), lues dans le **fuseau de l'organisation** (`organization_settings.fuseauHoraire`,
+  Kinshasa par défaut, Lubumbashi possible, affiché « 14:00 WAT ») ; heure sans date refusée,
+  échéance ≥ début à la minute ; « en retard » à l'heure exacte et « aujourd'hui » dans le fuseau
+  de l'organisation ; rappel `work.task_due_in_hour` (Essentiel · important) et rappels toutes les
+  5 minutes ; import « JJ/MM/AAAA HH:mm ». Le lot « options Asana » prend le numéro ADR-0081.
+  Statut : **accepté** (18 nov. 2026 ; sept points « à revoir » listés).

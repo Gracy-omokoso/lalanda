@@ -794,3 +794,14 @@ Captures : `docs/refonte-ui/v5/` (`import-apercu.png`, `import-resultat.png`, `i
   remise à zéro), proposition inutilisable (non décomptée).
 - Couleur jamais seule (états et sévérités écrits) ; champs étiquetés (`sr-only` dans la relecture) ;
   tableau d'aperçu défilant horizontalement sur téléphone.
+
+## Heures de début et d'échéance — implémenté, ADR-0080
+
+- **Organisation › Paramètres** : « Fuseau horaire » (Heure de Kinshasa — Ouest, WAT, UTC+1 ; Heure
+  de Lubumbashi — Est, CAT, UTC+2).
+- **Panneau de tâche** et **Projet › Paramètres** : à côté de chaque date, une heure facultative
+  (`input type="time"`) suivie de l'abréviation du fuseau, libellé complet en infobulle ; désactivée
+  sans date ; vider la date vide l'heure.
+- Partout où une échéance s'écrit (liste, Kanban, Mes tâches, Aperçu, accueil, portefeuille,
+  en-tête, Gantt, aperçu d'import, espace externe) : « 3 nov. · 14:00 WAT ». Le rouge « en retard »
+  bascule à l'heure exacte ; sans heure, rien ne change.

@@ -1395,6 +1395,28 @@ hors portée : `404`) :
 Vues ajoutées : `WorkTaskView` + `clientVisible`, `clientApprovalState`, `consultantAssigneeId` ;
 `WorkCommentView` + `visibility` ; `WorkMemberRef` + `external?` (`client` · `consultant`).
 
+## Heures de début et d'échéance, fuseau de l'organisation — implémenté, ADR-0080
+
+Champs facultatifs `startTime` et `dueTime` (`HH:mm`, 24 h, ou `null`) à côté de `startDate` et
+`dueDate`, lus dans le fuseau de l'organisation :
+
+| Route | Changement |
+|---|---|
+| `POST /work/projects`, `PUT /work/projects/:id` | `startTime`, `dueTime` |
+| `POST /work/projects/:id/tasks`, `PATCH /work/tasks/:id` | `startTime`, `dueTime` |
+| `POST /work/projects/from-quote`, `/from-opportunity` | `milestone.dueTime` |
+| `GET /work/settings` | `timeZone` (lecture seule, `work.read`) |
+| `GET /work/my-tasks` | `asOfTime`, `timeZone` ; une tâche du jour passe « en retard » à l'heure |
+| `GET /work/portfolio` | `timeZone`, `items[].dueTime` |
+| `GET`, `PUT /organizations/current/settings` | `fuseauHoraire` (facultatif au `PUT`, absent = inchangé), `options.timeZones` |
+| espace externe (`/portal/...`) | `startTime`, `dueTime`, `timeZone` |
+
+Erreurs : `400 WORK_TIME_INVALID` (format), `400 WORK_TIME_WITHOUT_DATE` (heure sans jour),
+`400 WORK_DATES_INVERTED` (échéance avant le début, à la minute), `400 WORK_MILESTONE_HAS_START`
+(heure de début d'un jalon). Effacer un jour efface son heure. Notification ajoutée :
+`work.task_due_in_hour` (catalogue ADR-0079, Essentiel · important). Tests :
+`work-heures.e2e.test.ts`.
+
 ## API publique
 
 Réservée aux offres compatibles. Clés à portée limitée, rotation, quotas, journal d’utilisation et documentation séparée. Aucune API publique avant stabilisation des contrats internes.

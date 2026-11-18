@@ -245,6 +245,12 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   `FT`/`ET` ordinaires, reliés par `sales_document_links` (`order_deposit`, `contract_deposit`,
   `requestedAmount`).
 
+- **Implémenté, ADR-0080** : `work_projects` et `work_tasks` gagnent `startTime` et `dueTime`
+  (`'HH:mm'` ou `null`, absents des documents anciens = `null`, aucune migration) ;
+  `work_tasks.reminders.dueInHourFor` (clé `AAAA-MM-JJTHH:mm`) ; `organization_settings` gagne
+  `fuseauHoraire` (`Africa/Kinshasa` par défaut, `Africa/Lubumbashi`). Index inchangés : les jours
+  restent la clé des tris et filtres.
+
 ## Rétention
 
 La politique définit données actives, exports, journaux, IA, pièces et sauvegardes. La suppression d’une organisation suit une période de récupération puis une purge contrôlée, sous réserve des obligations légales.
