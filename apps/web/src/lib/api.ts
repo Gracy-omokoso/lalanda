@@ -1451,8 +1451,10 @@ export interface OrganizationSettingsView {
   type: string;
   pays: string;
   deviseAffichage: DisplayCurrency;
+  /** ADR-0080 : fuseau de l'organisation (heures des Projets). Absent d'une API plus ancienne. */
+  fuseauHoraire?: string;
   updatedAt: string | null;
-  options: { currencies: string[] };
+  options: { currencies: string[]; timeZones?: { value: string; label: string }[] };
 }
 
 export interface DepassementView {
@@ -3380,6 +3382,8 @@ export const api = {
     name: string;
     pays: string;
     deviseAffichage: DisplayCurrency;
+    /** ADR-0080 : facultatif ; absent, le fuseau reste inchangé. */
+    fuseauHoraire?: string;
   }) =>
     jsonRequest<OrganizationSettingsView>(`/organizations/current/settings`, {
       method: 'PUT',

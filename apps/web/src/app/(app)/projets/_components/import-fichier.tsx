@@ -59,7 +59,7 @@ import {
 import {
   NATURES_PROJET,
   PRIORITES,
-  formatJour,
+  formatJourHeure,
   hrefProjet,
   peutGerer,
   peutTravailler,
@@ -191,10 +191,10 @@ function LigneApercu({
       <td className="px-2 py-2 text-xs">{r.section ?? '—'}</td>
       <td className="px-2 py-2 text-xs">{r.assignee?.name ?? '—'}</td>
       <td className="whitespace-nowrap px-2 py-2 text-xs tabular-nums">
-        {r.startDate ? formatJour(r.startDate) : '—'}
+        {r.startDate ? formatJourHeure(r.startDate, r.startTime) : '—'}
         <span aria-hidden="true"> → </span>
         <span className="sr-only"> au </span>
-        {r.dueDate ? formatJour(r.dueDate) : '—'}
+        {r.dueDate ? formatJourHeure(r.dueDate, r.dueTime) : '—'}
       </td>
       <td className="px-2 py-2 text-xs">
         {r.priority === 'none' ? '—' : PRIORITES[r.priority].label}

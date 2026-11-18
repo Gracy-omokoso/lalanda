@@ -4,12 +4,14 @@
 // validation des livrables (contact client), temps sur ses tâches et semaine (consultant).
 // Aucun montant, aucune marge, aucun coût n'est affiché (l'API n'en rend aucun).
 
-import type {
-  PortalMeView,
-  PortalProjectSummary,
-  PortalProjectView,
-  PortalTaskView,
-  PortalTimesheetView,
+import {
+  WORK_DEFAULT_TIME_ZONE,
+  formatTimeShort,
+  type PortalMeView,
+  type PortalProjectSummary,
+  type PortalProjectView,
+  type PortalTaskView,
+  type PortalTimesheetView,
 } from '@lalanda/shared/work';
 import {
   Alert,
@@ -39,6 +41,16 @@ function jour(iso: string | null): string {
   if (!iso) return '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
   return `${d}/${m}/${y}`;
+}
+
+/** ADR-0080 : jour et heure facultative, avec l'abréviation du fuseau (« 14:00 WAT »). */
+function jourHeure(
+  iso: string | null,
+  time: string | null | undefined,
+  timeZone: string | undefined,
+): string {
+  if (!iso || !time) return jour(iso);
+  return `${jour(iso)} à ${formatTimeShort(time, timeZone ?? WORK_DEFAULT_TIME_ZONE)}`;
 }
 
 /** Charge une ressource du portail ; 401 → retour à la connexion. */
@@ -147,7 +159,8 @@ export function ProjetsPortail(): React.ReactElement {
             >
               <span className="font-medium">{p.name}</span>
               <span className="text-xs text-[var(--foreground-muted)]">
-                Chef de projet : {p.leadName ?? '—'} · échéance {jour(p.dueDate)}
+                Chef de projet : {p.leadName ?? '—'} · échéance{' '}
+                {jourHeure(p.dueDate, p.dueTime, p.timeZone)}
               </span>
               <span className="text-xs">
                 {p.doneTaskCount}/{p.taskCount} tâche{p.taskCount > 1 ? 's' : ''} terminée
@@ -183,7 +196,13 @@ export function ProjetPortail({ projectId }: { projectId: string }): React.React
             <h1 className="text-xl font-semibold">{donnee.project.name}</h1>
             <p className="text-sm text-[var(--foreground-muted)]">
               Chef de projet : {donnee.project.leadName ?? '—'} · du{' '}
-              {jour(donnee.project.startDate)} au {jour(donnee.project.dueDate)}
+              {jourHeure(
+                donnee.project.startDate,
+                donnee.project.startTime,
+                donnee.project.timeZone,
+              )}{' '}
+              au{' '}
+              {jourHeure(donnee.project.dueDate, donnee.project.dueTime, donnee.project.timeZone)}
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
@@ -211,7 +230,8 @@ export function ProjetPortail({ projectId }: { projectId: string }): React.React
                         ) : null}
                       </span>
                       <span className="flex flex-wrap items-center gap-2 text-xs text-[var(--foreground-muted)]">
-                        {ETAPES[t.stage] ?? t.stage} · échéance {jour(t.dueDate)}
+                        {ETAPES[t.stage] ?? t.stage} · échéance{' '}
+                        {jourHeure(t.dueDate, t.dueTime, donnee.project.timeZone)}
                         {t.clientApproval.required ? (
                           <StatusPill tone={etat.ton}>{etat.libelle}</StatusPill>
                         ) : null}
@@ -297,7 +317,7 @@ function TachePortail({
           #{t.number} {t.title}
         </h2>
         <p className="text-xs text-[var(--foreground-muted)]">
-          {ETAPES[t.stage] ?? t.stage} · échéance {jour(t.dueDate)}
+          {ETAPES[t.stage] ?? t.stage} · échéance {jourHeure(t.dueDate, t.dueTime, donnee.timeZone)}
         </p>
         {donnee.description ? (
           <p className="mt-2 whitespace-pre-wrap text-sm">{donnee.description}</p>

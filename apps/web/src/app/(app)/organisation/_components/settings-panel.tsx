@@ -29,6 +29,8 @@ export function SettingsPanel(): React.ReactElement {
   const [nom, setNom] = useState('');
   const [pays, setPays] = useState('');
   const [devise, setDevise] = useState<DisplayCurrency>('USD');
+  // ADR-0080 : fuseau de l'organisation (heures de début et d'échéance des Projets).
+  const [fuseau, setFuseau] = useState<string>('');
 
   /** Recharge et RÉINITIALISE le formulaire depuis la réponse du serveur. */
   const appliquer = useCallback((s: OrganizationSettingsView): void => {
@@ -36,6 +38,7 @@ export function SettingsPanel(): React.ReactElement {
     setNom(s.name);
     setPays(s.pays);
     setDevise(s.deviseAffichage);
+    setFuseau(s.fuseauHoraire ?? '');
   }, []);
 
   const charger = useCallback(async (): Promise<void> => {
@@ -70,6 +73,7 @@ export function SettingsPanel(): React.ReactElement {
         name: nom.trim(),
         pays: pays.trim().toUpperCase(),
         deviseAffichage: devise,
+        ...(fuseau ? { fuseauHoraire: fuseau } : {}),
       });
       appliquer(enregistre);
       setNotice('Paramètres enregistrés.');
@@ -160,6 +164,22 @@ export function SettingsPanel(): React.ReactElement {
             }))}
           />
         </Field>
+
+        {vue?.options.timeZones && fuseau ? (
+          <Field
+            id="org-fuseau"
+            label="Fuseau horaire"
+            size="lg"
+            newRow
+            hint="Les heures de début et d’échéance des projets, des tâches et des jalons s’y lisent, ainsi que « aujourd’hui » et « en retard ». Les dates sans heure ne changent pas."
+          >
+            <Select<string>
+              value={fuseau}
+              onChange={setFuseau}
+              options={vue.options.timeZones.map((z) => ({ value: z.value, label: z.label }))}
+            />
+          </Field>
+        ) : null}
       </FormGrid>
 
       {/* L'ancien champ « Logo (URL) » est retiré (ADR-0028, décision ouverte n° 6) :

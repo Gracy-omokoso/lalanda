@@ -19,7 +19,13 @@ import type { MyTaskEntry, MyTaskItem, WorkTimesheetMyTaskItem } from '@lalanda/
 
 import type { OrgAction } from '@/lib/api';
 
-import { MES_TACHES_HREF, formatJour, hrefTache } from '../../projets/_components/projets-model';
+import {
+  MES_TACHES_HREF,
+  formatHeure,
+  formatJour,
+  formatJourHeure,
+  hrefTache,
+} from '../../projets/_components/projets-model';
 
 export { MES_TACHES_HREF };
 
@@ -156,7 +162,12 @@ function ligne(t: Element, enRetard: boolean): LigneTache {
     id: t.id,
     titre: t.title,
     projet: t.projectName,
-    echeance: enRetard ? `En retard · ${formatJour(t.dueDate, false)}` : 'Aujourd’hui',
+    // ADR-0080 : heure d'échéance et fuseau (« Aujourd’hui · 14:00 WAT »).
+    echeance: enRetard
+      ? `En retard · ${formatJourHeure(t.dueDate, t.dueTime, false)}`
+      : t.dueTime
+        ? `Aujourd’hui · ${formatHeure(t.dueTime)}`
+        : 'Aujourd’hui',
     enRetard,
     lien: hrefTache(t.projectId, t.id),
   };

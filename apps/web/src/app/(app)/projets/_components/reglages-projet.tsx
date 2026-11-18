@@ -11,6 +11,7 @@ import {
   WORK_LABEL_COLORS,
   WORK_LIMITS,
   WORK_PROJECT_EDITABLE_STATUSES,
+  WORK_TIME_ZONE_INFO,
   WorkColumnsSchema,
   type WorkColumn,
   type WorkLabel,
@@ -47,6 +48,7 @@ import {
   PROJETS_BASE,
   STATUTS_PROJET,
   cleDepuisLibelle,
+  fuseauCourant,
   messageWork,
 } from './projets-model';
 
@@ -118,8 +120,12 @@ function InfosProjet(): React.ReactElement {
     deputyUserId: p.deputy?.userId ?? '',
     startDate: p.startDate ?? '',
     dueDate: p.dueDate ?? '',
+    // ADR-0080 : heures facultatives (fuseau de l'organisation).
+    startTime: p.startTime ?? '',
+    dueTime: p.dueTime ?? '',
   });
   const [envoi, setEnvoi] = useState(false);
+  const zone = WORK_TIME_ZONE_INFO[fuseauCourant()];
   const [ok, setOk] = useState(false);
   const archive = p.status === 'archived';
   const bloque = archive || envoi;
@@ -143,6 +149,9 @@ function InfosProjet(): React.ReactElement {
             : {}),
           startDate: f.startDate || null,
           dueDate: f.dueDate || null,
+          // Une heure sans son jour n'est jamais envoyée (le serveur la refuserait).
+          startTime: f.startDate && f.startTime ? f.startTime : null,
+          dueTime: f.dueDate && f.dueTime ? f.dueTime : null,
         }),
       );
       setOk(true);
@@ -242,16 +251,36 @@ function InfosProjet(): React.ReactElement {
               <DatePicker
                 value={f.startDate}
                 disabled={bloque}
-                onChange={(v) => setF({ ...f, startDate: v })}
+                onChange={(v) => setF({ ...f, startDate: v, ...(v ? {} : { startTime: '' }) })}
                 shortcuts={['today']}
+              />
+            </Field>
+            <Field id="rg-debut-heure" label="Heure de début" optional size="xs" hint={zone.label}>
+              <TextInput
+                type="time"
+                step={60}
+                value={f.startDate ? f.startTime : ''}
+                disabled={bloque || !f.startDate}
+                onChange={(e) => setF({ ...f, startTime: e.target.value.slice(0, 5) })}
+                trailing={zone.abbr}
               />
             </Field>
             <Field id="rg-fin" label="Échéance" size="sm">
               <DatePicker
                 value={f.dueDate}
                 disabled={bloque}
-                onChange={(v) => setF({ ...f, dueDate: v })}
+                onChange={(v) => setF({ ...f, dueDate: v, ...(v ? {} : { dueTime: '' }) })}
                 shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+              />
+            </Field>
+            <Field id="rg-fin-heure" label="Heure d’échéance" optional size="xs" hint={zone.label}>
+              <TextInput
+                type="time"
+                step={60}
+                value={f.dueDate ? f.dueTime : ''}
+                disabled={bloque || !f.dueDate}
+                onChange={(e) => setF({ ...f, dueTime: e.target.value.slice(0, 5) })}
+                trailing={zone.abbr}
               />
             </Field>
             <Field id="rg-desc" label="Description" optional size="full">

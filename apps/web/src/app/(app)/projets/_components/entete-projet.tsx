@@ -25,7 +25,7 @@ import {
   NATURES_PROJET,
   PROJETS_BASE,
   STATUTS_PROJET,
-  formatJour,
+  formatJourHeure,
   hrefProjet,
   progression,
 } from './projets-model';
@@ -191,7 +191,8 @@ export function EnteteProjet(): React.ReactElement {
           <div className="flex gap-1">
             <dt>Dates :</dt>
             <dd className="text-[var(--foreground)]">
-              {formatJour(project.startDate)} → {formatJour(project.dueDate)}
+              {formatJourHeure(project.startDate, project.startTime)} →{' '}
+              {formatJourHeure(project.dueDate, project.dueTime)}
             </dd>
           </div>
         ) : null}

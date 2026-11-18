@@ -2,7 +2,7 @@
 // (ADR-0057) : groupes repliables par colonne, avatars, ton d'une échéance.
 // Testée sans DOM ; les `.tsx` assemblent.
 
-import type { WorkColumn, WorkTaskView } from '@lalanda/shared/work';
+import { isPastDue, type WorkColumn, type WorkTaskView } from '@lalanda/shared/work';
 
 export interface LigneListe {
   task: WorkTaskView;
@@ -119,12 +119,15 @@ function jourSuivant(jour: string): string {
  * Le libellé écrit (« Aujourd'hui », « Demain », date) double toujours la couleur.
  */
 export function tonDate(
-  t: { done: boolean; dueDate: string | null },
+  t: { done: boolean; dueDate: string | null; dueTime?: string | null },
   today: string,
+  /** ADR-0080 : heure courante (fuseau de l'organisation) ; une heure atteinte passe en retard. */
+  nowTime?: string,
 ): TonDate | null {
   if (t.dueDate === null) return null;
   if (t.done) return 'terminee';
   if (t.dueDate < today) return 'retard';
+  if (nowTime !== undefined && isPastDue(t, { today, time: nowTime })) return 'retard';
   if (t.dueDate === today) return 'aujourdhui';
   if (t.dueDate === jourSuivant(today)) return 'demain';
   return 'normal';

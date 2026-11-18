@@ -62,7 +62,14 @@ import {
   sousTitreRelance,
   titreElementRh,
 } from './mes-taches-model';
-import { PROJETS_BASE, aujourdhui, hrefTache, messageWork, peutTravailler } from './projets-model';
+import {
+  PROJETS_BASE,
+  aujourdhui,
+  definirFuseau,
+  hrefTache,
+  messageWork,
+  peutTravailler,
+} from './projets-model';
 import { messagesAvertissements } from './taches-model';
 
 /** Élément du calendrier : la forme lue par la vue, et l'élément d'origine. */
@@ -190,6 +197,8 @@ export function CalendrierMesTaches(): React.ReactElement {
     workApi
       .myTasks()
       .then((v) => {
+        // ADR-0080 : fuseau de l'organisation (heures et « aujourd'hui »).
+        definirFuseau(v.timeZone);
         setVue(v);
         setErreur(null);
       })

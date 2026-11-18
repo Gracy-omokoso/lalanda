@@ -76,7 +76,13 @@ import {
   titreElementRh,
   totalMesTaches,
 } from './mes-taches-model';
-import { PROJETS_BASE, hrefTache, messageWork, peutTravailler } from './projets-model';
+import {
+  PROJETS_BASE,
+  definirFuseau,
+  hrefTache,
+  messageWork,
+  peutTravailler,
+} from './projets-model';
 
 export function MesTaches(): React.ReactElement {
   const { actions } = useShell();
@@ -93,6 +99,8 @@ export function MesTaches(): React.ReactElement {
     workApi
       .myTasks()
       .then((v) => {
+        // ADR-0080 : fuseau de l'organisation (heures et « aujourd'hui »).
+        definirFuseau(v.timeZone);
         setVue(v);
         setErreur(null);
       })

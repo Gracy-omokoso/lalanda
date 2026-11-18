@@ -267,6 +267,9 @@ export interface FormulaireTache {
   priority: WorkPriority;
   startDate: string;
   dueDate: string;
+  /** ADR-0080 : heures facultatives `HH:mm` (`''` : sans heure). */
+  startTime: string;
+  dueTime: string;
   isMilestone: boolean;
   labelKeys: string[];
   estimate: string;
@@ -280,6 +283,8 @@ export function formulaireTache(t: WorkTaskDetail): FormulaireTache {
     priority: t.priority,
     startDate: t.startDate ?? '',
     dueDate: t.dueDate ?? '',
+    startTime: t.startTime ?? '',
+    dueTime: t.dueTime ?? '',
     isMilestone: t.isMilestone,
     labelKeys: [...t.labelKeys],
     estimate: t.estimateMinutes === null ? '' : String(t.estimateMinutes),
@@ -304,7 +309,13 @@ export function diffTache(t: WorkTaskDetail, f: FormulaireTache): PatchWorkTaskB
   if (f.isMilestone !== t.isMilestone) corps['isMilestone'] = f.isMilestone;
   const start = f.isMilestone ? null : ouNull(f.startDate);
   if (start !== (t.startDate ?? null)) corps['startDate'] = start;
-  if (ouNull(f.dueDate) !== (t.dueDate ?? null)) corps['dueDate'] = ouNull(f.dueDate);
+  const due = ouNull(f.dueDate);
+  if (due !== (t.dueDate ?? null)) corps['dueDate'] = due;
+  // ADR-0080 : une heure sans son jour n'est jamais envoyée ; effacer le jour l'efface.
+  const startTime = start === null ? null : ouNull(f.startTime);
+  if (startTime !== (t.startTime ?? null)) corps['startTime'] = startTime;
+  const dueTime = due === null ? null : ouNull(f.dueTime);
+  if (dueTime !== (t.dueTime ?? null)) corps['dueTime'] = dueTime;
   const a = [...f.labelKeys].sort().join(',');
   const b = [...t.labelKeys].sort().join(',');
   if (a !== b) corps['labelKeys'] = f.labelKeys;

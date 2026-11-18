@@ -3,13 +3,29 @@
 // Règle d'accessibilité tenue partout : la couleur n'est jamais seule — chaque
 // état (priorité, échéance, blocage, jalon) porte un TEXTE ou une forme.
 
-import { Badge, Tag } from '@lalanda/ui';
-import type { WorkLabel, WorkPriority, WorkTaskView } from '@lalanda/shared/work';
+import { Badge, Tag, TextInput } from '@lalanda/ui';
+import {
+  WORK_TIME_ZONE_INFO,
+  isTimeOfDay,
+  type WorkLabel,
+  type WorkPriority,
+  type WorkTaskView,
+} from '@lalanda/shared/work';
 
 import { badgeAbsent, constatAbsentEcheance } from './absences-model';
 import { enAttenteDeValidation, progressionListe } from './collab-model';
 import { initiales, pileAvatars, teinteAvatar, tonDate, type TonDate } from './liste-model';
-import { LIBELLES_ECHEANCE, PRIORITES, etatEcheance, formatJour } from './projets-model';
+import {
+  LIBELLES_ECHEANCE,
+  PRIORITES,
+  aujourdhui,
+  etatEcheance,
+  formatHeure,
+  formatHeureLongue,
+  formatJour,
+  fuseauCourant,
+  heureActuelle,
+} from './projets-model';
 
 export function Etiquettes({
   keys,
@@ -54,12 +70,13 @@ export function Echeance({
   today,
   dueSoonDays,
 }: {
-  task: Pick<WorkTaskView, 'done' | 'dueDate' | 'isMilestone'>;
+  task: Pick<WorkTaskView, 'done' | 'dueDate' | 'isMilestone' | 'dueTime'>;
   today: string;
   dueSoonDays: number;
 }): React.ReactElement | null {
   if (!task.dueDate) return null;
   const etat = etatEcheance(task, today, dueSoonDays);
+  const heure = task.dueTime ?? null;
   const tone = etat === 'en_retard' ? 'danger' : etat === null ? 'neutral' : 'warning';
   return (
     <Badge tone={tone}>
@@ -70,6 +87,8 @@ export function Echeance({
       ) : null}
       <span className="sr-only">{task.isMilestone ? 'Jalon, échéance ' : 'Échéance '}</span>
       {formatJour(task.dueDate, false)}
+      {/* ADR-0080 : heure et fuseau (« 14:00 WAT »), détail en infobulle. */}
+      {heure ? <span title={formatHeureLongue(heure)}> {formatHeure(heure)}</span> : null}
       {etat ? ` · ${LIBELLES_ECHEANCE[etat]}` : null}
     </Badge>
   );
@@ -331,10 +350,12 @@ export function DateEcheance({
   task,
   today,
 }: {
-  task: Pick<WorkTaskView, 'done' | 'dueDate' | 'isMilestone'>;
+  task: Pick<WorkTaskView, 'done' | 'dueDate' | 'isMilestone' | 'dueTime'>;
   today: string;
 }): React.ReactElement | null {
-  const ton = tonDate(task, today);
+  // ADR-0080 : une échéance avec heure passe en retard à l'heure (fuseau de l'organisation).
+  const ton = tonDate(task, today, today === aujourdhui() ? heureActuelle() : undefined);
+  const heure = task.dueTime ?? null;
   if (ton === null || !task.dueDate) return null;
   const texte =
     ton === 'aujourdhui'
@@ -351,7 +372,51 @@ export function DateEcheance({
       ) : null}
       <span className="sr-only">{task.isMilestone ? 'Jalon, échéance ' : 'Échéance '}</span>
       {texte}
+      {heure ? <span title={formatHeureLongue(heure)}>{formatHeure(heure)}</span> : null}
       {ton === 'retard' ? <span className="sr-only"> (en retard)</span> : null}
+    </span>
+  );
+}
+
+/**
+ * ADR-0080 : heure facultative (24 h) d'une date de début ou d'échéance, suivie
+ * de l'abréviation du fuseau de l'organisation (« WAT », « CAT ») et de son
+ * libellé complet en infobulle. Désactivée tant que le jour n'est pas choisi ;
+ * vider le champ retire l'heure.
+ */
+export function ChampHeure({
+  id,
+  libelle,
+  valeur,
+  actif,
+  onChange,
+}: {
+  id: string;
+  libelle: string;
+  valeur: string;
+  actif: boolean;
+  onChange: (v: string) => void;
+}): React.ReactElement {
+  const zone = WORK_TIME_ZONE_INFO[fuseauCourant()];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <TextInput
+        id={id}
+        type="time"
+        step={60}
+        aria-label={`${libelle} (facultative, ${zone.label})`}
+        title={actif ? zone.label : 'Choisissez d’abord une date.'}
+        value={actif ? valeur : ''}
+        disabled={!actif}
+        onChange={(e) => {
+          const v = e.target.value.slice(0, 5);
+          if (v === '' || isTimeOfDay(v)) onChange(v);
+        }}
+        className="w-28"
+      />
+      <span className="text-xs text-[var(--foreground-muted)]" title={zone.label}>
+        {zone.abbr}
+      </span>
     </span>
   );
 }

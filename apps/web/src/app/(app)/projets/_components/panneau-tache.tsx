@@ -16,6 +16,7 @@
 
 import {
   WORK_PRIORITIES,
+  datesInverted,
   type WorkTaskDetail,
   type WorkTaskView,
   type WorkTaskWriteResult,
@@ -40,7 +41,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { AbsenceBadges, Avatar, CercleCoche, DateEcheance, BloqueeBadge } from './elements';
+import {
+  AbsenceBadges,
+  Avatar,
+  BloqueeBadge,
+  CercleCoche,
+  ChampHeure,
+  DateEcheance,
+} from './elements';
 import { colonnesKanban, placer } from './kanban-model';
 import { COULEURS_CARTE, LIBELLES_COULEUR, numeroVisible } from './cartes-model';
 import { useProjet } from './project-context';
@@ -264,6 +272,19 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
       setChamps({ dueDate: 'L’échéance précède la date de début.' });
       return;
     }
+    // ADR-0080 : le même jour, l'heure d'échéance ne précède pas l'heure de début.
+    if (
+      !g.isMilestone &&
+      datesInverted({
+        startDate: g.startDate || null,
+        dueDate: g.dueDate || null,
+        startTime: g.startTime || null,
+        dueTime: g.dueTime || null,
+      })
+    ) {
+      setChamps({ dueDate: 'L’heure d’échéance précède l’heure de début.' });
+      return;
+    }
     setChamps({});
     const corps = diffTache(d, g);
     if (corps === null) return;
@@ -469,12 +490,19 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             <DatePicker
               id="tache-ech"
               value={f.dueDate}
-              onChange={(v) => void sauver({ dueDate: v })}
+              onChange={(v) => void sauver({ dueDate: v, ...(v ? {} : { dueTime: '' }) })}
               shortcuts={['today', 'plus7', 'endOfMonth']}
               className="w-44"
               {...(champs['dueDate']
                 ? { 'aria-invalid': true, 'aria-describedby': 'tache-ech-erreur' }
                 : {})}
+            />
+            <ChampHeure
+              id="tache-ech-heure"
+              libelle="Heure d’échéance"
+              valeur={f.dueTime}
+              actif={f.dueDate !== ''}
+              onChange={(v) => void sauver({ dueTime: v })}
             />
             <DateEcheance task={d} today={today} />
             {champs['dueDate'] ? (
@@ -492,13 +520,22 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                 </label>
               </dt>
               <dd>
-                <DatePicker
-                  id="tache-debut"
-                  value={f.startDate}
-                  onChange={(v) => void sauver({ startDate: v })}
-                  shortcuts={['today']}
-                  className="w-44"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <DatePicker
+                    id="tache-debut"
+                    value={f.startDate}
+                    onChange={(v) => void sauver({ startDate: v, ...(v ? {} : { startTime: '' }) })}
+                    shortcuts={['today']}
+                    className="w-44"
+                  />
+                  <ChampHeure
+                    id="tache-debut-heure"
+                    libelle="Heure de début"
+                    valeur={f.startTime}
+                    actif={f.startDate !== ''}
+                    onChange={(v) => void sauver({ startTime: v })}
+                  />
+                </div>
               </dd>
             </>
           ) : null}

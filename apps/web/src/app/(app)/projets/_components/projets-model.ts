@@ -12,9 +12,15 @@
 
 import {
   CreateWorkProjectBody,
+  WORK_DEFAULT_TIME_ZONE,
   WORK_LIMITS,
-  kinshasaDayOf,
+  formatTimeLong,
+  formatTimeShort,
+  isPastDue,
+  orgClock,
+  workTimeZoneOr,
   type WorkColumnCategory,
+  type WorkTimeZone,
   type WorkPriority,
   type WorkProjectKind,
   type WorkProjectStatus,
@@ -90,9 +96,56 @@ export const CATEGORIES_COLONNE: Record<WorkColumnCategory, string> = {
 
 // ─── Dates et durées ────────────────────────────────────────────────────────
 
-/** Jour de Kinshasa d'aujourd'hui (ADR-0027) — seul appel à l'horloge, isolé. */
+// ─── Fuseau de l'organisation (ADR-0080) ────────────────────────────────────
+
+/**
+ * Fuseau de l'organisation active : servi par l'API avec les réglages des
+ * Projets, « Mes tâches » et l'accueil (`timeZone`), retenu ici dès réception
+ * (`definirFuseau`). Kinshasa tant que rien n'est reçu (règle d'avant, ADR-0027).
+ */
+let fuseauOrganisation: WorkTimeZone = WORK_DEFAULT_TIME_ZONE;
+
+export function definirFuseau(timeZone: string | null | undefined): void {
+  if (timeZone) fuseauOrganisation = workTimeZoneOr(timeZone);
+}
+
+export function fuseauCourant(): WorkTimeZone {
+  return fuseauOrganisation;
+}
+
+/** Jour d'aujourd'hui dans le fuseau de l'organisation — seul appel à l'horloge, isolé. */
 export function aujourdhui(now: Date = new Date()): string {
-  return kinshasaDayOf(now);
+  return orgClock(now, fuseauOrganisation).today;
+}
+
+/** ADR-0080 : heure courante (`HH:mm`) dans le fuseau de l'organisation. */
+export function heureActuelle(now: Date = new Date()): string {
+  return orgClock(now, fuseauOrganisation).time;
+}
+
+/** Heure courante à comparer, seulement si `today` est bien aujourd'hui. */
+function heureDuJour(today: string): string | undefined {
+  return today === aujourdhui() ? heureActuelle() : undefined;
+}
+
+/** « 14:00 WAT » — l'abréviation du fuseau lève l'ambiguïté Ouest / Est. */
+export function formatHeure(time: string | null | undefined): string {
+  return time ? formatTimeShort(time, fuseauOrganisation) : '';
+}
+
+/** « 14:00, heure de Kinshasa (WAT, UTC+1) » — infobulles et aides. */
+export function formatHeureLongue(time: string | null | undefined): string {
+  return time ? formatTimeLong(time, fuseauOrganisation) : '';
+}
+
+/** « 3 nov. 2026 · 14:00 WAT » ; sans heure, le jour seul (comportement d'avant). */
+export function formatJourHeure(
+  day: string | null,
+  time: string | null | undefined,
+  avecAnnee = true,
+): string {
+  const jour = formatJour(day, avecAnnee);
+  return day && time ? `${jour} · ${formatHeure(time)}` : jour;
 }
 
 const MOIS = [
@@ -173,12 +226,15 @@ export type EtatEcheance = 'en_retard' | 'aujourdhui' | 'bientot' | null;
  * aujourd'hui, ou dans `dueSoonDays` jours. Toujours doublé d'un texte.
  */
 export function etatEcheance(
-  t: { done: boolean; dueDate: string | null },
+  t: { done: boolean; dueDate: string | null; dueTime?: string | null },
   today: string,
   dueSoonDays: number = WORK_LIMITS.dueSoonDaysDefault,
+  /** ADR-0080 : heure courante (fuseau de l'organisation) ; par défaut, l'heure réelle si `today` est aujourd'hui. */
+  nowTime: string | undefined = heureDuJour(today),
 ): EtatEcheance {
   if (t.done || t.dueDate === null) return null;
   if (t.dueDate < today) return 'en_retard';
+  if (nowTime !== undefined && isPastDue(t, { today, time: nowTime })) return 'en_retard';
   if (t.dueDate === today) return 'aujourdhui';
   const fin = new Date(`${today}T00:00:00Z`);
   fin.setUTCDate(fin.getUTCDate() + Math.max(0, dueSoonDays));

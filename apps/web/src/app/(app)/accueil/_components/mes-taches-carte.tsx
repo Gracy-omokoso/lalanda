@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
+import { definirFuseau } from '../../projets/_components/projets-model';
+
 import { MES_TACHES_HREF, carteMesTaches, type CarteMesTaches } from './mes-taches-model';
 
 export function MesTachesCarte({
@@ -24,6 +26,8 @@ export function MesTachesCarte({
     setCarte(undefined);
     workApi.myTasks().then(
       (vue) => {
+        // ADR-0080 : fuseau de l'organisation (heures affichées).
+        definirFuseau(vue.timeZone);
         if (!annule) setCarte(carteMesTaches(vue));
       },
       () => {

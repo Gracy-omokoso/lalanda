@@ -7,10 +7,11 @@
 // opportunité et devis liés (ADR-0039 § 8). Tout vient de `GET /work/portfolio` :
 // rien n'est recalculé ici.
 
-import type {
-  WorkPortfolioProject,
-  WorkPortfolioScope,
-  WorkPortfolioView,
+import {
+  isPastDue,
+  type WorkPortfolioProject,
+  type WorkPortfolioScope,
+  type WorkPortfolioView,
 } from '@lalanda/shared/work';
 import {
   Alert,
@@ -60,8 +61,12 @@ import {
 import {
   MES_TACHES_HREF,
   NATURES_PROJET,
-  formatJour,
+  aujourdhui,
+  definirFuseau,
+  formatHeureLongue,
+  formatJourHeure,
   formulaireProjet,
+  heureActuelle,
   hrefProjet,
   messageWork,
   peutGerer,
@@ -371,12 +376,17 @@ function EcheanceProjet({
   today: string;
 }): React.ReactElement {
   if (!p.dueDate) return <span className="text-xs text-[var(--foreground-muted)]">—</span>;
-  const depassee = p.health !== 'closed' && p.dueDate < today;
+  // ADR-0080 : une échéance avec heure est dépassée à l'heure (fuseau de l'organisation).
+  const depassee =
+    p.health !== 'closed' &&
+    (p.dueDate < today ||
+      (today === aujourdhui() && isPastDue(p, { today, time: heureActuelle() })));
   return (
     <span
       className={`whitespace-nowrap text-xs tabular-nums ${depassee ? 'font-medium text-[var(--danger)]' : 'text-[var(--foreground-muted)]'}`}
+      {...(p.dueTime ? { title: formatHeureLongue(p.dueTime) } : {})}
     >
-      {formatJour(p.dueDate)}
+      {formatJourHeure(p.dueDate, p.dueTime)}
       {depassee ? <span className="sr-only"> (dépassée)</span> : null}
     </span>
   );
@@ -564,6 +574,8 @@ export function ListeProjets(): React.ReactElement {
     workPortfolioApi
       .get(scope)
       .then((v) => {
+        // ADR-0080 : fuseau de l'organisation (heures et « aujourd'hui »).
+        definirFuseau(v.timeZone);
         setVue(v);
         setChiffres(v);
         setErreur(null);

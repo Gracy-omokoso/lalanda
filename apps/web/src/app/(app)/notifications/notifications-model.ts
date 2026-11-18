@@ -58,6 +58,11 @@ const LIBELLES_EXPLICITES: Partial<Record<NotificationKind, { label: string; aid
     label: 'Échéance proche',
     aide: 'Une de vos tâches arrive à échéance.',
   },
+  // ADR-0080 : échéance avec heure.
+  'work.task_due_in_hour': {
+    label: 'Échéance dans une heure',
+    aide: 'Une de vos tâches arrive à échéance dans moins d’une heure.',
+  },
   'work.task_overdue': {
     label: 'Tâche en retard',
     aide: 'Une de vos tâches a dépassé son échéance.',

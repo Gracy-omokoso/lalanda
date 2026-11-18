@@ -41,7 +41,7 @@ import { useShell } from '../../_components/shell-context';
 
 import { recalculerBlocages, remplacerTache } from './kanban-model';
 import { suggestionFacture } from './marge/marge-model';
-import { PARAM_TACHE, aujourdhui, codeWork, messageWork } from './projets-model';
+import { PARAM_TACHE, aujourdhui, codeWork, definirFuseau, messageWork } from './projets-model';
 import { membresConnus, messagesAvertissements } from './taches-model';
 
 export interface ContexteProjet {
@@ -147,6 +147,8 @@ export function ProjetProvider({
         if (annule) return;
         setProject(p);
         setTasksState(t);
+        // ADR-0080 : fuseau de l'organisation, avant le rendu qui lit « aujourd'hui ».
+        definirFuseau(s.timeZone);
         setSettings(s);
         setErreur(null);
       })

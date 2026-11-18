@@ -26,7 +26,7 @@ import {
   lundiDe,
   premierDuMois,
 } from './calendar-model';
-import { formatJour } from './projets-model';
+import { formatJour, formatJourHeure } from './projets-model';
 
 // ─── Échelle et dimensions ──────────────────────────────────────────────────
 
@@ -363,7 +363,16 @@ export function gesteClavier(
 
 type TacheTexte = Pick<
   WorkTaskView,
-  'id' | 'number' | 'title' | 'startDate' | 'dueDate' | 'blockedBy' | 'isMilestone'
+  | 'id'
+  | 'number'
+  | 'title'
+  | 'startDate'
+  | 'dueDate'
+  | 'blockedBy'
+  | 'isMilestone'
+  // ADR-0080 : heures facultatives (même règle de conflit que le serveur).
+  | 'startTime'
+  | 'dueTime'
 >;
 
 /**
@@ -376,9 +385,10 @@ export function phrasesConflits(tasks: readonly TacheTexte[]): { taskId: string;
     const t = parId.get(c.taskId)!;
     const p = parId.get(c.predecessorId)!;
     const debut = t.startDate ?? t.dueDate!;
+    const heureDebut = t.startDate !== null ? t.startTime : t.dueTime;
     return {
       taskId: t.id,
-      texte: `#${t.number} ${t.title} commence le ${formatJour(debut, false)}, sans attendre la fin de #${p.number} ${p.title} (échéance le ${formatJour(p.dueDate, false)}).`,
+      texte: `#${t.number} ${t.title} commence le ${formatJourHeure(debut, heureDebut, false)}, sans attendre la fin de #${p.number} ${p.title} (échéance le ${formatJourHeure(p.dueDate, p.dueTime, false)}).`,
     };
   });
 }
@@ -386,16 +396,20 @@ export function phrasesConflits(tasks: readonly TacheTexte[]): { taskId: string;
 /** Description d'une barre pour les lecteurs d'écran. */
 export function descriptionBarre(
   t: Pick<WorkTaskView, 'number' | 'title' | 'done'>,
-  row: Pick<GanttRow, 'shape' | 'start' | 'end' | 'conflict'>,
+  row: Pick<GanttRow, 'shape' | 'start' | 'end' | 'conflict'> &
+    Partial<Pick<GanttRow, 'startTime' | 'endTime'>>,
   /** ADR-0066 § 4 : réglage `showTaskNumbers` (vrai par défaut). */
   numeros = true,
 ): string {
+  // ADR-0080 : heures facultatives, avec l'abréviation du fuseau.
+  const debut = formatJourHeure(row.start, row.startTime);
+  const fin = formatJourHeure(row.end, row.endTime);
   const dates =
     row.shape === 'milestone'
-      ? `jalon le ${formatJour(row.end)}`
-      : row.start === row.end
-        ? `le ${formatJour(row.end)}`
-        : `du ${formatJour(row.start)} au ${formatJour(row.end)}`;
+      ? `jalon le ${fin}`
+      : row.start === row.end && !row.startTime
+        ? `le ${fin}`
+        : `du ${debut} au ${fin}`;
   return [
     numeros ? `#${t.number} ${t.title}` : t.title,
     dates,
