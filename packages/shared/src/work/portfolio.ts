@@ -11,6 +11,7 @@ import { overviewHealth } from './overview.js';
 import type { WorkProjectKind, WorkProjectStatus } from './constants.js';
 import { addDays, isCalendarDay } from './scheduling.js';
 import type { WorkMemberRef, WorkProjectStatusView } from './views.js';
+import type { WorkTimeZone } from './time.js';
 
 /** Filtres de l'accueil : mes projets, tous les projets non archivés, archivés. */
 export const WORK_PORTFOLIO_SCOPES = ['mine', 'all', 'archived'] as const;
@@ -37,18 +38,27 @@ export type WorkProjectHealth = 'on_track' | 'at_risk' | 'late' | 'closed';
 export interface ProjectHealthInput {
   status: WorkProjectStatus;
   dueDate: string | null;
+  /** ADR-0080 : heure d'échéance du projet (fuseau de l'organisation). */
+  dueTime?: string | null;
   openTaskCount: number;
   doneTaskCount: number;
   overdueTaskCount: number;
   overdueMilestoneCount: number;
 }
 
-export function projectHealth(p: ProjectHealthInput, today: string): WorkProjectHealth {
+export function projectHealth(
+  p: ProjectHealthInput,
+  today: string,
+  /** ADR-0080 : heure courante (`HH:mm`) dans le fuseau de l'organisation. */
+  nowTime?: string,
+): WorkProjectHealth {
   if (!isCalendarDay(today)) throw new RangeError(`Date invalide : ${today}`);
   if (p.status === 'completed' || p.status === 'archived') return 'closed';
   const { status } = overviewHealth({
     status: p.status,
     projectDueDate: p.dueDate,
+    projectDueTime: p.dueTime ?? null,
+    ...(nowTime !== undefined ? { nowTime } : {}),
     today,
     open: p.openTaskCount,
     done: p.doneTaskCount,
@@ -101,6 +111,8 @@ export interface WorkPortfolioProject {
   customerName: string | null;
   owner: WorkMemberRef | null;
   dueDate: string | null;
+  /** ADR-0080 : heure d'échéance du projet. */
+  dueTime?: string | null;
   totalTaskCount: number;
   doneTaskCount: number;
   overdueTaskCount: number;
@@ -132,6 +144,8 @@ export interface WorkPortfolioStats {
 /** `GET /work/portfolio`. Les chiffres portent sur l'organisation, quel que soit le filtre. */
 export interface WorkPortfolioView {
   asOf: string;
+  /** ADR-0080 : fuseau de l'organisation (les heures s'y lisent). */
+  timeZone?: WorkTimeZone;
   scope: WorkPortfolioScope;
   stats: WorkPortfolioStats;
   items: WorkPortfolioProject[];

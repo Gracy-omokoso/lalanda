@@ -265,6 +265,16 @@ const SPECS: Record<
     importance: 'urgent',
     whatsappTemplate: 'lalanda_echeance_depassee',
   }),
+  // ADR-0080 : seulement pour une échéance avec heure ; Essentiel · important (cloche et
+  // e-mail dans les trois modes, Slack dès Atténué, WhatsApp en Perroquet).
+  'work.task_due_in_hour': work({
+    family: 'work.tasks',
+    label: 'Échéance dans une heure d’une de mes tâches',
+    recipients: 'Le responsable de la tâche',
+    audience: ['assignee'],
+    tier: 'essentiel',
+    importance: 'important',
+  }),
   'work.project_task_overdue': work({
     family: 'work.tasks',
     label: 'Une tâche d’un projet que je dirige est en retard',

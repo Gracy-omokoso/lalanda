@@ -11,6 +11,7 @@ import {
 } from '@lalanda/shared/work';
 import type { Model } from 'mongoose';
 
+import { WorkClockService } from './work-clock.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import {
@@ -30,6 +31,7 @@ type TaskRow = Pick<
   | 'done'
   | 'completedAt'
   | 'dueDate'
+  | 'dueTime'
   | 'isMilestone'
   | 'assigneeUserId'
 > & { createdAt?: Date };
@@ -41,6 +43,8 @@ export class WorkOverviewService {
     @InjectModel(WorkComment.name) private readonly comments: Model<WorkCommentDocument>,
     @Inject(WorkProjectsService) private readonly projects: WorkProjectsService,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
+    // ADR-0080 : fuseau de l'organisation.
+    @Inject(WorkClockService) private readonly clock: WorkClockService,
   ) {}
 
   async overview(
@@ -61,6 +65,7 @@ export class WorkOverviewService {
             done: 1,
             completedAt: 1,
             dueDate: 1,
+            dueTime: 1,
             isMilestone: 1,
             assigneeUserId: 1,
             createdAt: 1,
@@ -74,11 +79,16 @@ export class WorkOverviewService {
         .lean<{ taskId: string }[]>()
         .exec(),
     ]);
-    const refs = await this.members.refs(rows.map((r) => r.assigneeUserId));
+    const [refs, timeZone] = await Promise.all([
+      this.members.refs(rows.map((r) => r.assigneeUserId)),
+      this.clock.timeZoneOf(organizationId),
+    ]);
     return computeWorkProjectOverview({
       projectId,
       status: project.status,
       projectDueDate: project.dueDate ?? null,
+      projectDueTime: project.dueTime ?? null,
+      timeZone,
       tasks: rows.map((r) => ({
         id: String(r._id),
         number: r.number,
@@ -88,6 +98,7 @@ export class WorkOverviewService {
         completedAt: r.completedAt ?? null,
         createdAt: r.createdAt ?? now,
         dueDate: r.dueDate ?? null,
+        dueTime: r.dueTime ?? null,
         isMilestone: r.isMilestone,
         assignee: r.assigneeUserId ? (refs.get(r.assigneeUserId) ?? null) : null,
       })),

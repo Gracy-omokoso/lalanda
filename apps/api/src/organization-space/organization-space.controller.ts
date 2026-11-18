@@ -101,6 +101,9 @@ export class OrganizationSpaceController {
         paysAvant: avant.pays,
         paysApres: apres.pays,
         deviseApres: apres.deviseAffichage,
+        // ADR-0080
+        fuseauAvant: avant.fuseauHoraire,
+        fuseauApres: apres.fuseauHoraire,
       },
     });
 

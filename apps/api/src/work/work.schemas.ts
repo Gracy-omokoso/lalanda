@@ -234,6 +234,16 @@ export class WorkProject {
   @Prop({ type: String, default: null })
   dueDate!: string | null;
 
+  /**
+   * ADR-0080 : heures facultatives (`HH:mm`, 24 h), lues dans le fuseau de
+   * l'organisation. Absentes des documents anciens : `null` (sans heure).
+   */
+  @Prop({ type: String, default: null })
+  startTime!: string | null;
+
+  @Prop({ type: String, default: null })
+  dueTime!: string | null;
+
   @Prop({ type: WorkProjectLinksSchema, default: () => ({}) })
   links!: WorkProjectLinks;
 
@@ -373,6 +383,14 @@ export class WorkTaskReminders {
 
   @Prop({ type: String, default: null })
   overdueFor!: string | null;
+
+  /**
+   * ADR-0080 : rappel « échéance dans 1 h » servi pour cette échéance
+   * (`AAAA-MM-JJTHH:mm`). Les deux autres gardent le jour seul quand la tâche
+   * n'a pas d'heure (valeurs existantes inchangées), `AAAA-MM-JJTHH:mm` sinon.
+   */
+  @Prop({ type: String, default: null })
+  dueInHourFor!: string | null;
 }
 const WorkTaskRemindersSchema = SchemaFactory.createForClass(WorkTaskReminders);
 
@@ -526,6 +544,16 @@ export class WorkTask {
 
   @Prop({ type: String, default: null })
   dueDate!: string | null;
+
+  /**
+   * ADR-0080 : heures facultatives (`HH:mm`, 24 h), lues dans le fuseau de
+   * l'organisation. Absentes des documents anciens : `null` (sans heure).
+   */
+  @Prop({ type: String, default: null })
+  startTime!: string | null;
+
+  @Prop({ type: String, default: null })
+  dueTime!: string | null;
 
   @Prop({ type: Boolean, required: true, default: false })
   isMilestone!: boolean;

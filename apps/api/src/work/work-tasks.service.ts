@@ -25,7 +25,7 @@ import {
   dueSoonEnd,
   groupMyTasks,
   isBlocked,
-  kinshasaDayOf,
+  formatDayTime,
   rankBetween,
   type CreateWorkTaskBody,
   type ListProjectTasksQuery,
@@ -68,9 +68,12 @@ import { Types, type Model } from 'mongoose';
 
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/time-cursor.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
+import { WorkClockService } from './work-clock.service.js';
 import {
   actorCan,
+  checkFinalDates,
   conflict,
+  finalTimes,
   forbidden,
   invalid,
   invalidCursor,
@@ -239,6 +242,8 @@ export class WorkTasksService {
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
     // ADR-0066 § 3 : l'assigné d'un projet qu'il ne voit pas en devient membre direct.
     @Inject(WorkProjectMembersService) private readonly projectMembers: WorkProjectMembersService,
+    // ADR-0080 : fuseau de l'organisation (« aujourd'hui », heures).
+    @Inject(WorkClockService) private readonly clock: WorkClockService,
     // ADR-0040 — C4 : relances CRM, facultatives (tests, module absent).
     @Optional() @Inject(CRM_AGENDA_SOURCE) crmAgenda: CrmAgendaReader | null = null,
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat, facultatives (tests, module absent).
@@ -579,7 +584,7 @@ export class WorkTasksService {
     if (this.absenceSource === null) return null;
     const users = [...new Set(docs.map((d) => d.assigneeUserId).filter((u): u is string => !!u))];
     if (users.length === 0) return new Map();
-    const today = kinshasaDayOf(now);
+    const { today } = await this.clock.clockOf(organizationId, now);
     let from = today;
     let to = today;
     for (const d of docs) {
@@ -625,6 +630,9 @@ export class WorkTasksService {
       labelKeys: d.labelKeys ?? [],
       startDate: d.startDate ?? null,
       dueDate: d.dueDate ?? null,
+      // ADR-0080 : heures facultatives (fuseau de l'organisation).
+      startTime: d.startTime ?? null,
+      dueTime: d.dueTime ?? null,
       isMilestone: d.isMilestone,
       blockedBy,
       blocked: isBlocked({ blockedBy }, ctx.doneById),
@@ -927,7 +935,9 @@ export class WorkTasksService {
       ...salesContracts.items,
       ...timesheets.items,
     ];
-    const today = kinshasaDayOf(now);
+    // ADR-0080 : jour ET heure dans le fuseau de l'organisation.
+    const clock = await this.clock.clockOf(organizationId, now);
+    const today = clock.today;
     const { dueSoonDays, workingDays } = await this.settings.get(organizationId);
     // ADR-0061 § 3 : la fenêtre « échéance proche » compte des jours OUVRÉS ; convertie
     // en jours calendaires pour le regroupement (vendredi + 1 jour ouvré → lundi).
@@ -935,9 +945,11 @@ export class WorkTasksService {
     const calendarSpan = Math.round(
       (Date.parse(`${soonEnd}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
     );
-    const groups = groupMyTasks(items, today, calendarSpan);
+    const groups = groupMyTasks(items, today, calendarSpan, clock.time);
     return {
       asOf: today,
+      asOfTime: clock.time,
+      timeZone: clock.timeZone,
       ...groups,
       truncated:
         workTruncated ||
@@ -1255,13 +1267,18 @@ export class WorkTasksService {
     taskId: string,
   ): Promise<WorkWarning[]> {
     const docs = await this.tasks
-      .find({ organizationId, projectId }, { blockedBy: 1, startDate: 1, dueDate: 1 })
+      .find(
+        { organizationId, projectId },
+        { blockedBy: 1, startDate: 1, dueDate: 1, startTime: 1, dueTime: 1 },
+      )
       .lean<
         {
           _id: unknown;
           blockedBy: { taskId: string }[];
           startDate: string | null;
           dueDate: string | null;
+          startTime?: string | null;
+          dueTime?: string | null;
         }[]
       >()
       .exec();
@@ -1271,6 +1288,8 @@ export class WorkTasksService {
         blockedBy: d.blockedBy ?? [],
         startDate: d.startDate ?? null,
         dueDate: d.dueDate ?? null,
+        startTime: d.startTime ?? null,
+        dueTime: d.dueTime ?? null,
       })),
     )
       .filter((c) => c.taskId === taskId || c.predecessorId === taskId)
@@ -1541,6 +1560,9 @@ export class WorkTasksService {
       labelKeys: body.labelKeys ?? [],
       startDate: body.startDate ?? null,
       dueDate: body.dueDate ?? null,
+      // ADR-0080 : le schéma refuse déjà une heure sans son jour.
+      startTime: body.startDate ? (body.startTime ?? null) : null,
+      dueTime: body.dueDate ? (body.dueTime ?? null) : null,
       isMilestone: body.isMilestone ?? false,
       blockedBy: [],
       loggedMinutes: 0,
@@ -1548,7 +1570,7 @@ export class WorkTasksService {
       color: body.color ?? null,
       source: null,
       billing: null,
-      reminders: { dueSoonFor: null, overdueFor: null },
+      reminders: { dueSoonFor: null, overdueFor: null, dueInHourFor: null },
       revision: 1,
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -1650,12 +1672,12 @@ export class WorkTasksService {
       isMilestone: body.isMilestone ?? current.isMilestone,
       startDate: body.startDate !== undefined ? body.startDate : current.startDate,
       dueDate: body.dueDate !== undefined ? body.dueDate : current.dueDate,
+      // ADR-0080 : effacer le jour efface son heure ; une heure posée sans jour est refusée.
+      ...finalTimes(body, current),
     };
-    if (final.startDate && final.dueDate && final.dueDate < final.startDate) {
-      invalid('dueDate', 'WORK_DATES_INVERTED', 'L’échéance précède la date de début.');
-    }
+    checkFinalDates(final);
     if (final.isMilestone) {
-      if (final.startDate) {
+      if (final.startDate || final.startTime) {
         invalid('startDate', 'WORK_MILESTONE_HAS_START', 'Un jalon n’a pas de date de début.');
       }
       if (!final.dueDate) {
@@ -1689,6 +1711,8 @@ export class WorkTasksService {
     if (body.isMilestone !== undefined) assign('isMilestone', body.isMilestone);
     if (body.startDate !== undefined) assign('startDate', body.startDate);
     if (body.dueDate !== undefined) assign('dueDate', body.dueDate);
+    if (final.startTime !== (current.startTime ?? null)) assign('startTime', final.startTime);
+    if (final.dueTime !== (current.dueTime ?? null)) assign('dueTime', final.dueTime);
     if (body.labelKeys !== undefined) {
       await this.checkLabels(organizationId, body.labelKeys);
       assign('labelKeys', body.labelKeys);
@@ -1808,7 +1832,10 @@ export class WorkTasksService {
 
     const base = { projectId: current.projectId, taskId, actorUserId: actor.userId };
     const entries: ActivityInput[] = [];
-    const others = changed.filter((f) => !['assigneeUserId', 'dueDate'].includes(f));
+    const others = changed.filter((f) => !['assigneeUserId', 'dueDate', 'dueTime'].includes(f));
+    // ADR-0080 : l'échéance change si son jour OU son heure change.
+    const dueChanged =
+      final.dueDate !== (current.dueDate ?? null) || final.dueTime !== (current.dueTime ?? null);
     if (others.length > 0)
       entries.push({ ...base, kind: 'task.updated', data: { fields: others } });
     if (assigneeChanged) {
@@ -1822,11 +1849,16 @@ export class WorkTasksService {
           : { ...base, kind: 'task.unassigned', data: { from: current.assigneeUserId ?? null } },
       );
     }
-    if (body.dueDate !== undefined && body.dueDate !== (current.dueDate ?? null)) {
+    if (dueChanged) {
       entries.push({
         ...base,
         kind: 'task.due_changed',
-        data: { from: current.dueDate ?? null, to: body.dueDate },
+        data: {
+          from: current.dueDate ?? null,
+          to: final.dueDate,
+          fromTime: current.dueTime ?? null,
+          toTime: final.dueTime,
+        },
       });
     }
     if (collabAdded.length + collabRemoved.length > 0) {
@@ -1866,9 +1898,10 @@ export class WorkTasksService {
     }
     // ADR-0079 § 3 : « l'échéance d'une de mes tâches change » — responsable (s'il n'est pas
     // celui qu'on vient d'assigner), collaborateurs, chef et adjoint.
-    if (body.dueDate !== undefined && body.dueDate !== (current.dueDate ?? null)) {
+    if (dueChanged) {
       const assignee = assigneeChanged ? null : (current.assigneeUserId ?? null);
       const label = `#${current.number} ${body.title ?? current.title}`;
+      const timeZone = await this.clock.timeZoneOf(organizationId);
       await this.notifier.taskEvent({
         organizationId,
         recipients: [
@@ -1879,8 +1912,8 @@ export class WorkTasksService {
         kind: 'work.task_due_date_changed',
         projectId: current.projectId,
         taskId,
-        title: body.dueDate
-          ? `${await this.actorName(actor)} a fixé l’échéance de ${label} au ${body.dueDate}`
+        title: final.dueDate
+          ? `${await this.actorName(actor)} a fixé l’échéance de ${label} au ${formatDayTime(final.dueDate, final.dueTime, timeZone)}`
           : `${await this.actorName(actor)} a retiré l’échéance de ${label}`,
         actorUserId: actor.userId,
       });

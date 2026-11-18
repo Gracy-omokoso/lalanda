@@ -4,6 +4,12 @@
 // (ADR-0012 §8) et ce fichier ne fait que DÉCRIRE ce que le serveur renvoie une
 // fois la décision prise.
 
+import {
+  WORK_DEFAULT_TIME_ZONE,
+  WORK_TIME_ZONES,
+  WORK_TIME_ZONE_INFO,
+  type WorkTimeZone,
+} from '@lalanda/shared/work';
 import { z } from 'zod';
 
 import type { Action, OrgRole } from '../authz/permissions.js';
@@ -23,6 +29,8 @@ export type DisplayCurrency = (typeof DISPLAY_CURRENCIES)[number];
 /** Réglages servis quand l'organisation n'a encore jamais été paramétrée. */
 export const DEFAULT_ORGANIZATION_SETTINGS = {
   deviseAffichage: 'USD' as DisplayCurrency,
+  // ADR-0080 : fuseau de l'organisation (heures des Projets).
+  fuseauHoraire: WORK_DEFAULT_TIME_ZONE as WorkTimeZone,
 };
 
 /**
@@ -45,6 +53,9 @@ export const UpdateOrganizationSettingsSchema = z
       .length(2)
       .regex(/^[A-Za-z]{2}$/, 'Code pays ISO-2 attendu (ex. CD).'),
     deviseAffichage: z.enum(DISPLAY_CURRENCIES),
+    // ADR-0080 : facultatif (un client plus ancien qui ne l'envoie pas garde le
+    // fuseau déjà réglé). Liste fermée : les deux fuseaux de la RDC.
+    fuseauHoraire: z.enum(WORK_TIME_ZONES).optional(),
     // Plus de `logoUrl` (ADR-0028, décision ouverte n° 6, retiré le 21 oct. 2026) :
     // le logo se gère dans l'identité visuelle (`/organizations/current/brand`).
     // Un client qui l'enverrait encore reçoit 400 (`.strict()`) plutôt qu'un 200
@@ -65,10 +76,21 @@ export interface OrganizationSettingsView {
   type: string;
   pays: string;
   deviseAffichage: DisplayCurrency;
+  /** ADR-0080 : fuseau de l'organisation. */
+  fuseauHoraire: WorkTimeZone;
   updatedAt: string | null;
   /** Valeurs acceptées, servies par l'API — l'interface ne les code pas en dur. */
-  options: { currencies: readonly string[] };
+  options: {
+    currencies: readonly string[];
+    timeZones: readonly { value: WorkTimeZone; label: string }[];
+  };
 }
+
+/** ADR-0080 : fuseaux proposés, avec leur libellé (« Heure de Kinshasa — Ouest… »). */
+export const TIME_ZONE_OPTIONS = WORK_TIME_ZONES.map((value) => ({
+  value,
+  label: WORK_TIME_ZONE_INFO[value].label,
+}));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tableau de bord

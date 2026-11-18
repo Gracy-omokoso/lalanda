@@ -35,12 +35,13 @@ export const IMPORT_GUIDE: Record<ImportField, { rule: string; values: string; e
     },
     startDate: {
       rule: 'Facultatif. Date de début.',
-      values: 'JJ/MM/AAAA (une date Excel convient aussi)',
+      values:
+        'JJ/MM/AAAA, heure facultative HH:mm (fuseau de l’organisation) ; une date Excel convient aussi',
       example: '02/11/2026',
     },
     dueDate: {
       rule: 'Facultatif (OBLIGATOIRE pour un jalon). Date d’échéance, jamais avant le début.',
-      values: 'JJ/MM/AAAA',
+      values: 'JJ/MM/AAAA, heure facultative HH:mm (par exemple 15/01/2027 14:30)',
       example: '13/11/2026',
     },
     priority: {

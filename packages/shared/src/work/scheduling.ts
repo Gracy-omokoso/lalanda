@@ -9,6 +9,8 @@
 
 import type { WorkPriority } from './constants.js';
 import { WORK_PRIORITIES } from './constants.js';
+// ADR-0080 : heures facultatives, lues dans le fuseau de l'organisation.
+import { compareDue, isPastDue } from './time.js';
 
 // ── Jours civils ────────────────────────────────────────────────────────────
 
@@ -121,6 +123,9 @@ export function detectCycle(
 export interface DatedNode extends DependencyNode {
   startDate: string | null;
   dueDate: string | null;
+  /** ADR-0080 : heures facultatives (`HH:mm`, fuseau de l'organisation). */
+  startTime?: string | null;
+  dueTime?: string | null;
 }
 
 /** Conflit de dates entre une tâche et son prédécesseur (non bloquant). */
@@ -141,10 +146,19 @@ export function dependencyConflicts(tasks: readonly DatedNode[]): DependencyConf
   for (const t of tasks) {
     const start = t.startDate ?? t.dueDate;
     if (start === null) continue;
+    const startTime = t.startDate !== null ? (t.startTime ?? null) : (t.dueTime ?? null);
     for (const dep of t.blockedBy) {
       const pred = byId.get(dep.taskId);
       if (pred === undefined || pred.dueDate === null) continue;
-      if (start <= pred.dueDate) out.push({ taskId: t.id, predecessorId: pred.id });
+      if (start < pred.dueDate) out.push({ taskId: t.id, predecessorId: pred.id });
+      else if (start === pred.dueDate) {
+        // ADR-0080 : le même jour, deux heures posées et un début à l'échéance ou
+        // après ne sont plus un conflit ; sans heure, la règle du jour reste.
+        const due = pred.dueTime ?? null;
+        if (startTime === null || due === null || startTime < due) {
+          out.push({ taskId: t.id, predecessorId: pred.id });
+        }
+      }
     }
   }
   return out;
@@ -212,6 +226,8 @@ export interface GroupableTask {
   id: string;
   done: boolean;
   dueDate: string | null;
+  /** ADR-0080 : heure d'échéance facultative (`HH:mm`, fuseau de l'organisation). */
+  dueTime?: string | null;
   priority: WorkPriority;
   rank: string;
 }
@@ -234,11 +250,8 @@ export interface MyTasksGroups<T> {
 const PRIORITY_RANK = new Map(WORK_PRIORITIES.map((p, i) => [p, i]));
 
 function compareTasks(a: GroupableTask, b: GroupableTask): number {
-  if (a.dueDate !== b.dueDate) {
-    if (a.dueDate === null) return 1;
-    if (b.dueDate === null) return -1;
-    return a.dueDate < b.dueDate ? -1 : 1;
-  }
+  const due = compareDue(a, b);
+  if (due !== 0) return due;
   const pa = PRIORITY_RANK.get(a.priority) ?? 0;
   const pb = PRIORITY_RANK.get(b.priority) ?? 0;
   if (pa !== pb) return pb - pa;
@@ -250,12 +263,19 @@ function compareTasks(a: GroupableTask, b: GroupableTask): number {
  * Regroupe les tâches NON terminées : en retard · aujourd'hui · 7 jours · plus
  * tard · sans date (ADR-0039 § 4, `GET /work/my-tasks`). `today` est le jour de
  * Kinshasa calculé par l'appelant (`kinshasaDayOf(now)`). Dans chaque groupe :
- * échéance croissante, priorité décroissante, puis rang.
+ * échéance croissante (une heure avant « toute la journée »), priorité
+ * décroissante, puis rang.
+ *
+ * ADR-0080 : `today` est le jour du fuseau de l'organisation ; `nowTime`
+ * (facultatif, `HH:mm` du même fuseau) fait passer « en retard » une tâche du
+ * jour dont l'heure d'échéance est atteinte. Sans `nowTime`, ou sans heure
+ * posée, la règle du jour seule.
  */
 export function groupMyTasks<T extends GroupableTask>(
   tasks: readonly T[],
   today: string,
   dueSoonDays: number,
+  nowTime?: string,
 ): MyTasksGroups<T> {
   if (!isCalendarDay(today)) throw new RangeError(`Date invalide : ${today}`);
   const in7 = addDays(today, 7);
@@ -271,12 +291,15 @@ export function groupMyTasks<T extends GroupableTask>(
   for (const t of tasks) {
     if (t.done) continue;
     const due = t.dueDate;
+    const late =
+      due !== null &&
+      (due < today || (nowTime !== undefined && isPastDue(t, { today, time: nowTime })));
     if (due === null) groups.noDate.push(t);
-    else if (due < today) groups.overdue.push(t);
+    else if (late) groups.overdue.push(t);
     else if (due === today) groups.today.push(t);
     else if (due <= in7) groups.next7Days.push(t);
     else groups.later.push(t);
-    if (due !== null && due >= today && due <= soonEnd) groups.dueSoonCount += 1;
+    if (due !== null && !late && due >= today && due <= soonEnd) groups.dueSoonCount += 1;
   }
   for (const key of ['overdue', 'today', 'next7Days', 'later', 'noDate'] as const) {
     groups[key].sort(compareTasks);
@@ -301,6 +324,9 @@ export interface GanttRow {
   shape: 'bar' | 'milestone';
   start: string;
   end: string;
+  /** ADR-0080 : heures facultatives du début et de l'échéance (infobulle). */
+  startTime: string | null;
+  endTime: string | null;
   /** Prédécesseurs connus et datés, pour les flèches. */
   predecessorIds: string[];
   /** Vrai si la tâche est en conflit de dates avec l'un de ses prédécesseurs. */
@@ -340,6 +366,8 @@ export function ganttRows(tasks: readonly GanttTask[]): GanttLayout {
       shape: t.isMilestone ? 'milestone' : 'bar',
       start,
       end,
+      startTime: t.isMilestone || t.startDate === null ? null : (t.startTime ?? null),
+      endTime: t.dueDate === null ? null : (t.dueTime ?? null),
       predecessorIds: t.blockedBy
         .map((d) => d.taskId)
         .filter((id) => {

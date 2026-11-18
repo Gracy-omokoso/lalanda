@@ -18,6 +18,7 @@
 import {
   WORK_LIMITS,
   WORK_PLAN_LIMITS,
+  datesInverted,
   isCalendarDay,
   planCycle,
   type WorkImportIssue,
@@ -396,6 +397,29 @@ export function parseDay(raw: string): string | null | undefined {
   return undefined;
 }
 
+/**
+ * ADR-0080 : date et heure facultative d'une cellule (« 15/01/2027 14:30 »,
+ * « 2027-01-15T14:30 », « 15/01/2027 14h30 »). L'heure exacte « 00:00 » d'un
+ * export de tableur (date sans heure) est ignorée. `''` → `null` ; illisible →
+ * `undefined`.
+ */
+export function parseDayTime(raw: string): { day: string; time: string | null } | null | undefined {
+  const s = raw.trim();
+  if (s === '') return null;
+  const m = /^(.+?)[ T]+(\d{1,2})[:h](\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i.exec(s);
+  if (m) {
+    const day = parseDay(m[1]!);
+    const h = Number(m[2]);
+    const min = Number(m[3]);
+    if (!day || h > 23 || min > 59) return undefined;
+    const time = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    return { day, time: time === '00:00' ? null : time };
+  }
+  const day = parseDay(s);
+  if (day === null || day === undefined) return day;
+  return { day, time: null };
+}
+
 /** Oui/Non ; `undefined` si illisible. */
 export function parseYesNo(raw: string): boolean | undefined {
   const k = normalizeLabel(raw);
@@ -433,6 +457,9 @@ interface Draft {
   assignee: { userId: string; name: string } | null;
   startDate: string | null;
   dueDate: string | null;
+  // ADR-0080 : heures facultatives lues dans les cellules de date.
+  startTime: string | null;
+  dueTime: string | null;
   priority: WorkPriority;
   isMilestone: boolean;
   dependsRaw: string[];
@@ -545,6 +572,8 @@ export function tableToPlan(
       assignee: null,
       startDate: null,
       dueDate: null,
+      startTime: null,
+      dueTime: null,
       priority: 'none',
       isMilestone: false,
       dependsRaw: splitList(cell(cells, 'dependsOn')),
@@ -614,18 +643,24 @@ export function tableToPlan(
     }
 
     // Dates.
-    for (const f of ['startDate', 'dueDate'] as const) {
+    for (const [f, t] of [
+      ['startDate', 'startTime'],
+      ['dueDate', 'dueTime'],
+    ] as const) {
       const raw = cell(cells, f);
-      const day = parseDay(raw);
-      if (day === undefined) {
+      const value = parseDayTime(raw);
+      if (value === undefined) {
         fail(
           f,
           'IMPORT_DATE_INVALID',
-          `Date « ${raw} » illisible : écrivez-la JJ/MM/AAAA (par exemple 15/01/2027).`,
+          `Date « ${raw} » illisible : écrivez-la JJ/MM/AAAA, avec une heure facultative (par exemple 15/01/2027 ou 15/01/2027 14:30).`,
         );
-      } else d[f] = day;
+      } else {
+        d[f] = value?.day ?? null;
+        d[t] = value?.time ?? null;
+      }
     }
-    if (d.startDate && d.dueDate && d.dueDate < d.startDate) {
+    if (datesInverted(d)) {
       fail('dueDate', 'WORK_DATES_INVERTED', 'L’échéance précède la date de début.');
     }
 
@@ -659,7 +694,9 @@ export function tableToPlan(
     if (d.isMilestone) {
       if (!d.dueDate && d.startDate) {
         d.dueDate = d.startDate;
+        d.dueTime = d.startTime;
         d.startDate = null;
+        d.startTime = null;
         add(
           row,
           'dueDate',
@@ -669,6 +706,7 @@ export function tableToPlan(
         );
       } else if (d.startDate) {
         d.startDate = null;
+        d.startTime = null;
         add(
           row,
           'startDate',
@@ -884,6 +922,8 @@ export function tableToPlan(
     assigneeUserId: d.assignee?.userId ?? null,
     startDate: d.startDate,
     dueDate: d.dueDate,
+    startTime: d.startTime,
+    dueTime: d.dueTime,
     priority: d.priority,
     isMilestone: d.isMilestone,
     dependsOn: d.dependsOn.map((r) => `L${r}`),
@@ -913,6 +953,8 @@ export function tableToPlan(
     assignee: d.assignee,
     startDate: d.startDate,
     dueDate: d.dueDate,
+    startTime: d.startTime,
+    dueTime: d.dueTime,
     priority: d.priority,
     isMilestone: d.isMilestone,
     dependsOn: d.dependsOn,

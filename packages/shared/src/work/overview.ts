@@ -21,6 +21,8 @@
 // propre est affiché à côté.
 
 import type { WorkMemberRef } from './views.js';
+// ADR-0080 : heures facultatives et fuseau de l'organisation.
+import { WORK_DEFAULT_TIME_ZONE, isPastDue, orgClock, type OrgClock } from './time.js';
 
 export type WorkOverviewHealth = 'on_track' | 'at_risk' | 'off_track';
 
@@ -32,6 +34,8 @@ export interface WorkOverviewTaskRef {
   number: number;
   title: string;
   dueDate: string;
+  /** ADR-0080 : heure d'échéance facultative. */
+  dueTime?: string | null;
   done: boolean;
   assignee: WorkMemberRef | null;
 }
@@ -83,6 +87,8 @@ export interface WorkOverviewTaskInput {
   completedAt: Date | null;
   createdAt: Date;
   dueDate: string | null;
+  /** ADR-0080 : heure d'échéance facultative. */
+  dueTime?: string | null;
   isMilestone: boolean;
   assignee: WorkMemberRef | null;
 }
@@ -91,11 +97,6 @@ export const WORK_OVERVIEW_WEEKS = 8;
 export const WORK_OVERVIEW_DUE_SOON_DAYS = 7;
 
 const DAY_MS = 86_400_000;
-const KINSHASA_OFFSET_MS = 3_600_000; // UTC+1, sans heure d'été (ADR-0027)
-
-function dayOf(d: Date): string {
-  return new Date(d.getTime() + KINSHASA_OFFSET_MS).toISOString().slice(0, 10);
-}
 
 function addDays(day: string, n: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
@@ -113,6 +114,7 @@ function ref(t: WorkOverviewTaskInput): WorkOverviewTaskRef {
     number: t.number,
     title: t.title,
     dueDate: t.dueDate!,
+    dueTime: t.dueTime ?? null,
     done: t.done,
     assignee: t.assignee,
   };
@@ -125,11 +127,22 @@ export function overviewHealth(input: {
   open: number;
   done: number;
   overdue: number;
+  /** ADR-0080 : heure d'échéance du projet et heure courante (fuseau de l'organisation). */
+  projectDueTime?: string | null;
+  nowTime?: string;
 }): { status: WorkOverviewHealth; reasons: WorkOverviewHealthReason[] } {
   const { open, done, overdue, today, projectDueDate } = input;
   if (input.status === 'completed') return { status: 'on_track', reasons: [] };
   const off: WorkOverviewHealthReason[] = [];
-  if (projectDueDate !== null && projectDueDate < today && open > 0) off.push('PROJECT_DUE_PASSED');
+  const duePassed =
+    projectDueDate !== null &&
+    (projectDueDate < today ||
+      (input.nowTime !== undefined &&
+        isPastDue(
+          { dueDate: projectDueDate, dueTime: input.projectDueTime ?? null },
+          { today, time: input.nowTime },
+        )));
+  if (duePassed && open > 0) off.push('PROJECT_DUE_PASSED');
   if (overdue >= 3 && overdue * 4 >= open) off.push('MANY_OVERDUE_TASKS');
   if (off.length > 0) return { status: 'off_track', reasons: off };
   const risk: WorkOverviewHealthReason[] = [];
@@ -137,6 +150,7 @@ export function overviewHealth(input: {
   const total = open + done;
   if (
     projectDueDate !== null &&
+    !duePassed &&
     projectDueDate >= today &&
     projectDueDate <= addDays(today, WORK_OVERVIEW_DUE_SOON_DAYS) &&
     total > 0 &&
@@ -157,15 +171,26 @@ export function computeWorkProjectOverview(input: {
   /** `taskId` de chaque commentaire non supprimé. */
   commentTaskIds: readonly string[];
   now: Date;
+  /** ADR-0080 : fuseau de l'organisation (absent : Kinshasa) et heure d'échéance du projet. */
+  timeZone?: string;
+  projectDueTime?: string | null;
 }): WorkProjectOverview {
-  const today = dayOf(input.now);
+  const tz = input.timeZone ?? WORK_DEFAULT_TIME_ZONE;
+  const clock: OrgClock = orgClock(input.now, tz);
+  const today = clock.today;
+  const dayOf = (d: Date): string => orgClock(d, tz).today;
+  const late = (t: WorkOverviewTaskInput): boolean => isPastDue(t, clock);
   const top = input.tasks.filter((t) => t.parentTaskId === null);
   const open = top.filter((t) => !t.done);
   const done = top.length - open.length;
   const overdueTasks = open
-    .filter((t) => t.dueDate !== null && t.dueDate < today)
+    .filter(late)
     .sort((a, b) =>
-      a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : a.number - b.number,
+      a.dueDate! < b.dueDate!
+        ? -1
+        : a.dueDate! > b.dueDate!
+          ? 1
+          : (a.dueTime ?? '99:99').localeCompare(b.dueTime ?? '99:99') || a.number - b.number,
     );
 
   const parResponsable = new Map<
@@ -176,7 +201,7 @@ export function computeWorkProjectOverview(input: {
     const k = t.assignee?.userId ?? '';
     const e = parResponsable.get(k) ?? { assignee: t.assignee, open: 0, overdue: 0 };
     e.open += 1;
-    if (t.dueDate !== null && t.dueDate < today) e.overdue += 1;
+    if (late(t)) e.overdue += 1;
     parResponsable.set(k, e);
   }
   const openByAssignee = [...parResponsable.values()].sort(
@@ -186,6 +211,11 @@ export function computeWorkProjectOverview(input: {
       (a.assignee?.name ?? '').localeCompare(b.assignee?.name ?? '', 'fr'),
   );
 
+  // Jour de chaque création et achèvement, calculé une seule fois (Intl est coûteux).
+  const createdDays = top.map((t) => dayOf(t.createdAt));
+  const completedDays = top.map((t) =>
+    t.done && t.completedAt !== null ? dayOf(t.completedAt) : null,
+  );
   const lundi = mondayOf(today);
   const weeks: WorkOverviewWeek[] = [];
   for (let i = WORK_OVERVIEW_WEEKS - 1; i >= 0; i -= 1) {
@@ -193,15 +223,20 @@ export function computeWorkProjectOverview(input: {
     const fin = addDays(weekStart, 6);
     weeks.push({
       weekStart,
-      done: top.filter((t) => t.done && t.completedAt !== null && dayOf(t.completedAt) <= fin)
-        .length,
-      total: top.filter((t) => dayOf(t.createdAt) <= fin).length,
+      done: completedDays.filter((d) => d !== null && d <= fin).length,
+      total: createdDays.filter((d) => d <= fin).length,
     });
   }
 
   const upcomingMilestones = top
-    .filter((t) => t.isMilestone && !t.done && t.dueDate !== null && t.dueDate >= today)
-    .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0))
+    .filter((t) => t.isMilestone && !t.done && t.dueDate !== null && !late(t))
+    .sort((a, b) =>
+      a.dueDate! < b.dueDate!
+        ? -1
+        : a.dueDate! > b.dueDate!
+          ? 1
+          : (a.dueTime ?? '99:99').localeCompare(b.dueTime ?? '99:99'),
+    )
     .slice(0, 5)
     .map(ref);
 
@@ -214,6 +249,8 @@ export function computeWorkProjectOverview(input: {
     health: overviewHealth({
       status: input.status,
       projectDueDate: input.projectDueDate,
+      projectDueTime: input.projectDueTime ?? null,
+      nowTime: clock.time,
       today,
       open: open.length,
       done,

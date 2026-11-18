@@ -39,6 +39,7 @@ import type { WorkCardColor } from './card-colors.js';
 // ADR-0076 : rôles, droits, validation, statut déclaré.
 import type { WorkProjectRights, WorkProjectRole, WorkTaskRights } from './roles.js';
 import type { WorkProjectStatusValue } from './schemas.js';
+import type { WorkTimeZone } from './time.js';
 
 /** ADR-0076 § 5 : statut déclaré d'un projet (chef ou adjoint). */
 export interface WorkProjectStatusView {
@@ -144,6 +145,11 @@ export interface WorkSettingsView extends WorkBehaviorSettings {
   labels: WorkLabel[];
   defaultColumns: WorkColumn[];
   dueSoonDays: number;
+  /**
+   * ADR-0080 : fuseau de l'organisation (réglage d'organisation, lecture seule
+   * ici) dans lequel se lisent les heures et « aujourd'hui ». Absent : Kinshasa.
+   */
+  timeZone?: WorkTimeZone;
   /** 0 tant que l'organisation n'a rien enregistré (défaut implicite). */
   revision: number;
   updatedAt: string | null;
@@ -179,6 +185,9 @@ export interface WorkProjectView {
   owner: WorkMemberRef | null;
   startDate: string | null;
   dueDate: string | null;
+  /** ADR-0080 : heures facultatives (`HH:mm`, fuseau de l'organisation) ; absent ou `null` : sans heure. */
+  startTime?: string | null;
+  dueTime?: string | null;
   links: WorkProjectLinksView;
   source: WorkProjectSource;
   columns: WorkColumn[];
@@ -226,10 +235,13 @@ export interface WorkProjectSummary {
   customerName: string | null;
   startDate: string | null;
   dueDate: string | null;
+  /** ADR-0080 : heures facultatives (`HH:mm`, fuseau de l'organisation) ; absent ou `null` : sans heure. */
+  startTime?: string | null;
+  dueTime?: string | null;
   openTaskCount: number;
   overdueTaskCount: number;
   doneTaskCount: number;
-  nextMilestone: { taskId: string; title: string; dueDate: string } | null;
+  nextMilestone: { taskId: string; title: string; dueDate: string; dueTime?: string | null } | null;
   updatedAt: string;
 }
 
@@ -264,6 +276,9 @@ export interface WorkTaskView {
   labelKeys: string[];
   startDate: string | null;
   dueDate: string | null;
+  /** ADR-0080 : heures facultatives (`HH:mm`, fuseau de l'organisation) ; absent ou `null` : sans heure. */
+  startTime?: string | null;
+  dueTime?: string | null;
   isMilestone: boolean;
   blockedBy: WorkDependencyView[];
   blocked: boolean;
@@ -392,6 +407,9 @@ export type MyTaskEntry =
 export interface MyTasksView {
   /** Jour de Kinshasa utilisé pour le regroupement (`AAAA-MM-JJ`). */
   asOf: string;
+  /** ADR-0080 : heure (`HH:mm`) et fuseau de l'organisation du regroupement. */
+  asOfTime?: string;
+  timeZone?: WorkTimeZone;
   overdue: MyTaskEntry[];
   today: MyTaskEntry[];
   next7Days: MyTaskEntry[];

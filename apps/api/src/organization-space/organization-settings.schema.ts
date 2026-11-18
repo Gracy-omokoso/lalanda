@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
+import { WORK_DEFAULT_TIME_ZONE, WORK_TIME_ZONES, type WorkTimeZone } from '@lalanda/shared/work';
+
 import { DISPLAY_CURRENCIES, type DisplayCurrency } from './organization-space.dto.js';
 
 /**
@@ -40,6 +42,15 @@ export class OrganizationSettings {
    */
   @Prop({ type: String, required: true, enum: DISPLAY_CURRENCIES, default: 'USD' })
   deviseAffichage!: DisplayCurrency;
+
+  /**
+   * Fuseau horaire de l'organisation (ADR-0080) : les heures de début et
+   * d'échéance des Projets s'y lisent, ainsi que « aujourd'hui » et « en
+   * retard ». Kinshasa (Ouest, UTC+1) par défaut ; Lubumbashi (Est, UTC+2)
+   * possible. Un document ancien sans ce champ vaut Kinshasa (aucune migration).
+   */
+  @Prop({ type: String, enum: WORK_TIME_ZONES, default: WORK_DEFAULT_TIME_ZONE })
+  fuseauHoraire!: WorkTimeZone;
 
   /**
    * ANCIEN champ « Logo (URL) » — RETIRÉ le 21 oct. 2026 (ADR-0028, décision

@@ -58,6 +58,8 @@ export const NOTIFICATION_KINDS = [
   'work.client_changes_requested',
   'work.external_comment',
   'work.consultant_time_logged',
+  // ADR-0080 : rappel « échéance dans 1 h » d'une tâche dont l'échéance a une heure.
+  'work.task_due_in_hour',
   // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM. `crm.opportunity_won`
   // est déclaré ici et émis par le lot C7 (opportunité gagnée → projet).
   'crm.activity_assigned',

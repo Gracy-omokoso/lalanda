@@ -12,6 +12,8 @@
 // rien. En local et en test, le transport de test journalise : aucun envoi réel.
 
 import {
+  formatDayTime,
+  isPastDue,
   dueSoonEnd,
   isWorkingDay,
   kinshasaDayOf,
@@ -27,6 +29,7 @@ import { MembersService } from '../../organizations/members.service.js';
 import { SchedulerService } from '../../scheduler/scheduler.service.js';
 import { projectIdFilter } from '../work-access.js';
 import { WorkAccessService } from '../work-access.service.js';
+import { WorkClockService } from '../work-clock.service.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import { kinshasaHour } from '../work-reminders.job.js';
@@ -64,6 +67,8 @@ export class WorkDigestJob implements OnModuleInit {
     @Inject(MembersService) private readonly identities: MembersService,
     @Inject(MailService) private readonly mail: MailService,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
+    // ADR-0080 : fuseau de l'organisation (heures des échéances).
+    @Inject(WorkClockService) private readonly clock: WorkClockService,
   ) {}
 
   onModuleInit(): void {
@@ -140,7 +145,7 @@ export class WorkDigestJob implements OnModuleInit {
     const visible = projectIdFilter(scope);
     if (Object.keys(visible).length > 0) and.push(visible);
     const docs = await this.tasks
-      .find({ $and: and }, { number: 1, title: 1, dueDate: 1, projectId: 1 })
+      .find({ $and: and }, { number: 1, title: 1, dueDate: 1, dueTime: 1, projectId: 1 })
       .sort({ dueDate: 1, _id: 1 })
       .limit(200)
       .lean<WorkTaskLean[]>()
@@ -149,10 +154,15 @@ export class WorkDigestJob implements OnModuleInit {
       organizationId,
       docs.map((d) => d.projectId),
     );
+    // ADR-0080 : heure d'échéance affichée avec son fuseau ; une tâche du jour dont
+    // l'heure est passée compte « en retard ».
+    const clock = await this.clock.clockOf(organizationId);
     const line = (d: WorkTaskLean) =>
-      `#${d.number} ${d.title} — ${names.get(d.projectId) ?? ''} (${d.dueDate})`;
-    const overdue = docs.filter((d) => d.dueDate! < today).map(line);
-    const dueToday = docs.filter((d) => d.dueDate === today).map(line);
+      `#${d.number} ${d.title} — ${names.get(d.projectId) ?? ''} (${formatDayTime(d.dueDate!, d.dueTime, clock.timeZone)})`;
+    const late = (d: WorkTaskLean) =>
+      d.dueDate! < today || (d.dueDate === today && isPastDue(d, clock));
+    const overdue = docs.filter(late).map(line);
+    const dueToday = docs.filter((d) => d.dueDate === today && !late(d)).map(line);
     const soon = docs.filter((d) => d.dueDate! > today).map(line);
     const unread = await this.connection.collection('notifications').countDocuments({
       organizationId,

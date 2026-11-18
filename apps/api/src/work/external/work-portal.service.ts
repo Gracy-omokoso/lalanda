@@ -30,6 +30,7 @@ import {
   type SubmitTimesheetBody,
   type UpdateTimeEntryBody,
   type WorkClientApprovalState,
+  WORK_DEFAULT_TIME_ZONE,
 } from '@lalanda/shared/work';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -42,6 +43,7 @@ import {
   WorkTimesheetApprovalsService,
 } from '../timesheets/work-timesheet-approvals.service.js';
 import { WorkActivityService } from '../work-activity.service.js';
+import { WorkClockService } from '../work-clock.service.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkNotifier } from '../work-notifier.js';
 import { WorkExternalNotifier } from './work-external-notifier.js';
@@ -94,6 +96,7 @@ const TASK_PROJECTION = {
   done: 1,
   columnKey: 1,
   dueDate: 1,
+  dueTime: 1,
   isMilestone: 1,
   clientVisible: 1,
   clientApproval: 1,
@@ -132,6 +135,10 @@ export class WorkPortalService {
     @Optional()
     @Inject(WorkExternalNotifier)
     private readonly externalNotifier: WorkExternalNotifier | null = null,
+    // ADR-0080 : fuseau de l'organisation, affiché avec les heures.
+    @Optional()
+    @Inject(WorkClockService)
+    private readonly clock: WorkClockService | null = null,
   ) {}
 
   /** Appelant du module, côté écriture (son compte externe, sans rôle d'organisation). */
@@ -247,6 +254,8 @@ export class WorkPortalService {
       done: t.done,
       stage: this.stageOf(project, t),
       dueDate: t.dueDate ?? null,
+      // ADR-0080 : heure facultative (fuseau du projet, rendu avec le projet).
+      dueTime: t.dueTime ?? null,
       isMilestone: t.isMilestone,
       mine: this.isMine(ctx, t),
       clientApproval: this.approvalOf(t),
@@ -294,6 +303,10 @@ export class WorkPortalService {
         status: a.project.status,
         startDate: a.project.startDate ?? null,
         dueDate: a.project.dueDate ?? null,
+        startTime: a.project.startTime ?? null,
+        dueTime: a.project.dueTime ?? null,
+        timeZone:
+          (await this.clock?.timeZoneOf(a.project.organizationId)) ?? WORK_DEFAULT_TIME_ZONE,
         leadName: leads.get(id) ?? null,
         taskCount,
         doneTaskCount,
@@ -405,6 +418,9 @@ export class WorkPortalService {
       task: this.summaryOf(ctx, access.project, task),
       projectId: String(access.project._id),
       projectName: access.project.name,
+      // ADR-0080 : fuseau dans lequel se lit l'heure d'échéance.
+      timeZone:
+        (await this.clock?.timeZoneOf(access.project.organizationId)) ?? WORK_DEFAULT_TIME_ZONE,
       description: task.description ?? null,
       clientApproval: {
         ...this.approvalOf(task),

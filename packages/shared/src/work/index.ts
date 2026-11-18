@@ -5,6 +5,8 @@
 
 export * from './constants.js';
 export * from './scheduling.js';
+// ADR-0080 : heures de début et d'échéance, fuseau de l'organisation.
+export * from './time.js';
 export * from './schemas.js';
 export * from './views.js';
 // ADR-0045 — H5 : feuille de temps hebdomadaire en lecture (§ 6.3).

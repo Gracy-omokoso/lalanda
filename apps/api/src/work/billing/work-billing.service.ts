@@ -563,7 +563,7 @@ export class WorkBillingService {
       links: { customerId: string | null; opportunityId: string | null; quoteIds: string[] };
       source: Record<string, unknown> | null;
       seeds: TaskSeed[];
-      milestone: { title: string; dueDate: string } | undefined;
+      milestone: { title: string; dueDate: string; dueTime?: string | null } | undefined;
       activity: Record<string, unknown>;
       duplicate: () => Promise<void>;
     },
@@ -624,11 +624,12 @@ export class WorkBillingService {
       priority: 'none',
       labelKeys: [],
       startDate: null,
+      startTime: null,
       blockedBy: [],
       loggedMinutes: 0,
       estimateMinutes: null,
       billing: null,
-      reminders: { dueSoonFor: null, overdueFor: null },
+      reminders: { dueSoonFor: null, overdueFor: null, dueInHourFor: null },
       revision: 1,
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -643,6 +644,7 @@ export class WorkBillingService {
         description: seed.description,
         rank,
         dueDate: seed.milestone?.dueDate ?? null,
+        dueTime: null,
         isMilestone: seed.milestone !== undefined,
         source: seed.source,
       };
@@ -656,6 +658,8 @@ export class WorkBillingService {
         description: null,
         rank,
         dueDate: input.milestone.dueDate,
+        // ADR-0080 : heure facultative du jalon (devis, opportunité).
+        dueTime: input.milestone.dueTime ?? null,
         isMilestone: true,
         source: null,
       });

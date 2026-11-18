@@ -11,13 +11,15 @@
 //      (`autoArchiveCompletedDays` des réglages ; `null` : jamais) est archivé, avec
 //      son historique (`project.archived`, auteur `system`).
 
-import { kinshasaDayOf, projectHealth } from '@lalanda/shared/work';
+import { orgClock, projectHealth } from '@lalanda/shared/work';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
 
 import { SchedulerService } from '../scheduler/scheduler.service.js';
 import { HR_TEAMS_COLLECTION } from './work-access.service.js';
+import { WorkClockService } from './work-clock.service.js';
+import { overdueExpr } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkNotifier } from './work-notifier.js';
 import { kinshasaHour } from './work-reminders.job.js';
@@ -61,6 +63,8 @@ export class WorkProjectWatchJob implements OnModuleInit {
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
+    // ADR-0080 : fuseau de chaque organisation.
+    @Inject(WorkClockService) private readonly clock: WorkClockService,
   ) {}
 
   onModuleInit(): void {
@@ -126,54 +130,65 @@ export class WorkProjectWatchJob implements OnModuleInit {
 
   /** Alertes « projet passé à risque » (entrée dans `at_risk` ou `late`). */
   async healthAlerts(now: Date): Promise<number> {
-    const today = kinshasaDayOf(now);
     const projects = await this.projects
       .find({ status: { $in: ['active', 'on_hold'] } })
       .lean<WorkProjectLean[]>()
       .exec();
     if (projects.length === 0) return 0;
-    const counters = await this.tasks
-      .aggregate<Counters>([
-        { $match: { projectId: { $in: projects.map((p) => String(p._id)) } } },
-        {
-          $group: {
-            _id: '$projectId',
-            open: { $sum: { $cond: [{ $eq: ['$done', false] }, 1, 0] } },
-            done: { $sum: { $cond: [{ $eq: ['$done', true] }, 1, 0] } },
-            overdue: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ['$done', false] },
-                      { $ne: ['$dueDate', null] },
-                      { $lt: ['$dueDate', today] },
-                    ],
-                  },
-                  1,
-                  0,
-                ],
+    // ADR-0080 : « aujourd'hui » et les retards à l'heure se lisent dans le fuseau
+    // de chaque organisation : une agrégation par organisation.
+    const orgIds = [...new Set(projects.map((p) => p.organizationId))];
+    const zones = await this.clock.timeZonesOf(orgIds);
+    const clocks = new Map(orgIds.map((o) => [o, orgClock(now, zones.get(o)!)]));
+    const byId = new Map<string, Counters>();
+    for (const organizationId of orgIds) {
+      const clock = clocks.get(organizationId)!;
+      const counters = await this.tasks
+        .aggregate<Counters>([
+          {
+            $match: {
+              organizationId,
+              projectId: {
+                $in: projects
+                  .filter((p) => p.organizationId === organizationId)
+                  .map((p) => String(p._id)),
               },
             },
           },
-        },
-      ])
-      .exec();
-    const byId = new Map(counters.map((c) => [c._id, c]));
+          {
+            $group: {
+              _id: '$projectId',
+              open: { $sum: { $cond: [{ $eq: ['$done', false] }, 1, 0] } },
+              done: { $sum: { $cond: [{ $eq: ['$done', true] }, 1, 0] } },
+              overdue: {
+                $sum: {
+                  $cond: [{ $and: [{ $eq: ['$done', false] }, overdueExpr(clock)] }, 1, 0],
+                },
+              },
+            },
+          },
+        ])
+        .exec();
+      for (const c of counters) byId.set(c._id, c);
+    }
     let alerted = 0;
     for (const p of projects) {
       const id = String(p._id);
       const c = byId.get(id);
+      const clock = clocks.get(p.organizationId)!;
+      const today = clock.today;
       const health = projectHealth(
         {
           status: p.status,
           dueDate: p.dueDate ?? null,
+          dueTime: p.dueTime ?? null,
           openTaskCount: c?.open ?? 0,
           doneTaskCount: c?.done ?? 0,
           overdueTaskCount: c?.overdue ?? 0,
           overdueMilestoneCount: 0,
         },
         today,
+        clock.time,
       );
       const alert = health === 'at_risk' || health === 'late' ? health : null;
       const previous = p.healthAlert ?? null;

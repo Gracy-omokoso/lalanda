@@ -11,8 +11,7 @@
 import {
   WORK_PORTFOLIO_AVATARS,
   WORK_PORTFOLIO_MAX,
-  kinshasaDayOf,
-  kinshasaDayStartInstant,
+  zonedInstant,
   kinshasaWeekStart,
   progressPercent,
   projectColor,
@@ -27,7 +26,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
-import { isWorkId, oid, type WorkActor } from './work.common.js';
+import { isWorkId, oid, overdueExpr, overdueFilter, type WorkActor } from './work.common.js';
+import { WorkClockService, type WorkOrgClock } from './work-clock.service.js';
 import { projectDocFilter, type WorkProjectScope } from './work-access.js';
 import { WorkAccessService } from './work-access.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
@@ -64,6 +64,8 @@ export class WorkPortfolioService {
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
     // ADR-0076 § 5 : dernier statut déclaré, à côté de la santé calculée.
     @Inject(WorkProjectsService) private readonly projectsService: WorkProjectsService,
+    // ADR-0080 : fuseau de l'organisation (« aujourd'hui », retards à l'heure).
+    @Inject(WorkClockService) private readonly clock: WorkClockService,
   ) {}
 
   async portfolio(
@@ -73,7 +75,8 @@ export class WorkPortfolioService {
     now: Date = new Date(),
   ): Promise<WorkPortfolioView> {
     const userId = actor.userId;
-    const today = kinshasaDayOf(now);
+    const clock = await this.clock.clockOf(organizationId, now);
+    const today = clock.today;
     const archived = query.scope === 'archived';
     // ADR-0060 § 5 : projets et chiffres limités à la portée de l'appelant.
     const scope = await this.access.scopeOf(organizationId, actor);
@@ -92,8 +95,8 @@ export class WorkPortfolioService {
     const ids = page.map((d) => String(d._id));
 
     const [counters, stats, statuses] = await Promise.all([
-      this.counters(organizationId, ids, userId, today),
-      this.stats(organizationId, today, scope),
+      this.counters(organizationId, ids, userId, clock),
+      this.stats(organizationId, clock, scope),
       this.projectsService.latestStatuses(organizationId, ids),
     ]);
     const countBy = new Map(counters.map((c) => [c._id, c]));
@@ -141,16 +144,19 @@ export class WorkPortfolioService {
           {
             status: d.status,
             dueDate: d.dueDate ?? null,
+            dueTime: d.dueTime ?? null,
             openTaskCount: c?.open ?? 0,
             doneTaskCount: done,
             overdueTaskCount: c?.overdue ?? 0,
             overdueMilestoneCount: c?.overdueMilestones ?? 0,
           },
           today,
+          clock.time,
         ),
         customerName: d.links?.customerId ? (customers.get(d.links.customerId) ?? null) : null,
         owner: d.ownerUserId ? WorkMembersService.refOf(refs, d.ownerUserId) : null,
         dueDate: d.dueDate ?? null,
+        dueTime: d.dueTime ?? null,
         totalTaskCount: total,
         doneTaskCount: done,
         overdueTaskCount: c?.overdue ?? 0,
@@ -166,7 +172,14 @@ export class WorkPortfolioService {
       };
     });
     if (query.scope === 'mine') items = items.filter((p) => p.mine);
-    return { asOf: today, scope: query.scope, stats, items, truncated };
+    return {
+      asOf: today,
+      timeZone: clock.timeZone,
+      scope: query.scope,
+      stats,
+      items,
+      truncated,
+    };
   }
 
   /** Compteurs par projet, en une agrégation (index `organizationId, projectId, …`). */
@@ -174,12 +187,10 @@ export class WorkPortfolioService {
     organizationId: string,
     projectIds: readonly string[],
     userId: string,
-    today: string,
+    clock: WorkOrgClock,
   ): Promise<TaskCounters[]> {
     if (projectIds.length === 0) return [];
-    const overdue = {
-      $and: [{ $eq: ['$done', false] }, { $ne: ['$dueDate', null] }, { $lt: ['$dueDate', today] }],
-    };
+    const overdue = { $and: [{ $eq: ['$done', false] }, overdueExpr(clock)] };
     return this.tasks
       .aggregate<TaskCounters>([
         { $match: { organizationId, projectId: { $in: [...projectIds] } } },
@@ -217,10 +228,10 @@ export class WorkPortfolioService {
   /** Chiffres de l'organisation, projets non archivés (quel que soit le filtre). */
   private async stats(
     organizationId: string,
-    today: string,
+    clock: WorkOrgClock,
     scope: WorkProjectScope,
   ): Promise<WorkPortfolioStats> {
-    const weekStart = kinshasaWeekStart(today);
+    const weekStart = kinshasaWeekStart(clock.today);
     const open = await this.projects
       .find(
         { organizationId, status: { $ne: 'archived' }, ...projectDocFilter(scope) },
@@ -238,7 +249,7 @@ export class WorkPortfolioService {
           organizationId,
           projectId: { $in: ids },
           done: false,
-          dueDate: { $ne: null, $lt: today },
+          ...overdueFilter(clock),
         })
         .exec(),
       this.tasks
@@ -246,7 +257,8 @@ export class WorkPortfolioService {
           organizationId,
           projectId: { $in: ids },
           done: true,
-          completedAt: { $gte: kinshasaDayStartInstant(weekStart) },
+          // ADR-0080 : lundi 0 h dans le fuseau de l'organisation.
+          completedAt: { $gte: zonedInstant(weekStart, '00:00', clock.timeZone) },
         })
         .exec(),
     ]);

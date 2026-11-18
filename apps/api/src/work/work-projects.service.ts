@@ -9,7 +9,6 @@
 
 import {
   WORK_LIMITS,
-  kinshasaDayOf,
   type CreateWorkProjectBody,
   type ListWorkProjectsQuery,
   type UpdateWorkProjectBody,
@@ -27,13 +26,17 @@ import { AuditService } from '../authz/audit.service.js';
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/time-cursor.js';
 import { escapeRegex, normalizeForSearch, searchKeyOf } from '../sales/search.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
+import { WorkClockService } from './work-clock.service.js';
 import {
   actorCan,
+  checkFinalDates,
   conflict,
+  finalTimes,
   forbidden,
   invalid,
   invalidCursor,
   iso,
+  overdueExpr,
   isWorkId,
   notFound,
   oid,
@@ -101,6 +104,8 @@ export class WorkProjectsService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    // ADR-0080 : fuseau de l'organisation (retards à l'heure).
+    @Inject(WorkClockService) private readonly clock: WorkClockService,
     // ADR-0076 § 5 : dernier statut déclaré (Aperçu, portefeuille).
     @InjectModel(WorkProjectStatusUpdate.name)
     private readonly statuses: Model<WorkProjectStatusUpdateDocument>,
@@ -251,7 +256,7 @@ export class WorkProjectsService {
   ): Promise<WorkProjectSummary[]> {
     if (docs.length === 0) return [];
     const ids = docs.map((d) => String(d._id));
-    const today = kinshasaDayOf(new Date());
+    const clock = await this.clock.clockOf(organizationId);
     const [counters, milestones, owners, customers] = await Promise.all([
       this.tasks
         .aggregate<{ _id: string } & Counters>([
@@ -263,17 +268,7 @@ export class WorkProjectsService {
               done: { $sum: { $cond: [{ $eq: ['$done', true] }, 1, 0] } },
               overdue: {
                 $sum: {
-                  $cond: [
-                    {
-                      $and: [
-                        { $eq: ['$done', false] },
-                        { $ne: ['$dueDate', null] },
-                        { $lt: ['$dueDate', today] },
-                      ],
-                    },
-                    1,
-                    0,
-                  ],
+                  $cond: [{ $and: [{ $eq: ['$done', false] }, overdueExpr(clock)] }, 1, 0],
                 },
               },
             },
@@ -281,7 +276,13 @@ export class WorkProjectsService {
         ])
         .exec(),
       this.tasks
-        .aggregate<{ _id: string; taskId: unknown; title: string; dueDate: string }>([
+        .aggregate<{
+          _id: string;
+          taskId: unknown;
+          title: string;
+          dueDate: string;
+          dueTime: string | null;
+        }>([
           {
             $match: {
               organizationId,
@@ -291,13 +292,16 @@ export class WorkProjectsService {
               dueDate: { $ne: null },
             },
           },
-          { $sort: { dueDate: 1, number: 1 } },
+          // ADR-0080 : le même jour, une heure passe avant « toute la journée ».
+          { $addFields: { _dueTimeSort: { $ifNull: ['$dueTime', '99:99'] } } },
+          { $sort: { dueDate: 1, _dueTimeSort: 1, number: 1 } },
           {
             $group: {
               _id: '$projectId',
               taskId: { $first: '$_id' },
               title: { $first: '$title' },
               dueDate: { $first: '$dueDate' },
+              dueTime: { $first: '$dueTime' },
             },
           },
         ])
@@ -323,10 +327,19 @@ export class WorkProjectsService {
         customerName: d.links?.customerId ? (customers.get(d.links.customerId) ?? null) : null,
         startDate: d.startDate ?? null,
         dueDate: d.dueDate ?? null,
+        startTime: d.startTime ?? null,
+        dueTime: d.dueTime ?? null,
         openTaskCount: c?.open ?? 0,
         overdueTaskCount: c?.overdue ?? 0,
         doneTaskCount: c?.done ?? 0,
-        nextMilestone: m ? { taskId: String(m.taskId), title: m.title, dueDate: m.dueDate } : null,
+        nextMilestone: m
+          ? {
+              taskId: String(m.taskId),
+              title: m.title,
+              dueDate: m.dueDate,
+              dueTime: m.dueTime ?? null,
+            }
+          : null,
         updatedAt: new Date(d.updatedAt).toISOString(),
       };
     });
@@ -364,6 +377,9 @@ export class WorkProjectsService {
       owner: d.ownerUserId ? WorkMembersService.refOf(owners, d.ownerUserId) : null,
       startDate: d.startDate ?? null,
       dueDate: d.dueDate ?? null,
+      // ADR-0080 : heures facultatives (fuseau de l'organisation).
+      startTime: d.startTime ?? null,
+      dueTime: d.dueTime ?? null,
       links: {
         customerId: links.customerId ?? null,
         customerName: links.customerId ? (customers.get(links.customerId) ?? null) : null,
@@ -525,6 +541,8 @@ export class WorkProjectsService {
       deputyUserId,
       startDate: body.startDate ?? null,
       dueDate: body.dueDate ?? null,
+      startTime: body.startDate ? (body.startTime ?? null) : null,
+      dueTime: body.dueDate ? (body.dueTime ?? null) : null,
       links,
       source: null,
       columns,
@@ -616,11 +634,13 @@ export class WorkProjectsService {
     }
     const startDate = body.startDate !== undefined ? body.startDate : current.startDate;
     const dueDate = body.dueDate !== undefined ? body.dueDate : current.dueDate;
-    if (startDate && dueDate && dueDate < startDate) {
-      invalid('dueDate', 'WORK_DATES_INVERTED', 'L’échéance précède la date de début.');
-    }
+    // ADR-0080 : heures retenues (effacer un jour efface son heure), puis ordre final.
+    const times = finalTimes(body, current);
+    checkFinalDates({ startDate, dueDate, ...times });
     if (body.startDate !== undefined) assign('startDate', body.startDate);
     if (body.dueDate !== undefined) assign('dueDate', body.dueDate);
+    if (times.startTime !== (current.startTime ?? null)) assign('startTime', times.startTime);
+    if (times.dueTime !== (current.dueTime ?? null)) assign('dueTime', times.dueTime);
     if (body.links !== undefined) {
       const links = {
         customerId:

@@ -17,7 +17,8 @@ describe('notifications — contrats partagés', () => {
     // statut du projet).
     // ADR-0079 § 3 : seize types work de plus et le test de la cloche (organisation).
     // ADR-0079 § 3 bis : quatre types des membres externes.
-    expect(NOTIFICATION_KINDS).toHaveLength(86);
+    // ADR-0080 : rappel « échéance dans 1 h ».
+    expect(NOTIFICATION_KINDS).toHaveLength(87);
     for (const kind of NOTIFICATION_KINDS) {
       if (kind === 'platform.announcement') continue;
       const module = kind.split('.')[0]!;

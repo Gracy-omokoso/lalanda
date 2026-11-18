@@ -10,6 +10,11 @@
 // importe ce module et réutilise `WorkProjectsService`, `WorkTasksService`,
 // `WorkActivityService` et `WorkMembersService`, exportés ci-dessous.
 
+import {
+  OrganizationSettings,
+  OrganizationSettingsSchema,
+} from '../organization-space/organization-settings.schema.js';
+import { WorkClockService } from './work-clock.service.js';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
@@ -180,6 +185,8 @@ import {
       { name: WorkExternalChallenge.name, schema: WorkExternalChallengeSchema },
       { name: WorkExternalSession.name, schema: WorkExternalSessionSchema },
       { name: WorkExternalNotification.name, schema: WorkExternalNotificationSchema },
+      // ADR-0080 : fuseau de l'organisation (lecture seule, écrit par organization-space).
+      { name: OrganizationSettings.name, schema: OrganizationSettingsSchema },
     ]),
   ],
   controllers: [
@@ -210,6 +217,8 @@ import {
     WorkAiPlanController,
   ],
   providers: [
+    // ADR-0080 : horloge de l'organisation (fuseau, « aujourd'hui »).
+    WorkClockService,
     WorkMembersService,
     WorkActivityService,
     WorkNotifier,
@@ -259,6 +268,7 @@ import {
     WorkExternalNotifier,
   ],
   exports: [
+    WorkClockService,
     WorkExternalLifecycle,
     WorkExternalNotifier,
     WorkTimeService,

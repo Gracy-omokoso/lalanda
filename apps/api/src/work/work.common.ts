@@ -11,6 +11,7 @@ import {
   NotFoundException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
+import { datesInverted } from '@lalanda/shared/work';
 import { Types } from 'mongoose';
 
 import type { CurrentOrgPermissionsValue } from '../authz/current-org-permissions.decorator.js';
@@ -168,4 +169,92 @@ export class WorkIdPipe {
   transform(value: unknown): unknown {
     return typeof value === 'string' && isObjectIdHex(value) ? value.toLowerCase() : value;
   }
+}
+
+// ── ADR-0080 : heures de début et d'échéance ─────────────────────────────────
+
+/**
+ * ADR-0080 : heures retenues après une modification partielle. Une heure absente
+ * du corps garde la valeur stockée, sauf si le corps efface son jour (`null`) :
+ * l'heure part avec lui. Une heure posée alors que le jour final manque est
+ * refusée `WORK_TIME_WITHOUT_DATE`.
+ */
+export function finalTimes(
+  body: {
+    startDate?: string | null;
+    dueDate?: string | null;
+    startTime?: string | null;
+    dueTime?: string | null;
+  },
+  current: {
+    startDate?: string | null;
+    dueDate?: string | null;
+    startTime?: string | null;
+    dueTime?: string | null;
+  },
+): { startTime: string | null; dueTime: string | null } {
+  const pick = (time: 'startTime' | 'dueTime', day: 'startDate' | 'dueDate'): string | null => {
+    const finalDay = body[day] !== undefined ? body[day] : (current[day] ?? null);
+    if (body[time] !== undefined && body[time] !== null) {
+      if (!finalDay) invalid(time, 'WORK_TIME_WITHOUT_DATE', 'Une heure exige une date.');
+      return body[time];
+    }
+    if (body[time] === null || !finalDay) return null;
+    return current[time] ?? null;
+  };
+  return { startTime: pick('startTime', 'startDate'), dueTime: pick('dueTime', 'dueDate') };
+}
+
+/** ADR-0080 : échéance (jour + heure) ≥ début (jour + heure), état final. */
+export function checkFinalDates(v: {
+  startDate: string | null;
+  dueDate: string | null;
+  startTime: string | null;
+  dueTime: string | null;
+}): void {
+  if (datesInverted(v)) {
+    const sameDay = v.startDate === v.dueDate;
+    invalid(
+      sameDay ? 'dueTime' : 'dueDate',
+      'WORK_DATES_INVERTED',
+      sameDay
+        ? 'L’heure d’échéance précède l’heure de début.'
+        : 'L’échéance précède la date de début.',
+    );
+  }
+}
+
+/**
+ * ADR-0080 : filtre Mongo « échéance dépassée » vu de l'horloge de
+ * l'organisation — jour passé, ou jour même et heure atteinte. Sans heure, la
+ * règle d'avant (`dueDate < aujourd'hui`).
+ */
+export function overdueFilter(clock: { today: string; time: string }): Record<string, unknown> {
+  return {
+    $or: [
+      { dueDate: { $ne: null, $lt: clock.today } },
+      { dueDate: clock.today, dueTime: { $ne: null, $lte: clock.time } },
+    ],
+  };
+}
+
+/** ADR-0080 : même règle en expression d'agrégation (`$cond`, `$expr`). */
+export function overdueExpr(clock: { today: string; time: string }): Record<string, unknown> {
+  return {
+    $and: [
+      { $ne: ['$dueDate', null] },
+      {
+        $or: [
+          { $lt: ['$dueDate', clock.today] },
+          {
+            $and: [
+              { $eq: ['$dueDate', clock.today] },
+              { $ne: [{ $ifNull: ['$dueTime', null] }, null] },
+              { $lte: ['$dueTime', clock.time] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
 }

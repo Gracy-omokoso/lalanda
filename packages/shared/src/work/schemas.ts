@@ -42,6 +42,8 @@ import { workBehaviorFields } from './behavior.js';
 import { WORK_CARD_COLORS } from './card-colors.js';
 // ADR-0076 : collaborateurs, validation, liste de contrôle, statut du projet.
 import { WORK_COLLAB_LIMITS } from './roles.js';
+// ADR-0080 : heures facultatives de début et d'échéance.
+import { WorkTime, datesInverted } from './time.js';
 
 type RawIssue = z.core.$ZodRawIssue;
 type Ctx = z.RefinementCtx;
@@ -147,10 +149,46 @@ const expectedRevision = z
 export const WorkExpectedRevisionBody = z.object({ expectedRevision }).strict();
 export type WorkExpectedRevisionBody = z.output<typeof WorkExpectedRevisionBody>;
 
-/** `dueDate ≥ startDate` quand les deux sont fournis (`WORK_DATES_INVERTED`). */
-function checkDates(v: { startDate?: string | null; dueDate?: string | null }, ctx: Ctx): void {
-  if (v.startDate && v.dueDate && v.dueDate < v.startDate) {
-    issue(ctx, ['dueDate'], 'WORK_DATES_INVERTED', 'L’échéance précède la date de début.');
+/** Heure facultative (ADR-0080) : `HH:mm` sur 24 h, `null` la retire. */
+const optionalTime = WorkTime.nullable().optional();
+
+/**
+ * `dueDate ≥ startDate` quand les deux sont fournis (`WORK_DATES_INVERTED`) ;
+ * ADR-0080 : le même jour, l'heure d'échéance ne précède pas l'heure de début.
+ * Une heure sans son jour est refusée `WORK_TIME_WITHOUT_DATE` : à la création
+ * dès que le jour manque, en modification quand le corps efface le jour
+ * (`null`) en posant une heure — un jour absent du corps est revérifié par le
+ * service contre l'état stocké.
+ */
+function checkDates(
+  v: {
+    startDate?: string | null;
+    dueDate?: string | null;
+    startTime?: string | null;
+    dueTime?: string | null;
+  },
+  ctx: Ctx,
+  creating = false,
+): void {
+  if (datesInverted(v)) {
+    const sameDay = v.startDate === v.dueDate;
+    issue(
+      ctx,
+      [sameDay ? 'dueTime' : 'dueDate'],
+      'WORK_DATES_INVERTED',
+      sameDay
+        ? 'L’heure d’échéance précède l’heure de début.'
+        : 'L’échéance précède la date de début.',
+    );
+  }
+  for (const [time, day] of [
+    ['startTime', 'startDate'],
+    ['dueTime', 'dueDate'],
+  ] as const) {
+    if (!v[time]) continue;
+    if (v[day] === null || (creating && !v[day])) {
+      issue(ctx, [time], 'WORK_TIME_WITHOUT_DATE', 'Une heure exige une date.');
+    }
   }
 }
 
@@ -292,6 +330,9 @@ const projectFields = {
   deputyUserId: WorkId.nullable().optional(),
   startDate: WorkDay.nullable().optional(),
   dueDate: WorkDay.nullable().optional(),
+  // ADR-0080 : heures facultatives, fuseau de l'organisation.
+  startTime: optionalTime,
+  dueTime: optionalTime,
   links: WorkProjectLinksSchema.optional(),
   // ADR-0060 § 3 : absente à la création, la visibilité par défaut des réglages.
   visibility: z
@@ -319,7 +360,7 @@ export const CreateWorkProjectBody = z
   .object({ ...projectFields, columns: WorkColumnsSchema.optional() })
   .strict()
   .superRefine((v, ctx) => {
-    checkDates(v, ctx);
+    checkDates(v, ctx, true);
     checkLeads(v, ctx);
   });
 export type CreateWorkProjectBody = z.output<typeof CreateWorkProjectBody>;
@@ -341,6 +382,8 @@ export const UpdateWorkProjectBody = z
     deputyUserId: projectFields.deputyUserId,
     startDate: projectFields.startDate,
     dueDate: projectFields.dueDate,
+    startTime: projectFields.startTime,
+    dueTime: projectFields.dueTime,
     links: projectFields.links,
     columns: WorkColumnsSchema.optional(),
     visibility: projectFields.visibility,
@@ -371,6 +414,8 @@ export const CreateProjectFromQuoteBody = z
       .object({
         title: requiredText(WORK_LIMITS.milestoneTitleMax, 'Titre du jalon'),
         dueDate: WorkDay,
+        // ADR-0080 : heure facultative du jalon.
+        dueTime: WorkTime.nullable().optional(),
       })
       .strict()
       .optional(),
@@ -416,6 +461,9 @@ const taskFields = {
     .optional(),
   startDate: WorkDay.nullable().optional(),
   dueDate: WorkDay.nullable().optional(),
+  // ADR-0080 : heures facultatives, fuseau de l'organisation.
+  startTime: optionalTime,
+  dueTime: optionalTime,
   isMilestone: z.boolean(fr('Vrai ou faux attendu.')).optional(),
   estimateMinutes: z
     .number(fr('Estimation : un nombre de minutes.'))
@@ -440,13 +488,21 @@ const taskFields = {
 
 /** Jalon : pas de date de début (durée nulle) ; échéance exigée à la création. */
 function checkMilestone(
-  v: { isMilestone?: boolean; startDate?: string | null; dueDate?: string | null },
+  v: {
+    isMilestone?: boolean;
+    startDate?: string | null;
+    dueDate?: string | null;
+    startTime?: string | null;
+  },
   ctx: Ctx,
   creating: boolean,
 ): void {
   if (v.isMilestone !== true) return;
   if (v.startDate) {
     issue(ctx, ['startDate'], 'WORK_MILESTONE_HAS_START', 'Un jalon n’a pas de date de début.');
+  }
+  if (v.startTime) {
+    issue(ctx, ['startTime'], 'WORK_MILESTONE_HAS_START', 'Un jalon n’a pas d’heure de début.');
   }
   if ((creating && !v.dueDate) || v.dueDate === null) {
     issue(ctx, ['dueDate'], 'WORK_MILESTONE_NEEDS_DATE', 'Un jalon exige une échéance.');
@@ -466,7 +522,7 @@ export const CreateWorkTaskBody = z
   })
   .strict()
   .superRefine((v, ctx) => {
-    checkDates(v, ctx);
+    checkDates(v, ctx, true);
     checkMilestone(v, ctx, true);
     if (v.isMilestone === true && v.parentTaskId) {
       issue(ctx, ['parentTaskId'], 'WORK_SUBTASK_DEPTH', 'Un jalon n’est pas une sous-tâche.');
@@ -489,6 +545,8 @@ export const PatchWorkTaskBody = z
     labelKeys: taskFields.labelKeys,
     startDate: taskFields.startDate,
     dueDate: taskFields.dueDate,
+    startTime: taskFields.startTime,
+    dueTime: taskFields.dueTime,
     isMilestone: taskFields.isMilestone,
     estimateMinutes: taskFields.estimateMinutes,
     color: taskFields.color,

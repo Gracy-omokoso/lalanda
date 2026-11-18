@@ -9,6 +9,7 @@
 // Il ne DÉCIDE pas non plus des autorisations : il appelle `can()` (ADR-0012 §8)
 // et n'écrit aucun `if (role === …)`.
 
+import { workTimeZoneOr } from '@lalanda/shared/work';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
@@ -41,6 +42,7 @@ import {
 import {
   DEFAULT_ORGANIZATION_SETTINGS,
   DISPLAY_CURRENCIES,
+  TIME_ZONE_OPTIONS,
   type ComptabiliteSection,
   type DisplayCurrency,
   type GouvernanceSection,
@@ -103,8 +105,9 @@ export class OrganizationSpaceService {
       type: org.type,
       pays: org.pays,
       deviseAffichage: reglages?.deviseAffichage ?? DEFAULT_ORGANIZATION_SETTINGS.deviseAffichage,
+      fuseauHoraire: workTimeZoneOr(reglages?.fuseauHoraire),
       updatedAt: reglages?.updatedAt ? new Date(reglages.updatedAt).toISOString() : null,
-      options: { currencies: DISPLAY_CURRENCIES },
+      options: { currencies: DISPLAY_CURRENCIES, timeZones: TIME_ZONE_OPTIONS },
     };
   }
 
@@ -136,6 +139,8 @@ export class OrganizationSpaceService {
         {
           $set: {
             deviseAffichage: input.deviseAffichage,
+            // ADR-0080 : absent du corps → fuseau inchangé.
+            ...(input.fuseauHoraire !== undefined ? { fuseauHoraire: input.fuseauHoraire } : {}),
             // `logoUrl` n'est plus écrit (ADR-0028, décision ouverte n° 6) : une
             // valeur déjà en base reste telle quelle.
             updatedBy: actorUserId,

@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { WORK_RATE_CURRENCIES } from './constants.js';
 import { WorkDay, WorkId } from './schemas.js';
 import type { WorkMemberRef } from './views.js';
+import type { WorkTimeZone } from './time.js';
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 
@@ -513,6 +514,10 @@ export interface PortalProjectSummary {
   status: string;
   startDate: string | null;
   dueDate: string | null;
+  /** ADR-0080 : heures facultatives, lues dans `timeZone` (fuseau de l'organisation). */
+  startTime?: string | null;
+  dueTime?: string | null;
+  timeZone?: WorkTimeZone;
   /** Nom du chef de projet, seul membre interne nommé. */
   leadName: string | null;
   /** Tâches visibles par l'appelant. */
@@ -530,6 +535,8 @@ export interface PortalTaskSummary {
   /** `todo` | `in_progress` | `done`. */
   stage: string;
   dueDate: string | null;
+  /** ADR-0080 : heure d'échéance facultative (fuseau du projet). */
+  dueTime?: string | null;
   isMilestone: boolean;
   /** Consultant : la tâche est la sienne (responsable ou collaborateur). */
   mine: boolean;
@@ -568,6 +575,8 @@ export interface PortalTaskView {
   task: PortalTaskSummary;
   projectId: string;
   projectName: string;
+  /** ADR-0080 : fuseau de l'organisation (heure d'échéance). */
+  timeZone?: WorkTimeZone;
   description: string | null;
   clientApproval: {
     required: boolean;

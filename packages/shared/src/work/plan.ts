@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { WORK_LIMITS, WORK_PRIORITIES, WORK_PROJECT_KINDS } from './constants.js';
 import { addDays, detectCycle, isCalendarDay } from './scheduling.js';
 import { WorkDay, WorkId } from './schemas.js';
+import { WorkTime, datesInverted } from './time.js';
 
 // ── Bornes ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,9 @@ export const WorkPlanTaskSchema = z
     assigneeUserId: WorkId.nullable().optional(),
     startDate: WorkDay.nullable().optional(),
     dueDate: WorkDay.nullable().optional(),
+    // ADR-0080 : heures facultatives (fuseau de l'organisation).
+    startTime: WorkTime.nullable().optional(),
+    dueTime: WorkTime.nullable().optional(),
     priority: z.enum(WORK_PRIORITIES, { error: 'Priorité inconnue.' }).optional(),
     isMilestone: z.boolean({ error: 'Vrai ou faux attendu.' }).optional(),
     dependsOn: z
@@ -168,7 +172,7 @@ export function planProblems(tasks: readonly WorkPlanTask[]): WorkPlanProblem[] 
     byRef.set(t.ref, t);
   });
   tasks.forEach((t, index) => {
-    if (t.startDate && t.dueDate && t.dueDate < t.startDate) {
+    if (datesInverted(t)) {
       out.push({
         index,
         field: 'dueDate',
@@ -176,8 +180,21 @@ export function planProblems(tasks: readonly WorkPlanTask[]): WorkPlanProblem[] 
         message: 'L’échéance précède la date de début.',
       });
     }
+    for (const [time, day] of [
+      ['startTime', 'startDate'],
+      ['dueTime', 'dueDate'],
+    ] as const) {
+      if (t[time] && !t[day]) {
+        out.push({
+          index,
+          field: time,
+          code: 'WORK_TIME_WITHOUT_DATE',
+          message: 'Une heure exige une date.',
+        });
+      }
+    }
     if (t.isMilestone) {
-      if (t.startDate)
+      if (t.startDate || t.startTime)
         out.push({
           index,
           field: 'startDate',
@@ -345,6 +362,9 @@ export interface WorkImportRowView {
   assignee: { userId: string; name: string } | null;
   startDate: string | null;
   dueDate: string | null;
+  /** ADR-0080 : heures lues dans le fichier (« 2026-11-20 14:00 »). */
+  startTime?: string | null;
+  dueTime?: string | null;
   priority: (typeof WORK_PRIORITIES)[number];
   isMilestone: boolean;
   dependsOn: number[];

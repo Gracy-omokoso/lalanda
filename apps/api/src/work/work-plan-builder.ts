@@ -545,6 +545,9 @@ export class WorkPlanBuilder {
           labelKeys,
           startDate: t.isMilestone ? null : (t.startDate ?? null),
           dueDate: t.dueDate ?? null,
+          // ADR-0080 : heures lues dans le fichier (l'IA n'en propose pas).
+          startTime: t.isMilestone || !t.startDate ? null : (t.startTime ?? null),
+          dueTime: t.dueDate ? (t.dueTime ?? null) : null,
           isMilestone: t.isMilestone ?? false,
           estimateMinutes: t.estimateMinutes ?? null,
           ...(column ? { columnKey: column.key } : {}),
